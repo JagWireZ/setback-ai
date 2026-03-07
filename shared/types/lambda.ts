@@ -74,7 +74,10 @@ type LambdaPayloadForAction<TAction extends LambdaAction> =
     ? ActionPayloadMap[TAction]
     : ActionPayloadMap[TAction] & { playerToken: string }
 
-export type LambdaEventPayload<TAction extends LambdaAction = LambdaAction> = {
-  action: TAction
-  payload: LambdaPayloadForAction<TAction>
-}
+export type LambdaEventPayload<TAction extends LambdaAction = LambdaAction> =
+  TAction extends LambdaAction
+    ? {
+        action: TAction
+        payload: LambdaPayloadForAction<TAction>
+      }
+    : never
