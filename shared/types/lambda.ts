@@ -18,6 +18,7 @@ type PublicAction = 'createGame' | 'joinGame'
 type ActionPayloadMap = {
   createGame: {
     playerName: string
+    maxCards: CardCount
   }
   joinGame: {
     gameId: string

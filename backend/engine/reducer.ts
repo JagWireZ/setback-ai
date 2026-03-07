@@ -1,11 +1,9 @@
-import type { CardCount, Game, Player, PlayerToken, Score } from "@shared/types/game";
+import type { Game, Player, PlayerToken, Score } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { generateGameId } from "./helpers/generateGameId";
 import { generatePlayerId } from "./helpers/generatePlayerId";
 import { generatePlayerToken } from "./helpers/generatePlayerToken";
 import { generateRounds } from "./helpers/generateRounds";
-
-const DEFAULT_MAX_CARDS: CardCount = 10;
 
 export type PublicGameState = Omit<Game, "playerTokens" | "ownerToken">;
 
@@ -65,7 +63,7 @@ const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResul
     version: 1,
     ownerToken: hostPlayerToken.token,
     options: {
-      maxCards: DEFAULT_MAX_CARDS,
+      maxCards: event.payload.maxCards,
       blindBid: false,
       rounds: [],
     },

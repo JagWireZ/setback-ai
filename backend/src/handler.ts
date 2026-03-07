@@ -1,19 +1,32 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { LambdaEventPayload } from "@shared/types/lambda";
+import { engineReducer } from "../engine";
+import { assertCreateGamePayload } from "./validation/lambdaPayload";
 
 export const handler = async (
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const request = parseLambdaEvent(event);
-  const result = await handleAction(request);
+  try {
+    const request = parseLambdaEvent(event);
+    const result = await handleAction(request);
 
-  return {
-    statusCode: 200,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(result),
-  };
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(result),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unhandled error";
+    return {
+      statusCode: 400,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ error: message }),
+    };
+  }
 };
 
 const parseLambdaEvent = (event: APIGatewayProxyEvent): LambdaEventPayload => {
@@ -26,9 +39,12 @@ const parseLambdaEvent = (event: APIGatewayProxyEvent): LambdaEventPayload => {
 
 const handleAction = async (
   event: LambdaEventPayload,
-): Promise<{ action: LambdaEventPayload["action"]; ok: true }> => {
+): Promise<unknown> => {
   switch (event.action) {
-    case "createGame":
+    case "createGame": {
+      assertCreateGamePayload(event);
+      return engineReducer(undefined, event);
+    }
     case "joinGame":
     case "setOptions":
     case "startGame":
