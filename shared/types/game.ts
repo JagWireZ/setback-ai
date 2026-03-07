@@ -1,5 +1,5 @@
 // Card types
-export type Suit = 'Clubs' | 'Diamonds' | 'Hearts' | 'Spades'
+export type Suit = 'Clubs' | 'Diamonds' | 'Hearts' | 'Spades' | 'Joker'
 
 export type Rank =
   | 'A'
@@ -15,15 +15,13 @@ export type Rank =
   | 'J'
   | 'Q'
   | 'K'
+  | 'LJ'
+  | 'BJ'
 
-export type StandardCard = {
+export type Card = {
   rank: Rank
   suit: Suit
 }
-
-export type JokerCard = 'Big Joker' | 'Little Joker'
-
-export type Card = StandardCard | JokerCard
 
 // Round types
 export type CardCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
