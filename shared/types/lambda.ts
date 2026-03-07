@@ -25,34 +25,42 @@ type ActionPayloadMap = {
   }
   setOptions: {
     gameId: string
+    version: number
     maxCards: CardCount
     blindBid: boolean
   }
   startGame: {
     gameId: string
+    version: number
   }
   dealCards: {
     gameId: string
+    version: number
   }
   submitBid: {
     gameId: string
+    version: number
     bid: number
   }
   playCard: {
     gameId: string
+    version: number
     card: Card
   }
   movePlayer: {
     gameId: string
+    version: number
     playerId: string
     direction: string
   }
   removePlayer: {
     gameId: string
+    version: number
     playerId: string
   }
   reconnectPlayer: {
     gameId: string
+    version: number
   }
   getGameState: {
     gameId: string

@@ -24,21 +24,26 @@ export const engineReducer = (
       return joinGame(game, event);
     case "setOptions":
       requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
       return setOptions(game, event);
     case "startGame":
     case "dealCards":
     case "submitBid":
     case "playCard":
       requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
       return toResult(requireGame(game));
     case "movePlayer":
       requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
       return movePlayer(game, event);
     case "removePlayer":
       requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
       return removePlayer(game, event);
     case "reconnectPlayer":
       requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
       return toResult(requireGame(game));
     case "getGameState":
       requirePlayerToken(game, event.payload.playerToken);
@@ -193,6 +198,13 @@ const requirePlayerToken = (game: Game | undefined, playerToken: string): void =
   const hasPlayer = existingGame.playerTokens.some((entry) => entry.token === playerToken);
   if (!hasPlayer) {
     throw new Error("Invalid player token");
+  }
+};
+
+const requireVersion = (game: Game | undefined, version: number): void => {
+  const existingGame = requireGame(game);
+  if (version !== existingGame.version) {
+    throw new Error("Version mismatch");
   }
 };
 
