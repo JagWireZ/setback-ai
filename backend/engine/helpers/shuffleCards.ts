@@ -1,29 +1,36 @@
 import type { Card, Rank, Suit } from "@shared/types/game";
 
-const SUITS: Suit[] = ["Clubs", "Diamonds", "Hearts", "Spades"];
-const RANKS: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const STANDARD_SUITS: Exclude<Suit, "Joker">[] = ["Clubs", "Diamonds", "Hearts", "Spades"];
+const STANDARD_RANKS: Exclude<Rank, "LJ" | "BJ">[] = [
+  "A",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "J",
+  "Q",
+  "K",
+];
 const JOKERS: Card[] = [
-  {
-    suit: 'Joker',
-    rank: 'LJ',
-  },
-  {
-    suit: 'Joker',
-    rank: 'BJ',
-  },
-]
+  { suit: "Joker", rank: "LJ" },
+  { suit: "Joker", rank: "BJ" },
+];
 
 const createDeck = (): Card[] => {
-  let standardDeck: Card[] = [];
+  const standardDeck: Card[] = [];
 
-  for (const suit of SUITS) {
-    for (const rank of RANKS) {
-      standardDeck = [ ...standardDeck, { rank, suit }];
+  for (const suit of STANDARD_SUITS) {
+    for (const rank of STANDARD_RANKS) {
+      standardDeck.push({ rank, suit });
     }
   }
 
-  standardDeck = [ ...standardDeck, ...JOKERS ];
-  return standardDeck;
+  return [...standardDeck, ...JOKERS];
 };
 
 export const shuffleCards = (): Card[] => {
