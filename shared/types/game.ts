@@ -87,6 +87,7 @@ export type Game = {
   id: string
   options: Options
   players: Player[]
+  playerOrder: string[]
   scores: Score[]
   activeRound?: ActiveRound
 }
