@@ -23,6 +23,11 @@ export type Card = {
   suit: Suit
 }
 
+export type Hand = {
+  playerId: string
+  cards: Card[]
+}
+
 // Round types
 export type CardCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
 export type RoundDirection = 'up' | 'down'
@@ -52,14 +57,18 @@ export type Trick = {
 }
 
 export type ActiveRound = Round & {
-  roundNumber: number
   phase: RoundPhase
   turnPlayerId: string
   dealerPlayerId: string
   trickIndex: number
   bids: Bid[]
-  currentTrick?: Trick
-  completedTricks: Trick[]
+  cards: {
+    deck: Card[]
+    trump: Card
+    hands: Hand[]
+    currentTrick?: Trick
+    completedTricks: Trick[]
+  }
 }
 
 // Player types
@@ -78,6 +87,7 @@ export type PlayerToken = {
 
 export type Options = {
   maxCards: CardCount
+  blindBid: boolean
 }
 
 export type Score = {
