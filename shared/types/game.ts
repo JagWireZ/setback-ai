@@ -90,6 +90,7 @@ export type Score = {
 export type Game = {
   id: string
   version: number
+  ownerToken: string
   options: Options
   players: Player[]
   playerTokens: PlayerToken[]

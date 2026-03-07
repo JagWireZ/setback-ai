@@ -6,7 +6,7 @@ import { generatePlayerToken } from "./helpers/generatePlayerToken";
 
 const DEFAULT_MAX_CARDS: CardCount = 10;
 
-export type PublicGameState = Omit<Game, "playerTokens">;
+export type PublicGameState = Omit<Game, "playerTokens" | "ownerToken">;
 
 export type EngineReducerResult = {
   game?: PublicGameState;
@@ -23,10 +23,13 @@ export const engineReducer = (
     case "joinGame":
       return joinGame(game, event);
     case "setOptions":
-      requirePlayerToken(game, event.payload.playerToken);
+      requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
       return setOptions(game, event);
     case "startGame":
+      requireOwnerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
+      return toResult(requireGame(game));
     case "dealCards":
     case "submitBid":
     case "playCard":
@@ -34,11 +37,11 @@ export const engineReducer = (
       requireVersion(game, event.payload.version);
       return toResult(requireGame(game));
     case "movePlayer":
-      requirePlayerToken(game, event.payload.playerToken);
+      requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
       return movePlayer(game, event);
     case "removePlayer":
-      requirePlayerToken(game, event.payload.playerToken);
+      requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
       return removePlayer(game, event);
     case "reconnectPlayer":
@@ -59,6 +62,7 @@ const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResul
   const game: Game = {
     id: generateGameId(),
     version: 1,
+    ownerToken: hostPlayerToken.token,
     options: {
       maxCards: DEFAULT_MAX_CARDS,
     },
@@ -201,6 +205,13 @@ const requirePlayerToken = (game: Game | undefined, playerToken: string): void =
   }
 };
 
+const requireOwnerToken = (game: Game | undefined, playerToken: string): void => {
+  const existingGame = requireGame(game);
+  if (existingGame.ownerToken !== playerToken) {
+    throw new Error("Owner token required");
+  }
+};
+
 const requireVersion = (game: Game | undefined, version: number): void => {
   const existingGame = requireGame(game);
   if (version !== existingGame.version) {
@@ -232,7 +243,7 @@ const withNextVersion = (game: Game, patch: Partial<Game>): Game => ({
 });
 
 const toPublicGameState = (game: Game): PublicGameState => {
-  const { playerTokens: _playerTokens, ...publicGame } = game;
+  const { playerTokens: _playerTokens, ownerToken: _ownerToken, ...publicGame } = game;
   return publicGame;
 };
 
