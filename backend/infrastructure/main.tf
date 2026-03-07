@@ -2,10 +2,17 @@ provider "aws" {
   region  = var.aws_region
 }
 
+locals {
+  dist_files = fileset("${path.module}/../dist", "**")
+  dist_hash = sha256(
+    join("", [for file in local.dist_files : filesha256("${path.module}/../dist/${file}")]),
+  )
+}
+
 data "archive_file" "lambda_package" {
   type        = "zip"
   source_dir  = "${path.module}/.."
-  output_path = "/tmp/setback-backend-lambda.zip"
+  output_path = "/tmp/setback-backend-lambda-${local.dist_hash}.zip"
 
   excludes = [
     ".git",
@@ -85,6 +92,7 @@ resource "aws_lambda_function" "backend" {
   function_name = var.lambda_function_name
   role          = aws_iam_role.lambda_execution.arn
   runtime       = "nodejs20.x"
+  description   = "setback-backend-${substr(local.dist_hash, 0, 12)}"
 
   # TypeScript compiles to dist/backend/src/handler.js in this project.
   handler = "dist/backend/src/handler.handler"

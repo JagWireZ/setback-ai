@@ -4,10 +4,13 @@ import { engineReducer } from "../engine";
 import { assertCreateGamePayload } from "./validation/lambdaPayload";
 
 export const handler = async (
-  event: LambdaFunctionURLEvent,
+  event: LambdaFunctionURLEvent
 ): Promise<LambdaFunctionURLResult> => {
   try {
-    const request = parseLambdaEvent(event);
+    const body = event.body ? JSON.parse(event.body) : {};
+    const { action, data } = body;
+
+    const request = parseLambdaEvent(action, data);
     const result = await handleAction(request);
 
     return {
@@ -29,12 +32,15 @@ export const handler = async (
   }
 };
 
-const parseLambdaEvent = (event: LambdaFunctionURLEvent): LambdaEventPayload => {
-  if (!event.body) {
-    throw new Error("Missing request body");
+const parseLambdaEvent = (action: unknown, data: unknown): LambdaEventPayload => {
+  if (typeof action !== "string") {
+    throw new Error("Missing request action");
   }
 
-  return JSON.parse(event.body) as LambdaEventPayload;
+  return {
+    action: action as LambdaEventPayload["action"],
+    payload: data as LambdaEventPayload["payload"],
+  } as LambdaEventPayload;
 };
 
 const handleAction = async (
