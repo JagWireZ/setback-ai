@@ -67,9 +67,13 @@ export type PlayerType = 'ai' | 'human'
 
 export type Player = {
   id: string
-  token: string
   name: string
   type: PlayerType
+}
+
+export type PlayerToken = {
+  playerId: string
+  token: string
 }
 
 export type Options = {
@@ -88,6 +92,7 @@ export type Game = {
   version: number
   options: Options
   players: Player[]
+  playerTokens: PlayerToken[]
   playerOrder: string[]
   scores: Score[]
   activeRound?: ActiveRound

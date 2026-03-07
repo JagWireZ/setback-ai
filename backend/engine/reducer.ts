@@ -1,4 +1,4 @@
-import type { CardCount, Game, Player, Score } from "@shared/types/game";
+import type { CardCount, Game, Player, PlayerToken, Score } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { generateGameId } from "./helpers/generateGameId";
 import { generatePlayerId } from "./helpers/generatePlayerId";
@@ -6,10 +6,17 @@ import { generatePlayerToken } from "./helpers/generatePlayerToken";
 
 const DEFAULT_MAX_CARDS: CardCount = 10;
 
+export type PublicGameState = Omit<Game, "playerTokens">;
+
+export type EngineReducerResult = {
+  game: PublicGameState;
+  playerToken?: string;
+};
+
 export const engineReducer = (
   game: Game | undefined,
   event: LambdaEventPayload,
-): Game => {
+): EngineReducerResult => {
   switch (event.action) {
     case "createGame":
       return createGame(event);
@@ -23,7 +30,7 @@ export const engineReducer = (
     case "submitBid":
     case "playCard":
       requirePlayerToken(game, event.payload.playerToken);
-      return requireGame(game);
+      return toResult(requireGame(game));
     case "movePlayer":
       requirePlayerToken(game, event.payload.playerToken);
       return movePlayer(game, event);
@@ -33,55 +40,74 @@ export const engineReducer = (
     case "reconnectPlayer":
     case "getGameState":
       requirePlayerToken(game, event.payload.playerToken);
-      return requireGame(game);
+      return toResult(requireGame(game));
     default:
       return assertNever(event);
   }
 };
 
-const createGame = (event: LambdaEventPayload<"createGame">): Game => {
+const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResult => {
   const hostPlayer = buildPlayer(event.payload.playerName);
-  return {
+  const hostPlayerToken = buildPlayerToken(hostPlayer.id);
+  const game: Game = {
     id: generateGameId(),
     version: 1,
     options: {
       maxCards: DEFAULT_MAX_CARDS,
     },
     players: [hostPlayer],
+    playerTokens: [hostPlayerToken],
     playerOrder: [hostPlayer.id],
     scores: [buildScore(hostPlayer.id)],
   };
+
+  return toResult(game, hostPlayerToken.token);
 };
 
-const joinGame = (game: Game | undefined, event: LambdaEventPayload<"joinGame">): Game => {
+const joinGame = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"joinGame">,
+): EngineReducerResult => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
   const nextPlayer = buildPlayer(event.payload.playerName);
-  return withNextVersion(existingGame, {
+  const nextPlayerToken = buildPlayerToken(nextPlayer.id);
+  const updatedGame = withNextVersion(existingGame, {
     players: [...existingGame.players, nextPlayer],
+    playerTokens: [...existingGame.playerTokens, nextPlayerToken],
     playerOrder: [...existingGame.playerOrder, nextPlayer.id],
     scores: [...existingGame.scores, buildScore(nextPlayer.id)],
   });
+
+  return toResult(updatedGame, nextPlayerToken.token);
 };
 
-const setOptions = (game: Game | undefined, event: LambdaEventPayload<"setOptions">): Game => {
+const setOptions = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"setOptions">,
+): EngineReducerResult => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
-  return withNextVersion(existingGame, {
+  const updatedGame = withNextVersion(existingGame, {
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
     },
   });
+
+  return toResult(updatedGame);
 };
 
-const movePlayer = (game: Game | undefined, event: LambdaEventPayload<"movePlayer">): Game => {
+const movePlayer = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"movePlayer">,
+): EngineReducerResult => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
@@ -109,22 +135,32 @@ const movePlayer = (game: Game | undefined, event: LambdaEventPayload<"movePlaye
     nextOrder[currentIndex],
   ];
 
-  return withNextVersion(existingGame, {
+  const updatedGame = withNextVersion(existingGame, {
     playerOrder: nextOrder,
   });
+
+  return toResult(updatedGame);
 };
 
-const removePlayer = (game: Game | undefined, event: LambdaEventPayload<"removePlayer">): Game => {
+const removePlayer = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"removePlayer">,
+): EngineReducerResult => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
-  return withNextVersion(existingGame, {
+  const updatedGame = withNextVersion(existingGame, {
     players: existingGame.players.filter((player) => player.id !== event.payload.playerId),
+    playerTokens: existingGame.playerTokens.filter(
+      (playerToken) => playerToken.playerId !== event.payload.playerId,
+    ),
     playerOrder: existingGame.playerOrder.filter((playerId) => playerId !== event.payload.playerId),
     scores: existingGame.scores.filter((score) => score.playerId !== event.payload.playerId),
   });
+
+  return toResult(updatedGame);
 };
 
 const requireGame = (game: Game | undefined): Game => {
@@ -136,7 +172,7 @@ const requireGame = (game: Game | undefined): Game => {
 
 const requirePlayerToken = (game: Game | undefined, playerToken: string): void => {
   const existingGame = requireGame(game);
-  const hasPlayer = existingGame.players.some((player) => player.token === playerToken);
+  const hasPlayer = existingGame.playerTokens.some((entry) => entry.token === playerToken);
   if (!hasPlayer) {
     throw new Error("Invalid player token");
   }
@@ -144,9 +180,13 @@ const requirePlayerToken = (game: Game | undefined, playerToken: string): void =
 
 const buildPlayer = (name: string): Player => ({
   id: generatePlayerId(),
-  token: generatePlayerToken(),
   name,
   type: "human",
+});
+
+const buildPlayerToken = (playerId: string): PlayerToken => ({
+  playerId,
+  token: generatePlayerToken(),
 });
 
 const buildScore = (playerId: string): Score => ({
@@ -159,6 +199,16 @@ const withNextVersion = (game: Game, patch: Partial<Game>): Game => ({
   ...game,
   ...patch,
   version: game.version + 1,
+});
+
+const toPublicGameState = (game: Game): PublicGameState => {
+  const { playerTokens: _playerTokens, ...publicGame } = game;
+  return publicGame;
+};
+
+const toResult = (game: Game, playerToken?: string): EngineReducerResult => ({
+  game: toPublicGameState(game),
+  playerToken,
 });
 
 const assertNever = (value: never): never => {
