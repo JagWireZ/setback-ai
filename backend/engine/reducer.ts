@@ -3,6 +3,7 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import { generateGameId } from "./helpers/generateGameId";
 import { generatePlayerId } from "./helpers/generatePlayerId";
 import { generatePlayerToken } from "./helpers/generatePlayerToken";
+import { generateRounds } from "./helpers/generateRounds";
 
 const DEFAULT_MAX_CARDS: CardCount = 10;
 
@@ -29,7 +30,7 @@ export const engineReducer = (
     case "startGame":
       requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return toResult(requireGame(game));
+      return startGame(game, event);
     case "dealCards":
     case "submitBid":
     case "playCard":
@@ -65,6 +66,8 @@ const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResul
     ownerToken: hostPlayerToken.token,
     options: {
       maxCards: DEFAULT_MAX_CARDS,
+      blindBid: false,
+      rounds: [],
     },
     players: [hostPlayer],
     playerTokens: [hostPlayerToken],
@@ -109,6 +112,26 @@ const setOptions = (
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
+      blindBid: event.payload.blindBid,
+    },
+  });
+
+  return toResult(updatedGame);
+};
+
+const startGame = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"startGame">,
+): EngineReducerResult => {
+  const existingGame = requireGame(game);
+  if (existingGame.id !== event.payload.gameId) {
+    throw new Error("Game ID mismatch");
+  }
+
+  const updatedGame = withNextVersion(existingGame, {
+    options: {
+      ...existingGame.options,
+      rounds: generateRounds(existingGame.options.maxCards),
     },
   });
 

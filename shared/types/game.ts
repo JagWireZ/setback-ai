@@ -88,6 +88,7 @@ export type PlayerToken = {
 export type Options = {
   maxCards: CardCount
   blindBid: boolean
+  rounds: Round[]
 }
 
 export type Score = {
