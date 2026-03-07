@@ -56,6 +56,7 @@ type ActionPayloadMap = {
   }
   getGameState: {
     gameId: string
+    version: number
   }
 }
 

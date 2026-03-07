@@ -9,7 +9,7 @@ const DEFAULT_MAX_CARDS: CardCount = 10;
 export type PublicGameState = Omit<Game, "playerTokens">;
 
 export type EngineReducerResult = {
-  game: PublicGameState;
+  game?: PublicGameState;
   playerToken?: string;
 };
 
@@ -38,9 +38,11 @@ export const engineReducer = (
       requirePlayerToken(game, event.payload.playerToken);
       return removePlayer(game, event);
     case "reconnectPlayer":
-    case "getGameState":
       requirePlayerToken(game, event.payload.playerToken);
       return toResult(requireGame(game));
+    case "getGameState":
+      requirePlayerToken(game, event.payload.playerToken);
+      return getGameState(game, event);
     default:
       return assertNever(event);
   }
@@ -161,6 +163,22 @@ const removePlayer = (
   });
 
   return toResult(updatedGame);
+};
+
+const getGameState = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"getGameState">,
+): EngineReducerResult => {
+  const existingGame = requireGame(game);
+  if (existingGame.id !== event.payload.gameId) {
+    throw new Error("Game ID mismatch");
+  }
+
+  if (event.payload.version < existingGame.version) {
+    return toResult(existingGame);
+  }
+
+  return {};
 };
 
 const requireGame = (game: Game | undefined): Game => {
