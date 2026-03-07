@@ -14,6 +14,6 @@
     "outDir": "dist",
     "rootDir": ".."
   },
-  "include": ["src/**/*.ts", "db/**/*.ts", "../shared/types/**/*.ts"],
+  "include": ["src/**/*.ts", "db/**/*.ts", "engine/**/*.ts", "../shared/types/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
