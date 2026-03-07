@@ -43,6 +43,7 @@ const createGame = (event: LambdaEventPayload<"createGame">): Game => {
   const hostPlayer = buildPlayer(event.payload.playerName);
   return {
     id: generateGameId(),
+    version: 1,
     options: {
       maxCards: DEFAULT_MAX_CARDS,
     },
@@ -59,12 +60,11 @@ const joinGame = (game: Game | undefined, event: LambdaEventPayload<"joinGame">)
   }
 
   const nextPlayer = buildPlayer(event.payload.playerName);
-  return {
-    ...existingGame,
+  return withNextVersion(existingGame, {
     players: [...existingGame.players, nextPlayer],
     playerOrder: [...existingGame.playerOrder, nextPlayer.id],
     scores: [...existingGame.scores, buildScore(nextPlayer.id)],
-  };
+  });
 };
 
 const setOptions = (game: Game | undefined, event: LambdaEventPayload<"setOptions">): Game => {
@@ -73,13 +73,12 @@ const setOptions = (game: Game | undefined, event: LambdaEventPayload<"setOption
     throw new Error("Game ID mismatch");
   }
 
-  return {
-    ...existingGame,
+  return withNextVersion(existingGame, {
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
     },
-  };
+  });
 };
 
 const movePlayer = (game: Game | undefined, event: LambdaEventPayload<"movePlayer">): Game => {
@@ -110,10 +109,9 @@ const movePlayer = (game: Game | undefined, event: LambdaEventPayload<"movePlaye
     nextOrder[currentIndex],
   ];
 
-  return {
-    ...existingGame,
+  return withNextVersion(existingGame, {
     playerOrder: nextOrder,
-  };
+  });
 };
 
 const removePlayer = (game: Game | undefined, event: LambdaEventPayload<"removePlayer">): Game => {
@@ -122,12 +120,11 @@ const removePlayer = (game: Game | undefined, event: LambdaEventPayload<"removeP
     throw new Error("Game ID mismatch");
   }
 
-  return {
-    ...existingGame,
+  return withNextVersion(existingGame, {
     players: existingGame.players.filter((player) => player.id !== event.payload.playerId),
     playerOrder: existingGame.playerOrder.filter((playerId) => playerId !== event.payload.playerId),
     scores: existingGame.scores.filter((score) => score.playerId !== event.payload.playerId),
-  };
+  });
 };
 
 const requireGame = (game: Game | undefined): Game => {
@@ -156,6 +153,12 @@ const buildScore = (playerId: string): Score => ({
   playerId,
   total: 0,
   possible: 0,
+});
+
+const withNextVersion = (game: Game, patch: Partial<Game>): Game => ({
+  ...game,
+  ...patch,
+  version: game.version + 1,
 });
 
 const assertNever = (value: never): never => {

@@ -85,6 +85,7 @@ export type Score = {
 // Game types
 export type Game = {
   id: string
+  version: number
   options: Options
   players: Player[]
   playerOrder: string[]
