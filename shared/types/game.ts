@@ -1,0 +1,94 @@
+// Card types
+export type Suit = 'Clubs' | 'Diamonds' | 'Hearts' | 'Spades'
+
+export type Rank =
+  | 'A'
+  | '2'
+  | '3'
+  | '4'
+  | '5'
+  | '6'
+  | '7'
+  | '8'
+  | '9'
+  | '10'
+  | 'J'
+  | 'Q'
+  | 'K'
+
+export type StandardCard = {
+  rank: Rank
+  suit: Suit
+}
+
+export type JokerCard = 'Big Joker' | 'Little Joker'
+
+export type Card = StandardCard | JokerCard
+
+// Round types
+export type CardCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+export type RoundDirection = 'up' | 'down'
+
+export type Round = {
+  cardCount: CardCount
+  direction: RoundDirection
+}
+
+export type RoundPhase = 'Dealing' | 'Bidding' | 'Playing'
+
+export type Bid = {
+  playerId: string
+  amount: number
+}
+
+export type TrickPlay = {
+  playerId: string
+  card: Card
+}
+
+export type Trick = {
+  index: number
+  leadPlayerId: string
+  plays: TrickPlay[]
+  winnerPlayerId?: string
+}
+
+export type ActiveRound = Round & {
+  roundNumber: number
+  phase: RoundPhase
+  turnPlayerId: string
+  dealerPlayerId: string
+  trickIndex: number
+  bids: Bid[]
+  currentTrick?: Trick
+  completedTricks: Trick[]
+}
+
+// Player types
+export type PlayerType = 'ai' | 'human'
+
+export type Player = {
+  id: string
+  token: string
+  name: string
+  type: PlayerType
+}
+
+export type Options = {
+  maxCards: CardCount
+}
+
+export type Score = {
+  playerId: string
+  total: number
+  possible: number
+}
+
+// Game types
+export type Game = {
+  id: string
+  options: Options
+  players: Player[]
+  scores: Score[]
+  activeRound?: ActiveRound
+}
