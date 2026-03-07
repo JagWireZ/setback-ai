@@ -6,7 +6,9 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "npm run build && node --test test/**/*.test.js"
+    "test": "npm run build && node --test test/**/*.test.js",
+    "tf:init": "terraform -chdir=infrastructure init",
+    "tf:apply": "terraform -chdir=infrastructure apply"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.888.0",
