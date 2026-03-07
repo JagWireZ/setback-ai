@@ -1,25 +1,53 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import type { Game } from "@shared/types/game";
+import type { LambdaEventPayload } from "@shared/types/lambda";
 
 export const handler = async (
-  _event: APIGatewayProxyEvent,
+  event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const game: Game = {
-    id: "demo-game",
-    options: { maxCards: 10 },
-    players: [],
-    scores: [],
-  };
+  const request = parseLambdaEvent(event);
+  const result = await handleAction(request);
 
   return {
     statusCode: 200,
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      message: "Hello from TypeScript Lambda!",
-      gameId: game.id,
-      timestamp: new Date().toISOString(),
-    }),
+    body: JSON.stringify(result),
   };
+};
+
+const parseLambdaEvent = (event: APIGatewayProxyEvent): LambdaEventPayload => {
+  if (!event.body) {
+    throw new Error("Missing request body");
+  }
+
+  return JSON.parse(event.body) as LambdaEventPayload;
+};
+
+const handleAction = async (
+  event: LambdaEventPayload,
+): Promise<{ action: LambdaEventPayload["action"]; ok: true }> => {
+  switch (event.action) {
+    case "createGame":
+    case "joinGame":
+    case "setOptions":
+    case "startGame":
+    case "dealCards":
+    case "submitBid":
+    case "playCard":
+    case "movePlayer":
+    case "removePlayer":
+    case "reconnectPlayer":
+    case "getGameState":
+      return {
+        action: event.action,
+        ok: true,
+      };
+    default:
+      return assertNever(event);
+  }
+};
+
+const assertNever = (value: never): never => {
+  throw new Error(`Unhandled action: ${JSON.stringify(value)}`);
 };
