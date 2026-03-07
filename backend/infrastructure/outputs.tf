@@ -17,3 +17,8 @@ output "dynamodb_table_arn" {
   description = "DynamoDB table ARN"
   value       = aws_dynamodb_table.setback_game.arn
 }
+
+output "lambda_function_url" {
+  description = "Public Lambda function URL"
+  value       = aws_lambda_function_url.backend.function_url
+}

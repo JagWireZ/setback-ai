@@ -106,3 +106,16 @@ resource "aws_lambda_function" "backend" {
     aws_cloudwatch_log_group.lambda
   ]
 }
+
+resource "aws_lambda_function_url" "backend" {
+  function_name      = aws_lambda_function.backend.function_name
+  authorization_type = "NONE"
+}
+
+resource "aws_lambda_permission" "allow_public_function_url" {
+  statement_id             = "AllowPublicFunctionUrlInvoke"
+  action                   = "lambda:InvokeFunctionUrl"
+  function_name            = aws_lambda_function.backend.function_name
+  principal                = "*"
+  function_url_auth_type   = "NONE"
+}

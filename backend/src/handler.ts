@@ -1,11 +1,11 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
 import { assertCreateGamePayload } from "./validation/lambdaPayload";
 
 export const handler = async (
-  event: APIGatewayProxyEvent,
-): Promise<APIGatewayProxyResult> => {
+  event: LambdaFunctionURLEvent,
+): Promise<LambdaFunctionURLResult> => {
   try {
     const request = parseLambdaEvent(event);
     const result = await handleAction(request);
@@ -29,7 +29,7 @@ export const handler = async (
   }
 };
 
-const parseLambdaEvent = (event: APIGatewayProxyEvent): LambdaEventPayload => {
+const parseLambdaEvent = (event: LambdaFunctionURLEvent): LambdaEventPayload => {
   if (!event.body) {
     throw new Error("Missing request body");
   }
