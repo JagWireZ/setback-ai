@@ -3,6 +3,7 @@ import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { generateRounds } from "../helpers/generateRounds";
+import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 
 export const startGame = (
   game: Game | undefined,
@@ -13,10 +14,20 @@ export const startGame = (
     throw new Error("Game ID mismatch");
   }
 
+  const rounds = generateRounds(existingGame.options.maxCards);
+  const nextPhase = advancePhase({
+    ...existingGame,
+    options: {
+      ...existingGame.options,
+      rounds,
+    },
+  });
+
   return withNextVersion(existingGame, {
     options: {
       ...existingGame.options,
-      rounds: generateRounds(existingGame.options.maxCards),
+      rounds,
     },
+    phase: nextPhase,
   });
 };

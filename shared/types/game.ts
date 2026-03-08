@@ -37,10 +37,6 @@ export type Round = {
   direction: RoundDirection
 }
 
-export type GamePhase = 'Lobby' | 'Playing' | 'GameOver'
-
-export type RoundPhase = 'Dealing' | 'Bidding' | 'TrickPlaying'
-
 export type Bid = {
   playerId: string
   amount: number
@@ -58,20 +54,58 @@ export type Trick = {
   winnerPlayerId?: string
 }
 
-export type ActiveRound = Round & {
-  phase: RoundPhase
-  turnPlayerId: string
+export type PhaseStage = 'Lobby' | 'Dealing' | 'Bidding' | 'Playing' | 'Scoring' | 'GameOver'
+
+export type PhaseCards = {
+  deck: Card[]
+  trump: Card
+  hands: Hand[]
+  currentTrick?: Trick
+  completedTricks: Trick[]
+}
+
+type RoundPhaseBase = {
   dealerPlayerId: string
+  roundIndex: number
   trickIndex: number
   bids: Bid[]
-  cards: {
-    deck: Card[]
-    trump: Card
-    hands: Hand[]
-    currentTrick?: Trick
-    completedTricks: Trick[]
-  }
+  cards: PhaseCards
 }
+
+export type LobbyPhase = {
+  stage: 'Lobby'
+}
+
+export type DealingPhase = RoundPhaseBase & {
+  stage: 'Dealing'
+  turnPlayerId: string
+}
+
+export type BiddingPhase = RoundPhaseBase & {
+  stage: 'Bidding'
+  turnPlayerId: string
+}
+
+export type PlayingPhase = RoundPhaseBase & {
+  stage: 'Playing'
+  turnPlayerId: string
+}
+
+export type ScoringPhase = RoundPhaseBase & {
+  stage: 'Scoring'
+}
+
+export type GameOverPhase = {
+  stage: 'GameOver'
+}
+
+export type Phase =
+  | LobbyPhase
+  | DealingPhase
+  | BiddingPhase
+  | PlayingPhase
+  | ScoringPhase
+  | GameOverPhase
 
 // Player types
 export type PlayerType = 'ai' | 'human'
@@ -100,7 +134,7 @@ export type Score = {
   possible: number
 }
 
-type GameBase = {
+export type Game = {
   id: string
   version: number
   ownerToken: string
@@ -109,22 +143,5 @@ type GameBase = {
   playerTokens: PlayerToken[]
   playerOrder: string[]
   scores: Score[]
+  phase: Phase
 }
-
-export type LobbyGame = GameBase & {
-  phase: 'Lobby'
-  activeRound?: never
-}
-
-export type PlayingGame = GameBase & {
-  phase: 'Playing'
-  activeRound: ActiveRound
-}
-
-export type GameOverGame = GameBase & {
-  phase: 'GameOver'
-  activeRound?: never
-}
-
-// Game types
-export type Game = LobbyGame | PlayingGame | GameOverGame
