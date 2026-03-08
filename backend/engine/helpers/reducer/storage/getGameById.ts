@@ -1,5 +1,5 @@
 import type { Game } from "@shared/types/game";
-import { GetItem } from "../../../db";
+import { GetItem } from "../../../../db";
 import { tableName } from "./tableName";
 
 export const getGameById = (gameId: string): Promise<Game | undefined> =>

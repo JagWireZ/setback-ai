@@ -1,7 +1,7 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/requireGame";
-import { withNextVersion } from "../helpers/reducer/withNextVersion";
+import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { generateRounds } from "../helpers/generateRounds";
 
 export const startGame = (

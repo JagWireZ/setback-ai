@@ -2,9 +2,9 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
 import { generateGameId } from "../helpers/generateGameId";
 import { generateRounds } from "../helpers/generateRounds";
-import { buildPlayer } from "../helpers/reducer/buildPlayer";
-import { buildPlayerToken } from "../helpers/reducer/buildPlayerToken";
-import { buildScore } from "../helpers/reducer/buildScore";
+import { buildPlayer } from "../helpers/reducer/player/buildPlayer";
+import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
+import { buildScore } from "../helpers/reducer/player/buildScore";
 
 type CreateGameResult = {
   game: Game;

@@ -1,10 +1,10 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/requireGame";
-import { withNextVersion } from "../helpers/reducer/withNextVersion";
-import { buildPlayer } from "../helpers/reducer/buildPlayer";
-import { buildPlayerToken } from "../helpers/reducer/buildPlayerToken";
-import { buildScore } from "../helpers/reducer/buildScore";
+import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
+import { buildPlayer } from "../helpers/reducer/player/buildPlayer";
+import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
+import { buildScore } from "../helpers/reducer/player/buildScore";
 
 type JoinGameResult = {
   game: Game;

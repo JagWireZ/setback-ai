@@ -1,7 +1,7 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
-import { getGameById } from "../helpers/reducer/getGameById";
-import { requireOwnerToken } from "../helpers/reducer/requireOwnerToken";
-import { deleteGameById } from "../helpers/reducer/deleteGameById";
+import { getGameById } from "../helpers/reducer/storage/getGameById";
+import { requireOwnerToken } from "../helpers/reducer/validation/requireOwnerToken";
+import { deleteGameById } from "../helpers/reducer/storage/deleteGameById";
 
 export const removeGame = (
   event: LambdaEventPayload<"removeGame">,

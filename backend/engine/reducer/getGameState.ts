@@ -1,8 +1,8 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { getGameById } from "../helpers/reducer/getGameById";
-import { requirePlayerToken } from "../helpers/reducer/requirePlayerToken";
-import { toResult } from "../helpers/reducer/toResult";
+import { getGameById } from "../helpers/reducer/storage/getGameById";
+import { requirePlayerToken } from "../helpers/reducer/validation/requirePlayerToken";
+import { toResult } from "../helpers/reducer/gameState/toResult";
 
 export const getGameState = (
   _game: Game | undefined,

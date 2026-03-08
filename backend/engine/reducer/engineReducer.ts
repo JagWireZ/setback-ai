@@ -8,13 +8,13 @@ import { movePlayer } from "./movePlayer";
 import { removePlayer } from "./removePlayer";
 import { getGameState } from "./getGameState";
 import { removeGame } from "./removeGame";
-import { requireOwnerToken } from "../helpers/reducer/requireOwnerToken";
-import { requireVersion } from "../helpers/reducer/requireVersion";
-import { requirePlayerToken } from "../helpers/reducer/requirePlayerToken";
-import { requireGame } from "../helpers/reducer/requireGame";
-import { putGame } from "../helpers/reducer/putGame";
-import { toResult } from "../helpers/reducer/toResult";
-import { assertNever } from "../helpers/reducer/assertNever";
+import { requireOwnerToken } from "../helpers/reducer/validation/requireOwnerToken";
+import { requireVersion } from "../helpers/reducer/validation/requireVersion";
+import { requirePlayerToken } from "../helpers/reducer/validation/requirePlayerToken";
+import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { putGame } from "../helpers/reducer/storage/putGame";
+import { toResult } from "../helpers/reducer/gameState/toResult";
+import { assertNever } from "../helpers/reducer/core/assertNever";
 
 export type PublicGameState = Omit<Game, "playerTokens" | "ownerToken">;
 

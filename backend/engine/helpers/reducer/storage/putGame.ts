@@ -1,5 +1,5 @@
 import type { Game } from "@shared/types/game";
-import { PutItem } from "../../../db";
+import { PutItem } from "../../../../db";
 import { tableName } from "./tableName";
 
 export const putGame = (game: Game): Promise<void> =>
