@@ -37,6 +37,8 @@ export type Round = {
   direction: RoundDirection
 }
 
+export type GamePhase = 'Lobby' | 'Playing' | 'GameOver'
+
 export type RoundPhase = 'Dealing' | 'Bidding' | 'Playing'
 
 export type Bid = {
@@ -98,8 +100,7 @@ export type Score = {
   possible: number
 }
 
-// Game types
-export type Game = {
+type GameBase = {
   id: string
   version: number
   ownerToken: string
@@ -108,5 +109,22 @@ export type Game = {
   playerTokens: PlayerToken[]
   playerOrder: string[]
   scores: Score[]
-  activeRound?: ActiveRound
 }
+
+export type LobbyGame = GameBase & {
+  phase: 'Lobby'
+  activeRound?: never
+}
+
+export type PlayingGame = GameBase & {
+  phase: 'Playing'
+  activeRound: ActiveRound
+}
+
+export type GameOverGame = GameBase & {
+  phase: 'GameOver'
+  activeRound?: never
+}
+
+// Game types
+export type Game = LobbyGame | PlayingGame | GameOverGame

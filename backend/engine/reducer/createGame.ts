@@ -29,6 +29,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
   const game: Game = {
     id: generateGameId(),
     version: 1,
+    phase: "Lobby",
     ownerToken: hostPlayerToken.token,
     options: {
       maxCards: event.payload.maxCards,
