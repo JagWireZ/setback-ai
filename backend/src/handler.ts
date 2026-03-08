@@ -1,7 +1,7 @@
 import { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
-import { assertCreateGamePayload } from "./validation/lambdaPayload";
+import { assertCreateGamePayload, assertRemoveGamePayload } from "./validation/lambdaPayload";
 
 export const handler = async (
   event: LambdaFunctionURLEvent
@@ -49,6 +49,10 @@ const handleAction = async (
   switch (event.action) {
     case "createGame": {
       assertCreateGamePayload(event);
+      return engineReducer(undefined, event);
+    }
+    case "removeGame": {
+      assertRemoveGamePayload(event);
       return engineReducer(undefined, event);
     }
     case "joinGame":

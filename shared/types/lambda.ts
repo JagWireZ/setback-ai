@@ -10,6 +10,7 @@ export type LambdaAction =
   | 'playCard'
   | 'movePlayer'
   | 'removePlayer'
+  | 'removeGame'
   | 'reconnectPlayer'
   | 'getGameState'
 
@@ -58,6 +59,9 @@ type ActionPayloadMap = {
     gameId: string
     version: number
     playerId: string
+  }
+  removeGame: {
+    gameId: string
   }
   reconnectPlayer: {
     gameId: string

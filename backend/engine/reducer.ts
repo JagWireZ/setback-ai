@@ -1,5 +1,6 @@
 import type { Game, Player, PlayerToken, Score } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
+import { DeleteItem, GetItem, PutItem } from "../db";
 import { generateGameId } from "./helpers/generateGameId";
 import { generatePlayerId } from "./helpers/generatePlayerId";
 import { generatePlayerToken } from "./helpers/generatePlayerToken";
@@ -12,50 +13,74 @@ export type EngineReducerResult = {
   playerToken?: string;
 };
 
+type JoinGameResult = {
+  game: Game;
+  playerToken: string;
+};
+
 export const engineReducer = (
   game: Game | undefined,
   event: LambdaEventPayload,
-): EngineReducerResult => {
+): Promise<EngineReducerResult> => {
   switch (event.action) {
-    case "createGame":
-      return createGame(event);
-    case "joinGame":
-      return joinGame(game, event);
-    case "setOptions":
+    case "createGame": {
+      const created = createGame(event);
+      return putGame(created.game).then(() => toResult(created.game, created.playerToken));
+    }
+    case "joinGame": {
+      const joined = joinGame(game, event);
+      return putGame(joined.game).then(() => toResult(joined.game, joined.playerToken));
+    }
+    case "setOptions": {
       requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return setOptions(game, event);
-    case "startGame":
+      const updatedGame = setOptions(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
+    case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return startGame(game, event);
+      const updatedGame = startGame(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
     case "dealCards":
     case "submitBid":
-    case "playCard":
+    case "playCard": {
       requirePlayerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return toResult(requireGame(game));
-    case "movePlayer":
+      const existingGame = requireGame(game);
+      return putGame(existingGame).then(() => toResult(existingGame));
+    }
+    case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return movePlayer(game, event);
-    case "removePlayer":
+      const updatedGame = movePlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
+    case "removePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return removePlayer(game, event);
-    case "reconnectPlayer":
+      const updatedGame = removePlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
+    case "removeGame":
+      return removeGame(event);
+    case "reconnectPlayer": {
       requirePlayerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      return toResult(requireGame(game));
+      const existingGame = requireGame(game);
+      return putGame(existingGame).then(() => toResult(existingGame));
+    }
     case "getGameState":
-      requirePlayerToken(game, event.payload.playerToken);
       return getGameState(game, event);
     default:
-      return assertNever(event);
+      return Promise.resolve(assertNever(event));
   }
 };
 
-const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResult => {
+const createGame = (
+  event: LambdaEventPayload<"createGame">,
+): { game: Game; playerToken: string } => {
   const hostPlayer = buildPlayer(event.payload.playerName);
   const hostPlayerToken = buildPlayerToken(hostPlayer.id);
   const game: Game = {
@@ -73,13 +98,16 @@ const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResul
     scores: [buildScore(hostPlayer.id)],
   };
 
-  return toResult(game, hostPlayerToken.token);
+  return {
+    game,
+    playerToken: hostPlayerToken.token,
+  };
 };
 
 const joinGame = (
   game: Game | undefined,
   event: LambdaEventPayload<"joinGame">,
-): EngineReducerResult => {
+): JoinGameResult => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
@@ -94,52 +122,51 @@ const joinGame = (
     scores: [...existingGame.scores, buildScore(nextPlayer.id)],
   });
 
-  return toResult(updatedGame, nextPlayerToken.token);
+  return {
+    game: updatedGame,
+    playerToken: nextPlayerToken.token,
+  };
 };
 
 const setOptions = (
   game: Game | undefined,
   event: LambdaEventPayload<"setOptions">,
-): EngineReducerResult => {
+): Game => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
-  const updatedGame = withNextVersion(existingGame, {
+  return withNextVersion(existingGame, {
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
       blindBid: event.payload.blindBid,
     },
   });
-
-  return toResult(updatedGame);
 };
 
 const startGame = (
   game: Game | undefined,
   event: LambdaEventPayload<"startGame">,
-): EngineReducerResult => {
+): Game => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
-  const updatedGame = withNextVersion(existingGame, {
+  return withNextVersion(existingGame, {
     options: {
       ...existingGame.options,
       rounds: generateRounds(existingGame.options.maxCards),
     },
   });
-
-  return toResult(updatedGame);
 };
 
 const movePlayer = (
   game: Game | undefined,
   event: LambdaEventPayload<"movePlayer">,
-): EngineReducerResult => {
+): Game => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
@@ -167,23 +194,21 @@ const movePlayer = (
     nextOrder[currentIndex],
   ];
 
-  const updatedGame = withNextVersion(existingGame, {
+  return withNextVersion(existingGame, {
     playerOrder: nextOrder,
   });
-
-  return toResult(updatedGame);
 };
 
 const removePlayer = (
   game: Game | undefined,
   event: LambdaEventPayload<"removePlayer">,
-): EngineReducerResult => {
+): Game => {
   const existingGame = requireGame(game);
   if (existingGame.id !== event.payload.gameId) {
     throw new Error("Game ID mismatch");
   }
 
-  const updatedGame = withNextVersion(existingGame, {
+  return withNextVersion(existingGame, {
     players: existingGame.players.filter((player) => player.id !== event.payload.playerId),
     playerTokens: existingGame.playerTokens.filter(
       (playerToken) => playerToken.playerId !== event.payload.playerId,
@@ -191,25 +216,39 @@ const removePlayer = (
     playerOrder: existingGame.playerOrder.filter((playerId) => playerId !== event.payload.playerId),
     scores: existingGame.scores.filter((score) => score.playerId !== event.payload.playerId),
   });
-
-  return toResult(updatedGame);
 };
 
 const getGameState = (
-  game: Game | undefined,
+  _game: Game | undefined,
   event: LambdaEventPayload<"getGameState">,
-): EngineReducerResult => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+): Promise<EngineReducerResult> => {
+  return getGameById(event.payload.gameId).then((existingGame) => {
+    if (!existingGame) {
+      throw new Error("Game not found");
+    }
 
-  if (event.payload.version < existingGame.version) {
-    return toResult(existingGame);
-  }
+    requirePlayerToken(existingGame, event.payload.playerToken);
 
-  return {};
+    if (event.payload.version < existingGame.version) {
+      return toResult(existingGame);
+    }
+
+    return {};
+  });
 };
+
+const removeGame = (
+  event: LambdaEventPayload<"removeGame">,
+): Promise<EngineReducerResult> =>
+  getGameById(event.payload.gameId).then((existingGame) => {
+    if (!existingGame) {
+      throw new Error("Game not found");
+    }
+
+    requireOwnerToken(existingGame, event.payload.playerToken);
+
+    return deleteGameById(event.payload.gameId).then(() => ({}));
+  });
 
 const requireGame = (game: Game | undefined): Game => {
   if (!game) {
@@ -272,6 +311,34 @@ const toResult = (game: Game, playerToken?: string): EngineReducerResult => ({
   game: toPublicGameState(game),
   playerToken,
 });
+
+const tableName = (): string => {
+  const value =
+    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+      ?.DYNAMODB_TABLE_NAME;
+  if (!value) {
+    throw new Error("Missing DYNAMODB_TABLE_NAME");
+  }
+  return value;
+};
+
+const putGame = (game: Game): Promise<void> =>
+  PutItem<Game>({
+    tableName: tableName(),
+    item: game,
+  });
+
+const getGameById = (gameId: string): Promise<Game | undefined> =>
+  GetItem<Game>({
+    tableName: tableName(),
+    key: { id: gameId },
+  });
+
+const deleteGameById = (gameId: string): Promise<void> =>
+  DeleteItem({
+    tableName: tableName(),
+    key: { id: gameId },
+  });
 
 const assertNever = (value: never): never => {
   throw new Error(`Unhandled action: ${JSON.stringify(value)}`);

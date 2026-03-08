@@ -78,6 +78,7 @@ export type Player = {
   id: string
   name: string
   type: PlayerType
+  connected: boolean
 }
 
 export type PlayerToken = {
