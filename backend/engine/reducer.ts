@@ -65,7 +65,7 @@ const createGame = (event: LambdaEventPayload<"createGame">): EngineReducerResul
     options: {
       maxCards: event.payload.maxCards,
       blindBid: false,
-      rounds: [],
+      rounds: generateRounds(event.payload.maxCards),
     },
     players: [hostPlayer],
     playerTokens: [hostPlayerToken],

@@ -8,9 +8,9 @@ export const handler = async (
 ): Promise<LambdaFunctionURLResult> => {
   try {
     const body = event.body ? JSON.parse(event.body) : {};
-    const { action, data } = body;
+    const { action, payload } = body;
 
-    const request = parseLambdaEvent(action, data);
+    const request = parseLambdaEvent(action, payload);
     const result = await handleAction(request);
 
     return {
@@ -32,14 +32,14 @@ export const handler = async (
   }
 };
 
-const parseLambdaEvent = (action: unknown, data: unknown): LambdaEventPayload => {
+const parseLambdaEvent = (action: unknown, payload: unknown): LambdaEventPayload => {
   if (typeof action !== "string") {
     throw new Error("Missing request action");
   }
 
   return {
     action: action as LambdaEventPayload["action"],
-    payload: data as LambdaEventPayload["payload"],
+    payload: payload as LambdaEventPayload["payload"],
   } as LambdaEventPayload;
 };
 
