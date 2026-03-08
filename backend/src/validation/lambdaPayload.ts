@@ -37,5 +37,23 @@ export function assertRemoveGamePayload(
   }
 }
 
+export function assertJoinGamePayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"joinGame"> {
+  if (event.action !== "joinGame") {
+    throw new Error("Invalid action for joinGame payload validation");
+  }
+
+  const { gameId, playerName } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("joinGame requires payload.gameId");
+  }
+
+  if (typeof playerName !== "string" || playerName.trim().length === 0) {
+    throw new Error("joinGame requires payload.playerName");
+  }
+}
+
 const isCardCount = (value: unknown): value is CardCount =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10;
