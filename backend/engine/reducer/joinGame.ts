@@ -2,9 +2,6 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
-import { buildPlayer } from "../helpers/reducer/player/buildPlayer";
-import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
-import { buildScore } from "../helpers/reducer/player/buildScore";
 
 type JoinGameResult = {
   game: Game;
@@ -20,13 +17,33 @@ export const joinGame = (
     throw new Error("Game ID mismatch");
   }
 
-  const nextPlayer = buildPlayer(event.payload.playerName);
-  const nextPlayerToken = buildPlayerToken(nextPlayer.id);
+  const humanPlayerCount = existingGame.players.filter((player) => player.type === "human").length;
+  if (humanPlayerCount >= 5) {
+    throw new Error("Game is full");
+  }
+
+  const aiPlayerToJoin = existingGame.players.find((player) => player.type === "ai");
+  if (!aiPlayerToJoin) {
+    throw new Error("No available AI player slot");
+  }
+
+  const nextPlayerToken = existingGame.playerTokens.find(
+    (entry) => entry.playerId === aiPlayerToJoin.id,
+  );
+  if (!nextPlayerToken) {
+    throw new Error("Missing player token for AI player");
+  }
+
   const updatedGame = withNextVersion(existingGame, {
-    players: [...existingGame.players, nextPlayer],
-    playerTokens: [...existingGame.playerTokens, nextPlayerToken],
-    playerOrder: [...existingGame.playerOrder, nextPlayer.id],
-    scores: [...existingGame.scores, buildScore(nextPlayer.id)],
+    players: existingGame.players.map((player) =>
+      player.id === aiPlayerToJoin.id
+        ? {
+            ...player,
+            name: event.payload.playerName,
+            type: "human",
+          }
+        : player,
+    ),
   });
 
   return {

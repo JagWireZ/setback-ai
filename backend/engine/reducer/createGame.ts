@@ -12,8 +12,20 @@ type CreateGameResult = {
 };
 
 export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameResult => {
-  const hostPlayer = buildPlayer(event.payload.playerName);
-  const hostPlayerToken = buildPlayerToken(hostPlayer.id);
+  const players = Array.from({ length: 5 }, (_, index) => {
+    const playerName = index === 0 ? event.payload.playerName : `AI ${index + 1}`;
+    return {
+      ...buildPlayer(playerName),
+      type: "ai" as const,
+    };
+  });
+  const hostPlayer = {
+    ...players[0],
+    type: "human" as const,
+  };
+  const allPlayers = [hostPlayer, ...players.slice(1)];
+  const playerTokens = allPlayers.map((player) => buildPlayerToken(player.id));
+  const hostPlayerToken = playerTokens[0];
   const game: Game = {
     id: generateGameId(),
     version: 1,
@@ -23,10 +35,10 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
       blindBid: false,
       rounds: generateRounds(event.payload.maxCards),
     },
-    players: [hostPlayer],
-    playerTokens: [hostPlayerToken],
-    playerOrder: [hostPlayer.id],
-    scores: [buildScore(hostPlayer.id)],
+    players: allPlayers,
+    playerTokens,
+    playerOrder: allPlayers.map((player) => player.id),
+    scores: allPlayers.map((player) => buildScore(player.id)),
   };
 
   return {
