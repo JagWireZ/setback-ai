@@ -39,7 +39,7 @@ export type Round = {
 
 export type GamePhase = 'Lobby' | 'Playing' | 'GameOver'
 
-export type RoundPhase = 'Dealing' | 'Bidding' | 'Playing'
+export type RoundPhase = 'Dealing' | 'Bidding' | 'TrickPlaying'
 
 export type Bid = {
   playerId: string
