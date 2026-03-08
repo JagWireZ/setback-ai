@@ -11,7 +11,8 @@ export type LambdaAction =
   | 'movePlayer'
   | 'removePlayer'
   | 'removeGame'
-  | 'reconnectPlayer'
+  | 'connectPlayer'
+  | 'disconnectPlayer'
   | 'getGameState'
 
 type PublicAction = 'createGame' | 'joinGame'
@@ -63,7 +64,11 @@ type ActionPayloadMap = {
   removeGame: {
     gameId: string
   }
-  reconnectPlayer: {
+  connectPlayer: {
+    gameId: string
+    version: number
+  }
+  disconnectPlayer: {
     gameId: string
     version: number
   }

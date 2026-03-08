@@ -8,10 +8,14 @@ import { movePlayer } from "./reducer/movePlayer";
 import { removePlayer } from "./reducer/removePlayer";
 import { getGameState } from "./reducer/getGameState";
 import { removeGame } from "./reducer/removeGame";
+import { dealCards } from "./reducer/dealCards";
+import { submitBid } from "./reducer/submitBid";
+import { playCard } from "./reducer/playCard";
+import { connectPlayer } from "./reducer/connectPlayer";
+import { disconnectPlayer } from "./reducer/disconnectPlayer";
 import { requireOwnerToken } from "./helpers/reducer/validation/requireOwnerToken";
 import { requireVersion } from "./helpers/reducer/validation/requireVersion";
 import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerToken";
-import { requireGame } from "./helpers/reducer/validation/requireGame";
 import { putGame } from "./helpers/reducer/storage/putGame";
 import { toResult } from "./helpers/reducer/gameState/toResult";
 import { assertNever } from "./helpers/reducer/core/assertNever";
@@ -48,13 +52,23 @@ export const engineReducer = (
       const updatedGame = startGame(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }
-    case "dealCards":
-    case "submitBid":
+    case "dealCards": {
+      requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
+      const updatedGame = dealCards(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
+    case "submitBid": {
+      requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
+      const updatedGame = submitBid(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
     case "playCard": {
       requirePlayerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      const existingGame = requireGame(game);
-      return putGame(existingGame).then(() => toResult(existingGame));
+      const updatedGame = playCard(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
@@ -70,11 +84,17 @@ export const engineReducer = (
     }
     case "removeGame":
       return removeGame(event);
-    case "reconnectPlayer": {
+    case "connectPlayer": {
       requirePlayerToken(game, event.payload.playerToken);
       requireVersion(game, event.payload.version);
-      const existingGame = requireGame(game);
-      return putGame(existingGame).then(() => toResult(existingGame));
+      const updatedGame = connectPlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
+    }
+    case "disconnectPlayer": {
+      requirePlayerToken(game, event.payload.playerToken);
+      requireVersion(game, event.payload.version);
+      const updatedGame = disconnectPlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "getGameState":
       return getGameState(game, event);
