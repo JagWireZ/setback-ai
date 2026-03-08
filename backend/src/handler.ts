@@ -62,9 +62,6 @@ const handleAction = async (
     case "submitBid":
     case "playCard":
     case "movePlayer":
-    case "removePlayer":
-    case "connectPlayer":
-    case "disconnectPlayer":
     case "getGameState":
       return {
         action: event.action,
