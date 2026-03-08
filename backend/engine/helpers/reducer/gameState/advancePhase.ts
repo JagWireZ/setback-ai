@@ -1,15 +1,6 @@
-import type {
-  BiddingPhase,
-  DealingPhase,
-  Game,
-  Phase,
-  PlayingPhase,
-  ScoringPhase,
-} from "@shared/types/game";
-import { shuffleCards } from "../../../shuffleCards";
+import type { DealingPhase, Game, Phase } from "@shared/types/game";
+import { shuffleCards } from "../../shuffleCards";
 import { assertNever } from "../core/assertNever";
-
-type RoundActionPhase = DealingPhase | BiddingPhase | PlayingPhase | ScoringPhase;
 
 const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
   if (game.playerOrder.length === 0) {
@@ -42,24 +33,6 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
   };
 };
 
-const toRoundActionPhase = (
-  phase: RoundActionPhase,
-  stage: "Bidding" | "Playing" | "Scoring",
-): Phase => {
-  if (stage === "Scoring") {
-    const { turnPlayerId: _turnPlayerId, ...scoringPhase } = phase;
-    return {
-      ...scoringPhase,
-      stage,
-    };
-  }
-
-  return {
-    ...phase,
-    stage,
-  };
-};
-
 export const advancePhase = (game: Game): Phase => {
   switch (game.phase.stage) {
     case "Lobby":
@@ -68,11 +41,22 @@ export const advancePhase = (game: Game): Phase => {
       }
       return buildDealingPhase(game, 0);
     case "Dealing":
-      return toRoundActionPhase(game.phase, "Bidding");
+      return {
+        ...game.phase,
+        stage: "Bidding",
+      };
     case "Bidding":
-      return toRoundActionPhase(game.phase, "Playing");
-    case "Playing":
-      return toRoundActionPhase(game.phase, "Scoring");
+      return {
+        ...game.phase,
+        stage: "Playing",
+      };
+    case "Playing": {
+      const { turnPlayerId: _turnPlayerId, ...scoringPhase } = game.phase;
+      return {
+        ...scoringPhase,
+        stage: "Scoring",
+      };
+    }
     case "Scoring": {
       const isLastRound = game.phase.roundIndex >= game.options.rounds.length - 1;
       return isLastRound ? { stage: "GameOver" } : buildDealingPhase(game, game.phase.roundIndex + 1);
