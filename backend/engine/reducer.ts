@@ -283,6 +283,7 @@ const buildPlayer = (name: string): Player => ({
   id: generatePlayerId(),
   name,
   type: "human",
+  connected: true
 });
 
 const buildPlayerToken = (playerId: string): PlayerToken => ({
