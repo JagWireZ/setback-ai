@@ -4,6 +4,7 @@ import { engineReducer } from "../engine";
 import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import {
   assertCreateGamePayload,
+  assertDealCardsPayload,
   assertJoinGamePayload,
   assertRemoveGamePayload,
 } from "./validation/lambdaPayload";
@@ -65,9 +66,13 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }
+    case "dealCards": {
+      assertDealCardsPayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
+    }
     case "setOptions":
     case "startGame":
-    case "dealCards":
     case "submitBid":
     case "playCard":
     case "movePlayer":

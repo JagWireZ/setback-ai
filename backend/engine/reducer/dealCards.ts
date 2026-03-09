@@ -38,6 +38,10 @@ export const dealCards = (
     throw new Error("Only the dealer can deal cards");
   }
 
+  if (playerToken.playerId !== existingGame.phase.turnPlayerId) {
+    throw new Error("Only the active turn player can deal cards");
+  }
+
   if (existingGame.playerOrder.length === 0) {
     throw new Error("Cannot deal cards without players");
   }
