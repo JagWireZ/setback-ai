@@ -2,7 +2,6 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
-import { generateRounds } from "../helpers/generateRounds";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 
 export const startGame = (
@@ -14,20 +13,15 @@ export const startGame = (
     throw new Error("Game ID mismatch");
   }
 
-  const rounds = generateRounds(existingGame.options.maxCards);
+  if (existingGame.phase.stage !== "Lobby") {
+    throw new Error("Game can only be started from Lobby phase");
+  }
+
   const nextPhase = advancePhase({
     ...existingGame,
-    options: {
-      ...existingGame.options,
-      rounds,
-    },
   });
 
   return withNextVersion(existingGame, {
-    options: {
-      ...existingGame.options,
-      rounds,
-    },
     phase: nextPhase,
   });
 };

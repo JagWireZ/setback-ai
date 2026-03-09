@@ -49,7 +49,11 @@ type TransactWriteParams = {
 };
 
 const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
+const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    removeUndefinedValues: true,
+  },
+});
 
 export const PutItem = async <TItem extends Record<string, unknown>>(
   params: PutItemParams<TItem>,
