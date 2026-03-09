@@ -1,4 +1,8 @@
-import { AwsClient } from 'aws4fetch'
+import { Sha256 } from '@aws-crypto/sha256-js'
+import { CognitoIdentityClient } from '@aws-sdk/client-cognito-identity'
+import { fromCognitoIdentityPool } from '@aws-sdk/credential-provider-cognito-identity'
+import { HttpRequest } from '@aws-sdk/protocol-http'
+import { SignatureV4 } from '@aws-sdk/signature-v4'
 
 const requiredEnv = (name) => {
   const value = import.meta.env[name]
@@ -24,20 +28,42 @@ const resolveRegion = (urlString) => {
 }
 
 const apiUrl = requiredEnv('VITE_BACKEND_URL')
-const awsClient = new AwsClient({
-  accessKeyId: requiredEnv('VITE_AWS_ACCESS_KEY_ID'),
-  secretAccessKey: requiredEnv('VITE_AWS_SECRET_ACCESS_KEY'),
+const region = resolveRegion(apiUrl)
+const identityPoolId = requiredEnv('VITE_COGNITO_IDENTITY_POOL_ID')
+
+const cognitoClient = new CognitoIdentityClient({ region })
+const credentialsProvider = fromCognitoIdentityPool({
+  client: cognitoClient,
+  identityPoolId,
+})
+const signer = new SignatureV4({
   service: 'lambda',
-  region: resolveRegion(apiUrl),
+  region,
+  credentials: credentialsProvider,
+  sha256: Sha256,
 })
 
 export const invokeLambda = async (action, payload) => {
-  const response = await awsClient.fetch(apiUrl, {
+  const body = JSON.stringify({ action, payload })
+  const url = new URL(apiUrl)
+
+  const request = new HttpRequest({
+    protocol: url.protocol,
+    hostname: url.hostname,
+    port: url.port,
     method: 'POST',
+    path: `${url.pathname}${url.search}`,
     headers: {
-      'Content-Type': 'application/json',
+      'content-type': 'application/json',
     },
-    body: JSON.stringify({ action, payload }),
+    body,
+  })
+
+  const signedRequest = await signer.sign(request)
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: signedRequest.headers,
+    body,
   })
 
   const data = await response.json().catch(() => ({}))

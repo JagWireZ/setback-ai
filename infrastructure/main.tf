@@ -2,6 +2,8 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   backend_source_files = concat(
     [for file in fileset("${path.module}/../backend/src", "**/*.ts") : "backend/src/${file}"],
@@ -35,24 +37,6 @@ locals {
   frontend_source_hash = sha256(
     join("", [for file in local.frontend_source_files : filesha256("${path.module}/../${file}")]),
   )
-
-  frontend_dist_files = fileset("${path.module}/../dist", "**")
-
-  content_types = {
-    ".html" = "text/html"
-    ".css"  = "text/css"
-    ".js"   = "application/javascript"
-    ".json" = "application/json"
-    ".svg"  = "image/svg+xml"
-    ".png"  = "image/png"
-    ".jpg"  = "image/jpeg"
-    ".jpeg" = "image/jpeg"
-    ".gif"  = "image/gif"
-    ".ico"  = "image/x-icon"
-    ".txt"  = "text/plain"
-    ".map"  = "application/json"
-    ".webp" = "image/webp"
-  }
 
   frontend_bucket_name = var.frontend_bucket_name != "" ? var.frontend_bucket_name : null
 }
@@ -195,8 +179,39 @@ resource "aws_lambda_function_url" "backend" {
   }
 }
 
-resource "aws_iam_user" "frontend_lambda_invoker" {
-  name = "${var.lambda_function_name}-frontend-invoker"
+resource "aws_cognito_identity_pool" "frontend" {
+  identity_pool_name               = "${var.lambda_function_name}-frontend-guests"
+  allow_unauthenticated_identities = true
+}
+
+data "aws_iam_policy_document" "frontend_unauth_assume_role" {
+  statement {
+    effect = "Allow"
+
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = ["cognito-identity.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "cognito-identity.amazonaws.com:aud"
+      values   = [aws_cognito_identity_pool.frontend.id]
+    }
+
+    condition {
+      test     = "ForAnyValue:StringLike"
+      variable = "cognito-identity.amazonaws.com:amr"
+      values   = ["unauthenticated"]
+    }
+  }
+}
+
+resource "aws_iam_role" "frontend_unauth" {
+  name               = "${var.lambda_function_name}-frontend-unauth"
+  assume_role_policy = data.aws_iam_policy_document.frontend_unauth_assume_role.json
 }
 
 data "aws_iam_policy_document" "frontend_lambda_invoke_url" {
@@ -215,31 +230,36 @@ data "aws_iam_policy_document" "frontend_lambda_invoke_url" {
   }
 }
 
-resource "aws_iam_user_policy" "frontend_lambda_invoke_url" {
+resource "aws_iam_role_policy" "frontend_lambda_invoke_url" {
   name   = "${var.lambda_function_name}-invoke-url"
-  user   = aws_iam_user.frontend_lambda_invoker.name
+  role   = aws_iam_role.frontend_unauth.id
   policy = data.aws_iam_policy_document.frontend_lambda_invoke_url.json
 }
 
-resource "aws_iam_access_key" "frontend_lambda_invoker" {
-  user = aws_iam_user.frontend_lambda_invoker.name
+resource "aws_cognito_identity_pool_roles_attachment" "frontend" {
+  identity_pool_id = aws_cognito_identity_pool.frontend.id
+  roles = {
+    unauthenticated = aws_iam_role.frontend_unauth.arn
+  }
 }
 
 resource "aws_lambda_permission" "allow_frontend_invoker_function_url" {
   statement_id           = "AllowFrontendInvokerFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.backend.function_name
-  principal              = aws_iam_user.frontend_lambda_invoker.arn
+  principal              = data.aws_caller_identity.current.account_id
   function_url_auth_type = "AWS_IAM"
 }
 
 resource "terraform_data" "build_frontend" {
   triggers_replace = {
-    source_hash = local.frontend_source_hash
+    source_hash      = local.frontend_source_hash
+    backend_url      = aws_lambda_function_url.backend.function_url
+    identity_pool_id = aws_cognito_identity_pool.frontend.id
   }
 
   provisioner "local-exec" {
-    command     = "npm run build"
+    command     = "VITE_BACKEND_URL='${aws_lambda_function_url.backend.function_url}' VITE_COGNITO_IDENTITY_POOL_ID='${aws_cognito_identity_pool.frontend.id}' VITE_AWS_REGION='${var.aws_region}' npm run build"
     working_dir = "${path.module}/.."
   }
 }
@@ -292,22 +312,19 @@ resource "aws_s3_bucket_policy" "frontend_public_read" {
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
-resource "aws_s3_object" "frontend_files" {
-  for_each = { for file in local.frontend_dist_files : file => file }
-
-  bucket = aws_s3_bucket.frontend.id
-  key    = each.value
-  source = "${path.module}/../dist/${each.value}"
-  etag   = filemd5("${path.module}/../dist/${each.value}")
-
-  content_type = lookup(
-    local.content_types,
-    lower(try(regex("\\.[^.]+$", each.value), "")),
-    "application/octet-stream",
-  )
+resource "terraform_data" "deploy_frontend" {
+  triggers_replace = {
+    source_hash = local.frontend_source_hash
+    bucket      = aws_s3_bucket.frontend.id
+  }
 
   depends_on = [
     terraform_data.build_frontend,
     aws_s3_bucket_policy.frontend_public_read,
   ]
+
+  provisioner "local-exec" {
+    command     = "node infrastructure/scripts/syncFrontendToS3.mjs ${aws_s3_bucket.frontend.id} dist"
+    working_dir = "${path.module}/.."
+  }
 }

@@ -23,16 +23,14 @@ output "lambda_function_url" {
   value       = aws_lambda_function_url.backend.function_url
 }
 
-output "frontend_lambda_invoker_access_key_id" {
-  description = "Access key id for frontend Lambda URL invoker"
-  value       = aws_iam_access_key.frontend_lambda_invoker.id
-  sensitive   = true
+output "frontend_cognito_identity_pool_id" {
+  description = "Cognito Identity Pool id for guest frontend credentials"
+  value       = aws_cognito_identity_pool.frontend.id
 }
 
-output "frontend_lambda_invoker_secret_access_key" {
-  description = "Secret access key for frontend Lambda URL invoker"
-  value       = aws_iam_access_key.frontend_lambda_invoker.secret
-  sensitive   = true
+output "frontend_unauth_role_arn" {
+  description = "IAM role assumed by unauthenticated Cognito identities"
+  value       = aws_iam_role.frontend_unauth.arn
 }
 
 output "frontend_bucket_name" {
