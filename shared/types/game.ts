@@ -134,6 +134,10 @@ export type Score = {
   playerId: string
   total: number
   possible: number
+  rounds: {
+    total: number
+    possible: number
+  }[]
 }
 
 export type Game = {

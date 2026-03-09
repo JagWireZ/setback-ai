@@ -80,7 +80,18 @@ export const scoreRound = (game: Game): Score[] => {
       playerId,
       total: 0,
       possible: 0,
+      rounds: [],
     };
+    const existingRounds = Array.isArray(existingScore.rounds)
+      ? existingScore.rounds.map((value) =>
+          typeof value === "number"
+            ? {
+                total: value,
+                possible: 0,
+              }
+            : value,
+        )
+      : [];
     const bid = bidByPlayerId.get(playerId);
     if (!bid) {
       throw new Error("Missing bid for player during scoring");
@@ -96,9 +107,23 @@ export const scoreRound = (game: Game): Score[] => {
       }
     }
 
+    const possibleMultiplier =
+      round.cardCount <= 3 && tricksWon === round.cardCount
+        ? 30
+        : 10;
+    const roundResult = {
+      total: delta,
+      possible: tricksWon * possibleMultiplier,
+    };
+    const rounds = [...existingRounds, roundResult];
+    const total = rounds.reduce((sum, value) => sum + value.total, 0);
+    const possible = rounds.reduce((sum, value) => sum + value.possible, 0);
+
     return {
       ...existingScore,
-      total: existingScore.total + delta,
+      rounds,
+      total,
+      possible,
     };
   });
 };

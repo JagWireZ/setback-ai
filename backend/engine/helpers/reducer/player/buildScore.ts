@@ -4,4 +4,5 @@ export const buildScore = (playerId: string): Score => ({
   playerId,
   total: 0,
   possible: 0,
+  rounds: [],
 });
