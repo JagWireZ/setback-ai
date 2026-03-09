@@ -77,7 +77,6 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }
-    case "setOptions":
     case "submitBid":
     case "playCard":
     case "movePlayer":

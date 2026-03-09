@@ -33,7 +33,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
     ownerToken: hostPlayerToken.token,
     options: {
       maxCards: event.payload.maxCards,
-      blindBid: false,
+      blindBid: event.payload.blindBid ?? false,
       rounds: generateRounds(event.payload.maxCards),
     },
     players: allPlayers,

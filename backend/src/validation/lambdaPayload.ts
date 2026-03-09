@@ -8,7 +8,7 @@ export function assertCreateGamePayload(
     throw new Error("Invalid action for createGame payload validation");
   }
 
-  const { playerName, maxCards } = event.payload;
+  const { playerName, maxCards, blindBid } = event.payload;
 
   if (typeof playerName !== "string" || playerName.trim().length === 0) {
     throw new Error("createGame requires payload.playerName");
@@ -16,6 +16,10 @@ export function assertCreateGamePayload(
 
   if (!isCardCount(maxCards)) {
     throw new Error("createGame requires payload.maxCards (1-10)");
+  }
+
+  if (typeof blindBid !== "undefined" && typeof blindBid !== "boolean") {
+    throw new Error("createGame payload.blindBid must be a boolean when provided");
   }
 }
 

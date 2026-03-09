@@ -2,7 +2,6 @@ import type { Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { createGame } from "./reducer/createGame";
 import { joinGame } from "./reducer/joinGame";
-import { setOptions } from "./reducer/setOptions";
 import { startGame } from "./reducer/startGame";
 import { movePlayer } from "./reducer/movePlayer";
 import { getGameState } from "./reducer/getGameState";
@@ -36,12 +35,6 @@ export const engineReducer = (
     case "joinGame": {
       const joined = joinGame(game, event);
       return putGame(joined.game).then(() => toResult(joined.game, joined.playerToken));
-    }
-    case "setOptions": {
-      requireOwnerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
-      const updatedGame = setOptions(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);

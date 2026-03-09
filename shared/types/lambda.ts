@@ -3,7 +3,6 @@ import type { Card, CardCount } from './game'
 export type LambdaAction =
   | 'createGame'
   | 'joinGame'
-  | 'setOptions'
   | 'startGame'
   | 'dealCards'
   | 'submitBid'
@@ -18,16 +17,11 @@ type ActionPayloadMap = {
   createGame: {
     playerName: string
     maxCards: CardCount
+    blindBid?: boolean
   }
   joinGame: {
     gameId: string
     playerName: string
-  }
-  setOptions: {
-    gameId: string
-    version: number
-    maxCards: CardCount
-    blindBid: boolean
   }
   startGame: {
     gameId: string
