@@ -66,7 +66,7 @@ export function assertDealCardsPayload(
     throw new Error("Invalid action for dealCards payload validation");
   }
 
-  const { gameId, playerToken, version } = event.payload;
+  const { gameId, playerToken } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("dealCards requires payload.gameId");
@@ -76,9 +76,6 @@ export function assertDealCardsPayload(
     throw new Error("dealCards requires payload.playerToken");
   }
 
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("dealCards requires payload.version");
-  }
 }
 
 export function assertStartGamePayload(
@@ -88,7 +85,7 @@ export function assertStartGamePayload(
     throw new Error("Invalid action for startGame payload validation");
   }
 
-  const { gameId, playerToken, version } = event.payload;
+  const { gameId, playerToken } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("startGame requires payload.gameId");
@@ -98,9 +95,6 @@ export function assertStartGamePayload(
     throw new Error("startGame requires payload.playerToken");
   }
 
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("startGame requires payload.version");
-  }
 }
 
 export function assertSubmitBidPayload(
@@ -110,7 +104,7 @@ export function assertSubmitBidPayload(
     throw new Error("Invalid action for submitBid payload validation");
   }
 
-  const { gameId, playerToken, version, bid, trip } = event.payload;
+  const { gameId, playerToken, bid, trip } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("submitBid requires payload.gameId");
@@ -118,10 +112,6 @@ export function assertSubmitBidPayload(
 
   if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
     throw new Error("submitBid requires payload.playerToken");
-  }
-
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("submitBid requires payload.version");
   }
 
   if (typeof bid !== "number" || !Number.isInteger(bid)) {
@@ -143,7 +133,7 @@ export function assertPlayCardPayload(
     throw new Error("Invalid action for playCard payload validation");
   }
 
-  const { gameId, playerToken, version, card } = event.payload;
+  const { gameId, playerToken, card } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("playCard requires payload.gameId");
@@ -151,10 +141,6 @@ export function assertPlayCardPayload(
 
   if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
     throw new Error("playCard requires payload.playerToken");
-  }
-
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("playCard requires payload.version");
   }
 
   if (
@@ -178,7 +164,7 @@ export function assertMovePlayerPayload(
     throw new Error("Invalid action for movePlayer payload validation");
   }
 
-  const { gameId, playerToken, version, playerId, direction } = event.payload;
+  const { gameId, playerToken, playerId, direction } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("movePlayer requires payload.gameId");
@@ -186,10 +172,6 @@ export function assertMovePlayerPayload(
 
   if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
     throw new Error("movePlayer requires payload.playerToken");
-  }
-
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("movePlayer requires payload.version");
   }
 
   if (typeof playerId !== "string" || playerId.trim().length === 0) {

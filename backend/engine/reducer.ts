@@ -10,7 +10,6 @@ import { dealCards } from "./reducer/dealCards";
 import { submitBid } from "./reducer/submitBid";
 import { playCard } from "./reducer/playCard";
 import { requireOwnerToken } from "./helpers/reducer/validation/requireOwnerToken";
-import { requireVersion } from "./helpers/reducer/validation/requireVersion";
 import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerToken";
 import { putGame } from "./helpers/reducer/storage/putGame";
 import { toResult } from "./helpers/reducer/gameState/toResult";
@@ -38,31 +37,26 @@ export const engineReducer = (
     }
     case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
       const updatedGame = startGame(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "dealCards": {
       requirePlayerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
       const updatedGame = dealCards(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "submitBid": {
       requirePlayerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
       const updatedGame = submitBid(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "playCard": {
       requirePlayerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
       const updatedGame = playCard(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }
     case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
-      requireVersion(game, event.payload.version);
       const updatedGame = movePlayer(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame));
     }

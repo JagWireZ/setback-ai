@@ -25,26 +25,21 @@ type ActionPayloadMap = {
   }
   startGame: {
     gameId: string
-    version: number
   }
   dealCards: {
     gameId: string
-    version: number
   }
   submitBid: {
     gameId: string
-    version: number
     bid: number
     trip?: boolean
   }
   playCard: {
     gameId: string
-    version: number
     card: Card
   }
   movePlayer: {
     gameId: string
-    version: number
     playerId: string
     direction: string
   }
