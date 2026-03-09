@@ -133,5 +133,43 @@ export function assertSubmitBidPayload(
   }
 }
 
+const CARD_SUITS = new Set(["Clubs", "Diamonds", "Hearts", "Spades", "Joker"]);
+const CARD_RANKS = new Set(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "LJ", "BJ"]);
+
+export function assertPlayCardPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"playCard"> {
+  if (event.action !== "playCard") {
+    throw new Error("Invalid action for playCard payload validation");
+  }
+
+  const { gameId, playerToken, version, card } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("playCard requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("playCard requires payload.playerToken");
+  }
+
+  if (typeof version !== "number" || !Number.isInteger(version)) {
+    throw new Error("playCard requires payload.version");
+  }
+
+  if (
+    typeof card !== "object" ||
+    card === null ||
+    !("rank" in card) ||
+    !("suit" in card) ||
+    typeof card.rank !== "string" ||
+    typeof card.suit !== "string" ||
+    !CARD_RANKS.has(card.rank) ||
+    !CARD_SUITS.has(card.suit)
+  ) {
+    throw new Error("playCard requires payload.card with valid rank and suit");
+  }
+}
+
 const isCardCount = (value: unknown): value is CardCount =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10;

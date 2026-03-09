@@ -131,6 +131,16 @@ export const playCard = (
 
   const phase = existingGame.phase;
   const turnPlayerId = phase.turnPlayerId;
+  const playerToken = existingGame.playerTokens.find(
+    (entry) => entry.token === event.payload.playerToken,
+  );
+  if (!playerToken) {
+    throw new Error("Invalid player token");
+  }
+  if (playerToken.playerId !== turnPlayerId) {
+    throw new Error("It is not this player's turn to play");
+  }
+
   const currentPlayerHand = phase.cards.hands.find((hand) => hand.playerId === turnPlayerId);
   if (!currentPlayerHand) {
     throw new Error("Current player's hand not found");

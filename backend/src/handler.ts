@@ -6,6 +6,7 @@ import {
   assertCreateGamePayload,
   assertDealCardsPayload,
   assertJoinGamePayload,
+  assertPlayCardPayload,
   assertRemoveGamePayload,
   assertStartGamePayload,
   assertSubmitBidPayload,
@@ -83,7 +84,11 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }
-    case "playCard":
+    case "playCard": {
+      assertPlayCardPayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
+    }
     case "movePlayer":
     case "getGameState":
       return {
