@@ -1,6 +1,8 @@
 import { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
+import { runAiTurnsForGame } from "../engine/ai/runAiTurnsForGame";
+import { toResult } from "../engine/helpers/reducer/gameState/toResult";
 import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import {
   assertCreateGamePayload,
@@ -74,22 +76,26 @@ const handleAction = async (
     case "dealCards": {
       assertDealCardsPayload(event);
       const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      await engineReducer(game, event);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "startGame": {
       assertStartGamePayload(event);
       const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      await engineReducer(game, event);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "submitBid": {
       assertSubmitBidPayload(event);
       const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      await engineReducer(game, event);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "playCard": {
       assertPlayCardPayload(event);
       const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      await engineReducer(game, event);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "movePlayer": {
       assertMovePlayerPayload(event);
@@ -107,4 +113,17 @@ const handleAction = async (
 
 const assertNever = (value: never): never => {
   throw new Error(`Unhandled action: ${JSON.stringify(value)}`);
+};
+
+const runAiAndReturnForViewer = async (
+  gameId: string,
+  viewerPlayerToken: string,
+): Promise<unknown> => {
+  await runAiTurnsForGame(gameId);
+  const latestGame = await getGameById(gameId);
+  if (!latestGame) {
+    throw new Error("Game not found");
+  }
+
+  return toResult(latestGame, undefined, viewerPlayerToken);
 };
