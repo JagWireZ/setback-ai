@@ -77,5 +77,27 @@ export function assertDealCardsPayload(
   }
 }
 
+export function assertStartGamePayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"startGame"> {
+  if (event.action !== "startGame") {
+    throw new Error("Invalid action for startGame payload validation");
+  }
+
+  const { gameId, playerToken, version } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("startGame requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("startGame requires payload.playerToken");
+  }
+
+  if (typeof version !== "number" || !Number.isInteger(version)) {
+    throw new Error("startGame requires payload.version");
+  }
+}
+
 const isCardCount = (value: unknown): value is CardCount =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10;
