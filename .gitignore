@@ -3,3 +3,5 @@ dist
 .DS_Store
 .terraform*
 terraform.tfstate*
+.env.local
+.env.*.local
