@@ -120,6 +120,83 @@ const chooseAiBid = (game: Game): { bid: number; trip?: boolean } => {
   };
 };
 
+const CARD_RANK_VALUE: Record<string, number> = {
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6,
+  "7": 7,
+  "8": 8,
+  "9": 9,
+  "10": 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+  LJ: 15,
+  BJ: 16,
+};
+
+const getCardRankValue = (card: Card): number => CARD_RANK_VALUE[card.rank] ?? 0;
+
+const getNormalizedSuit = (card: Card, trumpSuit: Card["suit"]): Card["suit"] =>
+  card.suit === "Joker" ? trumpSuit : card.suit;
+
+const isTrumpCard = (card: Card, trumpSuit: Card["suit"]): boolean =>
+  getNormalizedSuit(card, trumpSuit) === trumpSuit;
+
+const isRankedTrump = (card: Card, trumpSuit: Card["suit"]): boolean =>
+  card.suit !== "Joker" && card.suit === trumpSuit;
+
+const chooseLowestCard = (cards: Card[], trumpSuit: Card["suit"]): Card => {
+  const sorted = [...cards].sort((a, b) => {
+    const aTrumpPenalty = isTrumpCard(a, trumpSuit) ? 1 : 0;
+    const bTrumpPenalty = isTrumpCard(b, trumpSuit) ? 1 : 0;
+    if (aTrumpPenalty !== bTrumpPenalty) {
+      return aTrumpPenalty - bTrumpPenalty;
+    }
+    return getCardRankValue(a) - getCardRankValue(b);
+  });
+  return sorted[0];
+};
+
+const getPlayStrength = (
+  card: Card,
+  leadSuit: Card["suit"],
+  trumpSuit: Card["suit"],
+): { tier: number; rank: number } => {
+  if (card.rank === "BJ") {
+    return { tier: 4, rank: 100 };
+  }
+  if (card.rank === "LJ") {
+    return { tier: 3, rank: 100 };
+  }
+
+  const normalizedSuit = getNormalizedSuit(card, trumpSuit);
+  if (normalizedSuit === trumpSuit) {
+    return { tier: 2, rank: getCardRankValue(card) };
+  }
+  if (normalizedSuit === leadSuit) {
+    return { tier: 1, rank: getCardRankValue(card) };
+  }
+  return { tier: 0, rank: getCardRankValue(card) };
+};
+
+const cardBeats = (
+  candidate: Card,
+  currentWinner: Card,
+  leadSuit: Card["suit"],
+  trumpSuit: Card["suit"],
+): boolean => {
+  const candidateStrength = getPlayStrength(candidate, leadSuit, trumpSuit);
+  const winnerStrength = getPlayStrength(currentWinner, leadSuit, trumpSuit);
+  if (candidateStrength.tier > winnerStrength.tier) {
+    return true;
+  }
+  return candidateStrength.tier === winnerStrength.tier && candidateStrength.rank > winnerStrength.rank;
+};
+
 const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Card => {
   if (game.phase.stage !== "Playing") {
     throw new Error("AI play requested outside Playing phase");
@@ -130,6 +207,12 @@ const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Ca
     throw new Error("AI hand not found");
   }
 
+  const trumpSuit = game.phase.cards.trump?.suit;
+  if (!trumpSuit) {
+    throw new Error("Trump card missing during AI play selection");
+  }
+
+  const legalCards: Card[] = [];
   let lastError: Error | undefined;
   for (const card of aiHand.cards) {
     const candidateEvent: LambdaEventPayload<"playCard"> = {
@@ -143,13 +226,77 @@ const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Ca
 
     try {
       playCard(game, candidateEvent);
-      return card;
+      legalCards.push(card);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error("Unknown AI play error");
     }
   }
 
-  throw lastError ?? new Error("AI has no playable card");
+  if (legalCards.length === 0) {
+    throw lastError ?? new Error("AI has no playable card");
+  }
+  if (legalCards.length === 1) {
+    return legalCards[0];
+  }
+
+  const currentTrick = game.phase.cards.currentTrick;
+  const leadCard = currentTrick?.plays[0]?.card;
+
+  if (!leadCard) {
+    if (game.phase.cards.trumpBroken) {
+      const bigJoker = legalCards.find((card) => card.rank === "BJ");
+      const hasOtherTrump = legalCards.some((card) => isTrumpCard(card, trumpSuit) && card.rank !== "BJ");
+      if (bigJoker && hasOtherTrump) {
+        return bigJoker;
+      }
+
+      const lowTrumps = legalCards.filter(
+        (card) => isRankedTrump(card, trumpSuit) && getCardRankValue(card) <= 7,
+      );
+      const mediumHighTrumps = legalCards.filter(
+        (card) => isRankedTrump(card, trumpSuit) && getCardRankValue(card) >= 11,
+      );
+      if (lowTrumps.length > 0 && mediumHighTrumps.length > 0) {
+        return lowTrumps.sort((a, b) => getCardRankValue(a) - getCardRankValue(b))[0];
+      }
+    }
+
+    return chooseLowestCard(legalCards, trumpSuit);
+  }
+
+  const leadSuit = getNormalizedSuit(leadCard, trumpSuit);
+  const hasLeadSuit = aiHand.cards.some((card) => getNormalizedSuit(card, trumpSuit) === leadSuit);
+
+  if (!hasLeadSuit) {
+    const rankedTrumpCards = legalCards.filter((card) => isRankedTrump(card, trumpSuit));
+    if (rankedTrumpCards.length > 0) {
+      return rankedTrumpCards.sort((a, b) => getCardRankValue(a) - getCardRankValue(b))[0];
+    }
+  }
+
+  const currentWinner = currentTrick?.plays.reduce((best, play) => {
+    if (!best) {
+      return play.card;
+    }
+    return cardBeats(play.card, best, leadSuit, trumpSuit) ? play.card : best;
+  }, undefined as Card | undefined);
+
+  if (currentWinner) {
+    const winningCards = legalCards.filter((card) =>
+      cardBeats(card, currentWinner, leadSuit, trumpSuit),
+    );
+    if (winningCards.length === 0) {
+      const nonTrumpCards = legalCards.filter((card) => !isTrumpCard(card, trumpSuit));
+      if (nonTrumpCards.length > 0) {
+        return chooseLowestCard(nonTrumpCards, trumpSuit);
+      }
+      return chooseLowestCard(legalCards, trumpSuit);
+    }
+
+    return winningCards.sort((a, b) => getCardRankValue(a) - getCardRankValue(b))[0];
+  }
+
+  return chooseLowestCard(legalCards, trumpSuit);
 };
 
 const applyAutomationStep = (game: Game): Game | undefined => {
