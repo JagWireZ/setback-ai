@@ -34,7 +34,91 @@ const getAiTurnPlayer = (game: Game): { playerId: string; token: string } | unde
   };
 };
 
-const chooseAiBid = (_game: Game): { bid: number; trip?: boolean } => ({ bid: 0 });
+const clampBid = (bid: number, cardCount: number): number =>
+  Math.max(0, Math.min(cardCount, Math.trunc(bid)));
+
+const getRankStrength = (card: Card): number => {
+  if (card.rank === "BJ") {
+    return 2.4;
+  }
+  if (card.rank === "LJ") {
+    return 2.1;
+  }
+
+  const rankWeights: Record<string, number> = {
+    A: 0.8,
+    K: 0.65,
+    Q: 0.5,
+    J: 0.38,
+    "10": 0.3,
+    "9": 0.22,
+    "8": 0.17,
+    "7": 0.13,
+    "6": 0.1,
+    "5": 0.08,
+    "4": 0.07,
+    "3": 0.06,
+    "2": 0.05,
+  };
+
+  return rankWeights[card.rank] ?? 0.05;
+};
+
+const getCardStrength = (card: Card, trumpSuit: Card["suit"]): number => {
+  if (card.suit === "Joker") {
+    return getRankStrength(card);
+  }
+
+  const rankStrength = getRankStrength(card);
+  if (card.suit === trumpSuit) {
+    return rankStrength + 0.5;
+  }
+
+  return rankStrength;
+};
+
+const chooseAiBid = (game: Game): { bid: number; trip?: boolean } => {
+  if (game.phase.stage !== "Bidding") {
+    throw new Error("AI bid requested outside Bidding phase");
+  }
+
+  const round = game.options.rounds[game.phase.roundIndex];
+  if (!round) {
+    throw new Error("Round not found for current phase");
+  }
+
+  const aiPlayerId = game.phase.turnPlayerId;
+  const aiHand = game.phase.cards.hands.find((hand) => hand.playerId === aiPlayerId);
+  if (!aiHand) {
+    throw new Error("AI hand not found for bidding");
+  }
+
+  const trumpSuit = game.phase.cards.trump?.suit;
+  if (!trumpSuit) {
+    return { bid: 0 };
+  }
+
+  const handStrength = aiHand.cards.reduce(
+    (sum, card) => sum + getCardStrength(card, trumpSuit),
+    0,
+  );
+
+  const estimatedTricks = clampBid(Math.round(handStrength / 1.2), round.cardCount);
+
+  if (round.cardCount <= 3) {
+    const strongForSweep = estimatedTricks === round.cardCount && handStrength >= round.cardCount + 0.8;
+    if (strongForSweep) {
+      return {
+        bid: round.cardCount,
+        trip: true,
+      };
+    }
+  }
+
+  return {
+    bid: estimatedTricks,
+  };
+};
 
 const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Card => {
   if (game.phase.stage !== "Playing") {
