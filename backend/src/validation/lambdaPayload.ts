@@ -171,5 +171,35 @@ export function assertPlayCardPayload(
   }
 }
 
+export function assertMovePlayerPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"movePlayer"> {
+  if (event.action !== "movePlayer") {
+    throw new Error("Invalid action for movePlayer payload validation");
+  }
+
+  const { gameId, playerToken, version, playerId, direction } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("movePlayer requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("movePlayer requires payload.playerToken");
+  }
+
+  if (typeof version !== "number" || !Number.isInteger(version)) {
+    throw new Error("movePlayer requires payload.version");
+  }
+
+  if (typeof playerId !== "string" || playerId.trim().length === 0) {
+    throw new Error("movePlayer requires payload.playerId");
+  }
+
+  if (direction !== "left" && direction !== "right") {
+    throw new Error('movePlayer requires payload.direction as "left" or "right"');
+  }
+}
+
 const isCardCount = (value: unknown): value is CardCount =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10;
