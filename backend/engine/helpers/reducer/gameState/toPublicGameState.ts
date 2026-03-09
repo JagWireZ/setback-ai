@@ -14,10 +14,9 @@ export const toPublicGameState = (
         cards: {
           ...game.phase.cards,
           deck: [],
-          hands: game.phase.cards.hands.map((hand) => ({
-            ...hand,
-            cards: hand.playerId === viewerPlayerId ? hand.cards : [],
-          })),
+          hands: viewerPlayerId
+            ? game.phase.cards.hands.filter((hand) => hand.playerId === viewerPlayerId)
+            : [],
         },
       }
     : game.phase;
