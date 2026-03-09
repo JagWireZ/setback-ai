@@ -138,6 +138,8 @@ export type Score = {
     total: number
     possible: number
     rainbow: boolean
+    bid: number
+    books: number
   }[]
 }
 

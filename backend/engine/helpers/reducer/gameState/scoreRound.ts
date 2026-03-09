@@ -89,10 +89,14 @@ export const scoreRound = (game: Game): Score[] => {
                 total: value,
                 possible: 0,
                 rainbow: false,
+                bid: 0,
+                books: 0,
               }
             : {
                 ...value,
                 rainbow: value.rainbow === true,
+                bid: typeof value.bid === "number" ? value.bid : 0,
+                books: typeof value.books === "number" ? value.books : 0,
               },
         )
       : [];
@@ -121,6 +125,8 @@ export const scoreRound = (game: Game): Score[] => {
       total: delta,
       possible: tricksWon * possibleMultiplier,
       rainbow,
+      bid: bid.amount,
+      books: tricksWon,
     };
     const rounds = [...existingRounds, roundResult];
     const total = rounds.reduce((sum, value) => sum + value.total, 0);
