@@ -1,9 +1,22 @@
 import type { Game } from "@shared/types/game";
-import { PutItem } from "../../../../db";
+import { TransactWriteItems } from "../../../../db";
 import { tableName } from "./tableName";
+import { toGameVersionItem } from "./gameVersionItem";
 
 export const putGame = (game: Game): Promise<void> =>
-  PutItem<Game>({
-    tableName: tableName(),
-    item: game,
+  TransactWriteItems({
+    items: [
+      {
+        put: {
+          tableName: tableName(),
+          item: game,
+        },
+      },
+      {
+        put: {
+          tableName: tableName(),
+          item: toGameVersionItem(game),
+        },
+      },
+    ],
   });

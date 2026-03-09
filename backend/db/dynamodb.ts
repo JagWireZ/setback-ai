@@ -4,6 +4,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 
@@ -28,6 +29,23 @@ type GetItemParams = {
 type DeleteItemParams = {
   tableName: string;
   key: DynamoKey;
+};
+
+type TransactWriteParams = {
+  items: Array<
+    | {
+        put: {
+          tableName: string;
+          item: Record<string, unknown>;
+        };
+      }
+    | {
+        delete: {
+          tableName: string;
+          key: DynamoKey;
+        };
+      }
+  >;
 };
 
 const client = new DynamoDBClient({});
@@ -108,6 +126,38 @@ export const DeleteItem = async (
     new DeleteCommand({
       TableName: tableName,
       Key: key,
+    }),
+  );
+};
+
+export const TransactWriteItems = async (
+  params: TransactWriteParams,
+): Promise<void> => {
+  const { items } = params;
+
+  if (items.length === 0) {
+    throw new Error("TransactWriteItems requires at least one item");
+  }
+
+  await docClient.send(
+    new TransactWriteCommand({
+      TransactItems: items.map((item) => {
+        if ("put" in item) {
+          return {
+            Put: {
+              TableName: item.put.tableName,
+              Item: item.put.item,
+            },
+          };
+        }
+
+        return {
+          Delete: {
+            TableName: item.delete.tableName,
+            Key: item.delete.key,
+          },
+        };
+      }),
     }),
   );
 };

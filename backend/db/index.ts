@@ -1,1 +1,1 @@
-export { DeleteItem, GetItem, PutItem, PutPartialItem } from "./dynamodb";
+export { DeleteItem, GetItem, PutItem, PutPartialItem, TransactWriteItems } from "./dynamodb";

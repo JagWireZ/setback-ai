@@ -5,6 +5,7 @@ import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import {
   assertCreateGamePayload,
   assertDealCardsPayload,
+  assertGetGameStatePayload,
   assertJoinGamePayload,
   assertMovePlayerPayload,
   assertPlayCardPayload,
@@ -95,11 +96,10 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }
-    case "getGameState":
-      return {
-        action: event.action,
-        ok: true,
-      };
+    case "getGameState": {
+      assertGetGameStatePayload(event);
+      return engineReducer(undefined, event);
+    }
     default:
       return assertNever(event);
   }
