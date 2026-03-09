@@ -60,6 +60,7 @@ export type PhaseStage = 'Lobby' | 'Dealing' | 'Bidding' | 'Playing' | 'Scoring'
 export type PhaseCards = {
   deck: Card[]
   trump: Card
+  trumpBroken: boolean
   hands: Hand[]
   currentTrick?: Trick
   completedTricks: Trick[]

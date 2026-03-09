@@ -92,6 +92,7 @@ export const dealCards = (
       ...existingGame.phase.cards,
       deck,
       trump,
+      trumpBroken: false,
       hands: existingGame.playerOrder.map((playerId) => ({
         playerId,
         cards: handsByPlayerId.get(playerId) ?? [],

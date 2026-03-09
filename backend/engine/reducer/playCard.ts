@@ -1,8 +1,24 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
-import type { Card, Game, Hand, Trick } from "@shared/types/game";
+import type { Card, Game, Hand, Suit, Trick, TrickPlay } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { scoreRound } from "../helpers/reducer/gameState/scoreRound";
+
+const RANK_VALUE: Record<string, number> = {
+  "2": 2,
+  "3": 3,
+  "4": 4,
+  "5": 5,
+  "6": 6,
+  "7": 7,
+  "8": 8,
+  "9": 9,
+  "10": 10,
+  J: 11,
+  Q: 12,
+  K: 13,
+  A: 14,
+};
 
 const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -11,6 +27,70 @@ const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
   }
 
   return playerOrder[(currentIndex + 1) % playerOrder.length];
+};
+
+const getNormalizedSuit = (card: Card, trumpSuit: Suit): Suit =>
+  card.suit === "Joker" ? trumpSuit : card.suit;
+
+const isTrumpCard = (card: Card, trumpSuit: Suit): boolean =>
+  getNormalizedSuit(card, trumpSuit) === trumpSuit;
+
+const hasSuit = (cards: Card[], suit: Suit, trumpSuit: Suit): boolean =>
+  cards.some((card) => getNormalizedSuit(card, trumpSuit) === suit);
+
+const canLeadTrump = (cards: Card[], trumpSuit: Suit, trumpBroken: boolean): boolean => {
+  if (trumpBroken) {
+    return true;
+  }
+
+  return cards.every((card) => isTrumpCard(card, trumpSuit));
+};
+
+const getPlayStrength = (
+  play: TrickPlay,
+  leadSuit: Suit,
+  trumpSuit: Suit,
+): { tier: number; rank: number } => {
+  if (play.card.rank === "BJ") {
+    return { tier: 4, rank: 100 };
+  }
+
+  if (play.card.rank === "LJ") {
+    return { tier: 3, rank: 100 };
+  }
+
+  const normalizedSuit = getNormalizedSuit(play.card, trumpSuit);
+  if (normalizedSuit === trumpSuit) {
+    return { tier: 2, rank: RANK_VALUE[play.card.rank] ?? 0 };
+  }
+
+  if (normalizedSuit === leadSuit) {
+    return { tier: 1, rank: RANK_VALUE[play.card.rank] ?? 0 };
+  }
+
+  return { tier: 0, rank: RANK_VALUE[play.card.rank] ?? 0 };
+};
+
+const resolveTrickWinner = (trick: Trick, trumpSuit: Suit): string => {
+  if (trick.plays.length === 0) {
+    throw new Error("Cannot resolve trick winner without plays");
+  }
+
+  const leadSuit = getNormalizedSuit(trick.plays[0].card, trumpSuit);
+  const winningPlay = trick.plays.reduce((best, current) => {
+    const bestStrength = getPlayStrength(best, leadSuit, trumpSuit);
+    const currentStrength = getPlayStrength(current, leadSuit, trumpSuit);
+
+    if (currentStrength.tier > bestStrength.tier) {
+      return current;
+    }
+    if (currentStrength.tier === bestStrength.tier && currentStrength.rank > bestStrength.rank) {
+      return current;
+    }
+    return best;
+  });
+
+  return winningPlay.playerId;
 };
 
 const removeCardFromHand = (
@@ -51,6 +131,18 @@ export const playCard = (
 
   const phase = existingGame.phase;
   const turnPlayerId = phase.turnPlayerId;
+  const currentPlayerHand = phase.cards.hands.find((hand) => hand.playerId === turnPlayerId);
+  if (!currentPlayerHand) {
+    throw new Error("Current player's hand not found");
+  }
+  if (
+    !currentPlayerHand.cards.some(
+      (card) => card.rank === event.payload.card.rank && card.suit === event.payload.card.suit,
+    )
+  ) {
+    throw new Error("Played card not found in current player's hand");
+  }
+
   const currentTrick: Trick = phase.cards.currentTrick ?? {
     index: phase.trickIndex,
     leadPlayerId: turnPlayerId,
@@ -59,6 +151,38 @@ export const playCard = (
 
   if (currentTrick.plays.some((play) => play.playerId === turnPlayerId)) {
     throw new Error("Current player has already played this trick");
+  }
+
+  const trumpSuit = phase.cards.trump.suit;
+  const leadCard = currentTrick.plays[0]?.card;
+  const leadSuit = leadCard ? getNormalizedSuit(leadCard, trumpSuit) : undefined;
+  const playedCardSuit = getNormalizedSuit(event.payload.card, trumpSuit);
+  const playedCardIsTrump = isTrumpCard(event.payload.card, trumpSuit);
+  const playerHasLeadSuit = leadSuit
+    ? hasSuit(currentPlayerHand.cards, leadSuit, trumpSuit)
+    : false;
+
+  if (!leadSuit) {
+    if (
+      playedCardIsTrump &&
+      !canLeadTrump(currentPlayerHand.cards, trumpSuit, phase.cards.trumpBroken)
+    ) {
+      throw new Error("Cannot lead with trump until trump is broken");
+    }
+  } else if (playerHasLeadSuit && playedCardSuit !== leadSuit) {
+    throw new Error("Player must follow the leading suit when possible");
+  }
+
+  let nextTrumpBroken = phase.cards.trumpBroken;
+  if (!nextTrumpBroken && playedCardIsTrump) {
+    if (!leadSuit) {
+      const hasAnyNonTrump = currentPlayerHand.cards.some((card) => !isTrumpCard(card, trumpSuit));
+      if (!hasAnyNonTrump) {
+        nextTrumpBroken = true;
+      }
+    } else if (!playerHasLeadSuit) {
+      nextTrumpBroken = true;
+    }
   }
 
   const nextTrick: Trick = {
@@ -81,6 +205,7 @@ export const playCard = (
         turnPlayerId: getNextPlayerId(existingGame.playerOrder, turnPlayerId),
         cards: {
           ...phase.cards,
+          trumpBroken: nextTrumpBroken,
           hands: nextHands,
           currentTrick: nextTrick,
         },
@@ -88,10 +213,7 @@ export const playCard = (
     });
   }
 
-  const winnerPlayerId = nextTrick.plays[0]?.playerId;
-  if (!winnerPlayerId) {
-    throw new Error("Cannot complete trick without plays");
-  }
+  const winnerPlayerId = resolveTrickWinner(nextTrick, trumpSuit);
 
   const completedTrick: Trick = {
     ...nextTrick,
@@ -104,11 +226,12 @@ export const playCard = (
       ...scoringPhase,
       stage: "Scoring" as const,
       trickIndex: phase.trickIndex + 1,
-      cards: {
-        ...phase.cards,
-        hands: nextHands,
-        currentTrick: undefined,
-        completedTricks: [...phase.cards.completedTricks, completedTrick],
+        cards: {
+          ...phase.cards,
+          trumpBroken: nextTrumpBroken,
+          hands: nextHands,
+          currentTrick: undefined,
+          completedTricks: [...phase.cards.completedTricks, completedTrick],
       },
     };
     const updatedScores = scoreRound({
@@ -131,6 +254,7 @@ export const playCard = (
       turnPlayerId: nextTurnPlayerId,
       cards: {
         ...phase.cards,
+        trumpBroken: nextTrumpBroken,
         hands: nextHands,
         currentTrick: undefined,
         completedTricks: [...phase.cards.completedTricks, completedTrick],

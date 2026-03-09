@@ -24,6 +24,7 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
     cards: {
       deck,
       trump,
+      trumpBroken: false,
       hands: game.playerOrder.map((playerId) => ({
         playerId,
         cards: [],
