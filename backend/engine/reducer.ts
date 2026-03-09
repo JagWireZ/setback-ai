@@ -20,6 +20,7 @@ export type PublicGameState = Omit<Game, "playerTokens" | "ownerToken">;
 export type EngineReducerResult = {
   game?: PublicGameState;
   playerToken?: string;
+  version?: number;
 };
 
 export const engineReducer = (

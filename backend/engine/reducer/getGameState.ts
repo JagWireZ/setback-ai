@@ -9,7 +9,7 @@ import { toResult } from "../helpers/reducer/gameState/toResult";
 export const getGameState = (
   _game: Game | undefined,
   event: LambdaEventPayload<"getGameState">,
-): Promise<{ game?: Omit<Game, "playerTokens" | "ownerToken">; playerToken?: string }> =>
+): Promise<{ game?: Omit<Game, "playerTokens" | "ownerToken">; playerToken?: string; version?: number }> =>
   getGameVersionById(event.payload.gameId).then((versionItem) => {
     if (!versionItem) {
       return getGameById(event.payload.gameId).then((existingGame) => {
@@ -21,7 +21,7 @@ export const getGameState = (
 
         return putGame(existingGame).then(() => {
           if (event.payload.version >= existingGame.version) {
-            return {};
+            return { version: existingGame.version };
           }
 
           return toResult(existingGame, undefined, event.payload.playerToken);
@@ -37,7 +37,7 @@ export const getGameState = (
     }
 
     if (event.payload.version >= versionItem.version) {
-      return {};
+      return { version: versionItem.version };
     }
 
     return getGameById(event.payload.gameId).then((existingGame) => {
