@@ -103,5 +103,35 @@ export function assertStartGamePayload(
   }
 }
 
+export function assertSubmitBidPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"submitBid"> {
+  if (event.action !== "submitBid") {
+    throw new Error("Invalid action for submitBid payload validation");
+  }
+
+  const { gameId, playerToken, version, bid, trip } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("submitBid requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("submitBid requires payload.playerToken");
+  }
+
+  if (typeof version !== "number" || !Number.isInteger(version)) {
+    throw new Error("submitBid requires payload.version");
+  }
+
+  if (typeof bid !== "number" || !Number.isInteger(bid)) {
+    throw new Error("submitBid requires payload.bid");
+  }
+
+  if (typeof trip !== "undefined" && typeof trip !== "boolean") {
+    throw new Error("submitBid payload.trip must be a boolean when provided");
+  }
+}
+
 const isCardCount = (value: unknown): value is CardCount =>
   typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10;

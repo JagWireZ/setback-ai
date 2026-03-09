@@ -8,6 +8,7 @@ import {
   assertJoinGamePayload,
   assertRemoveGamePayload,
   assertStartGamePayload,
+  assertSubmitBidPayload,
 } from "./validation/lambdaPayload";
 
 export const handler = async (
@@ -77,7 +78,11 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }
-    case "submitBid":
+    case "submitBid": {
+      assertSubmitBidPayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
+    }
     case "playCard":
     case "movePlayer":
     case "getGameState":
