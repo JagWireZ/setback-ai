@@ -29,36 +29,40 @@ export const engineReducer = (
   switch (event.action) {
     case "createGame": {
       const created = createGame(event);
-      return putGame(created.game).then(() => toResult(created.game, created.playerToken));
+      return putGame(created.game).then(() =>
+        toResult(created.game, created.playerToken, created.playerToken),
+      );
     }
     case "joinGame": {
       const joined = joinGame(game, event);
-      return putGame(joined.game).then(() => toResult(joined.game, joined.playerToken));
+      return putGame(joined.game).then(() =>
+        toResult(joined.game, joined.playerToken, joined.playerToken),
+      );
     }
     case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);
       const updatedGame = startGame(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "dealCards": {
       requirePlayerToken(game, event.payload.playerToken);
       const updatedGame = dealCards(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "submitBid": {
       requirePlayerToken(game, event.payload.playerToken);
       const updatedGame = submitBid(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "playCard": {
       requirePlayerToken(game, event.payload.playerToken);
       const updatedGame = playCard(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
       const updatedGame = movePlayer(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame));
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "removeGame":
       return removeGame(event);

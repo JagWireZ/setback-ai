@@ -24,7 +24,7 @@ export const getGameState = (
             return {};
           }
 
-          return toResult(existingGame);
+          return toResult(existingGame, undefined, event.payload.playerToken);
         });
       });
     }
@@ -45,6 +45,6 @@ export const getGameState = (
         throw new Error("Game not found");
       }
 
-      return toResult(existingGame);
+      return toResult(existingGame, undefined, event.payload.playerToken);
     });
   });
