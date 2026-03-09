@@ -40,7 +40,7 @@ const scoreForPlayer = (
   }
 
   if (tricksWon >= bidAmount) {
-    const base = 10 * tricksWon;
+    const base = 10 * bidAmount;
     const overTricks = Math.max(0, tricksWon - bidAmount);
     return base + overTricks;
   }
