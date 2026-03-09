@@ -30,6 +30,9 @@ const resolveRegion = (urlString) => {
 const apiUrl = requiredEnv('VITE_BACKEND_URL')
 const region = resolveRegion(apiUrl)
 const identityPoolId = requiredEnv('VITE_COGNITO_IDENTITY_POOL_ID')
+if (identityPoolId === 'replace-with-terraform-output' || identityPoolId.includes('xxxxxxxx')) {
+  throw new Error('Invalid VITE_COGNITO_IDENTITY_POOL_ID. Set it from Terraform output.')
+}
 
 const cognitoClient = new CognitoIdentityClient({ region })
 const credentialsProvider = fromCognitoIdentityPool({
@@ -54,6 +57,7 @@ export const invokeLambda = async (action, payload) => {
     method: 'POST',
     path: `${url.pathname}${url.search}`,
     headers: {
+      host: url.host,
       'content-type': 'application/json',
     },
     body,

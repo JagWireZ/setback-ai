@@ -228,6 +228,20 @@ data "aws_iam_policy_document" "frontend_lambda_invoke_url" {
       values   = ["AWS_IAM"]
     }
   }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "lambda:InvokeFunction"
+    ]
+    resources = [aws_lambda_function.backend.arn]
+
+    condition {
+      test     = "Bool"
+      variable = "lambda:InvokedViaFunctionUrl"
+      values   = ["true"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "frontend_lambda_invoke_url" {
