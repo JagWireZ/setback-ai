@@ -40,6 +40,7 @@ export type Round = {
 export type Bid = {
   playerId: string
   amount: number
+  trip: boolean
 }
 
 export type TrickPlay = {

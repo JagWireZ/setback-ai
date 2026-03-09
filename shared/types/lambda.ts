@@ -41,6 +41,7 @@ type ActionPayloadMap = {
     gameId: string
     version: number
     bid: number
+    trip?: boolean
   }
   playCard: {
     gameId: string
