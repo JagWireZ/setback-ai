@@ -88,8 +88,12 @@ export const scoreRound = (game: Game): Score[] => {
             ? {
                 total: value,
                 possible: 0,
+                rainbow: false,
               }
-            : value,
+            : {
+                ...value,
+                rainbow: value.rainbow === true,
+              },
         )
       : [];
     const bid = bidByPlayerId.get(playerId);
@@ -100,9 +104,11 @@ export const scoreRound = (game: Game): Score[] => {
     const tricksWon = tricksWonByPlayer.get(playerId) ?? 0;
     let delta = scoreForPlayer(tricksWon, bid.amount, bid.trip, round.cardCount);
 
+    let rainbow = false;
     if (round.cardCount === 4) {
       const playedCards = playedCardsByPlayer.get(playerId) ?? [];
       if (hasAllSuitsWithTrumpJokerRule(playedCards, trumpCard.suit)) {
+        rainbow = true;
         delta += 25;
       }
     }
@@ -114,6 +120,7 @@ export const scoreRound = (game: Game): Score[] => {
     const roundResult = {
       total: delta,
       possible: tricksWon * possibleMultiplier,
+      rainbow,
     };
     const rounds = [...existingRounds, roundResult];
     const total = rounds.reduce((sum, value) => sum + value.total, 0);

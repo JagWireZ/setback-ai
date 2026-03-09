@@ -137,6 +137,7 @@ export type Score = {
   rounds: {
     total: number
     possible: number
+    rainbow: boolean
   }[]
 }
 
