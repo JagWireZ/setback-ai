@@ -5,6 +5,7 @@ import { runAiTurnsForGame } from "../engine/ai/runAiTurnsForGame";
 import { toResult } from "../engine/helpers/reducer/gameState/toResult";
 import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import {
+  assertCheckStatePayload,
   assertCreateGamePayload,
   assertDealCardsPayload,
   assertGetGameStatePayload,
@@ -70,6 +71,11 @@ const handleAction = async (
     }
     case "joinGame": {
       assertJoinGamePayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
+    }
+    case "checkState": {
+      assertCheckStatePayload(event);
       const game = await getGameById(event.payload.gameId);
       return engineReducer(game, event);
     }

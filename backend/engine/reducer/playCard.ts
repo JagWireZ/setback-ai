@@ -164,7 +164,11 @@ export const playCard = (
     throw new Error("Current player has already played this trick");
   }
 
-  const trumpSuit = phase.cards.trump.suit;
+  const trumpCard = phase.cards.trump;
+  if (!trumpCard) {
+    throw new Error("Trump card is not set for Playing phase");
+  }
+  const trumpSuit = trumpCard.suit;
   const leadCard = currentTrick.plays[0]?.card;
   const leadSuit = leadCard ? getNormalizedSuit(leadCard, trumpSuit) : undefined;
   const playedCardSuit = getNormalizedSuit(event.payload.card, trumpSuit);

@@ -53,6 +53,10 @@ export const scoreRound = (game: Game): Score[] => {
     throw new Error("scoreRound requires Scoring phase");
   }
   const scoringPhase = game.phase;
+  const trumpCard = scoringPhase.cards.trump;
+  if (!trumpCard) {
+    throw new Error("scoreRound requires a trump card");
+  }
 
   const round = game.options.rounds[scoringPhase.roundIndex];
   if (!round) {
@@ -87,7 +91,7 @@ export const scoreRound = (game: Game): Score[] => {
 
     if (round.cardCount === 4) {
       const playedCards = playedCardsByPlayer.get(playerId) ?? [];
-      if (hasAllSuitsWithTrumpJokerRule(playedCards, scoringPhase.cards.trump.suit)) {
+      if (hasAllSuitsWithTrumpJokerRule(playedCards, trumpCard.suit)) {
         delta += 25;
       }
     }

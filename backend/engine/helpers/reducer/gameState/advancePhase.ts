@@ -8,11 +8,6 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
   }
 
   const deck = shuffleCards();
-  const trump = deck.pop();
-  if (!trump) {
-    throw new Error("Cannot initialize dealing phase without cards");
-  }
-
   const dealerPlayerId = game.playerOrder[roundIndex % game.playerOrder.length];
   return {
     stage: "Dealing",
@@ -23,7 +18,7 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
     bids: [],
     cards: {
       deck,
-      trump,
+      trump: undefined,
       trumpBroken: false,
       hands: game.playerOrder.map((playerId) => ({
         playerId,

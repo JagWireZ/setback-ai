@@ -3,6 +3,7 @@ import type { Card, CardCount } from './game'
 export type LambdaAction =
   | 'createGame'
   | 'joinGame'
+  | 'checkState'
   | 'startGame'
   | 'dealCards'
   | 'submitBid'
@@ -22,6 +23,9 @@ type ActionPayloadMap = {
   joinGame: {
     gameId: string
     playerName: string
+  }
+  checkState: {
+    gameId: string
   }
   startGame: {
     gameId: string

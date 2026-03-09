@@ -2,6 +2,7 @@ import type { Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { createGame } from "./reducer/createGame";
 import { joinGame } from "./reducer/joinGame";
+import { checkState } from "./reducer/checkState";
 import { startGame } from "./reducer/startGame";
 import { movePlayer } from "./reducer/movePlayer";
 import { getGameState } from "./reducer/getGameState";
@@ -11,6 +12,7 @@ import { submitBid } from "./reducer/submitBid";
 import { playCard } from "./reducer/playCard";
 import { requireOwnerToken } from "./helpers/reducer/validation/requireOwnerToken";
 import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerToken";
+import { requireGame } from "./helpers/reducer/validation/requireGame";
 import { putGame } from "./helpers/reducer/storage/putGame";
 import { toResult } from "./helpers/reducer/gameState/toResult";
 import { assertNever } from "./helpers/reducer/core/assertNever";
@@ -39,6 +41,19 @@ export const engineReducer = (
       return putGame(joined.game).then(() =>
         toResult(joined.game, joined.playerToken, joined.playerToken),
       );
+    }
+    case "checkState": {
+      requireOwnerToken(game, event.payload.playerToken);
+      const existingGame = requireGame(game);
+      const updatedGame = checkState(game, event);
+
+      if (updatedGame.version !== existingGame.version) {
+        return putGame(updatedGame).then(() =>
+          toResult(updatedGame, undefined, event.payload.playerToken),
+        );
+      }
+
+      return Promise.resolve(toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);

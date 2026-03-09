@@ -59,6 +59,24 @@ export function assertJoinGamePayload(
   }
 }
 
+export function assertCheckStatePayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"checkState"> {
+  if (event.action !== "checkState") {
+    throw new Error("Invalid action for checkState payload validation");
+  }
+
+  const { gameId, playerToken } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("checkState requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("checkState requires payload.playerToken");
+  }
+}
+
 export function assertDealCardsPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"dealCards"> {
