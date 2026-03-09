@@ -7,8 +7,8 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "test": "npm run build && node --test test/**/*.test.js",
-    "tf:init": "tofu -chdir=infrastructure init",
-    "tf:apply": "tofu -chdir=infrastructure apply"
+    "tf:init": "tofu -chdir=../infrastructure init",
+    "tf:apply": "tofu -chdir=../infrastructure apply"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.888.0",

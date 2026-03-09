@@ -34,3 +34,13 @@ output "frontend_lambda_invoker_secret_access_key" {
   value       = aws_iam_access_key.frontend_lambda_invoker.secret
   sensitive   = true
 }
+
+output "frontend_bucket_name" {
+  description = "S3 bucket name hosting the frontend"
+  value       = aws_s3_bucket.frontend.id
+}
+
+output "frontend_website_url" {
+  description = "Public S3 website URL for the frontend"
+  value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
+}

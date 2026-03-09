@@ -27,3 +27,9 @@ variable "frontend_allowed_origins" {
   type        = list(string)
   default     = ["http://localhost:5173"]
 }
+
+variable "frontend_bucket_name" {
+  description = "Optional S3 bucket name for frontend hosting. Leave empty for auto-generated name."
+  type        = string
+  default     = ""
+}
