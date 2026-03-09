@@ -1,12 +1,38 @@
-const FALLBACK_URL = '/api'
+import { AwsClient } from 'aws4fetch'
 
-const resolveApiUrl = () => {
-  const configuredUrl = import.meta.env.VITE_API_BASE_URL
-  return configuredUrl && configuredUrl.trim() ? configuredUrl.trim() : FALLBACK_URL
+const requiredEnv = (name) => {
+  const value = import.meta.env[name]
+  if (!value || !value.trim()) {
+    throw new Error(`Missing required env var: ${name}`)
+  }
+  return value.trim()
 }
 
+const resolveRegion = (urlString) => {
+  const configuredRegion = import.meta.env.VITE_AWS_REGION
+  if (configuredRegion && configuredRegion.trim()) {
+    return configuredRegion.trim()
+  }
+
+  const host = new URL(urlString).hostname
+  const match = host.match(/lambda-url\.([a-z0-9-]+)\.on\.aws$/)
+  if (match?.[1]) {
+    return match[1]
+  }
+
+  return 'us-east-1'
+}
+
+const apiUrl = requiredEnv('VITE_BACKEND_URL')
+const awsClient = new AwsClient({
+  accessKeyId: requiredEnv('VITE_AWS_ACCESS_KEY_ID'),
+  secretAccessKey: requiredEnv('VITE_AWS_SECRET_ACCESS_KEY'),
+  service: 'lambda',
+  region: resolveRegion(apiUrl),
+})
+
 export const invokeLambda = async (action, payload) => {
-  const response = await fetch(resolveApiUrl(), {
+  const response = await awsClient.fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -118,13 +118,56 @@ resource "aws_lambda_function" "backend" {
 
 resource "aws_lambda_function_url" "backend" {
   function_name      = aws_lambda_function.backend.function_name
-  authorization_type = "NONE"
+  authorization_type = "AWS_IAM"
+
+  cors {
+    allow_origins = var.frontend_allowed_origins
+    allow_methods = ["POST", "OPTIONS"]
+    allow_headers = [
+      "content-type",
+      "authorization",
+      "x-amz-date",
+      "x-amz-security-token",
+      "x-amz-content-sha256"
+    ]
+    max_age = 3600
+  }
 }
 
-resource "aws_lambda_permission" "allow_public_function_url" {
-  statement_id             = "AllowPublicFunctionUrlInvoke"
+resource "aws_iam_user" "frontend_lambda_invoker" {
+  name = "${var.lambda_function_name}-frontend-invoker"
+}
+
+data "aws_iam_policy_document" "frontend_lambda_invoke_url" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "lambda:InvokeFunctionUrl"
+    ]
+    resources = [aws_lambda_function.backend.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "lambda:FunctionUrlAuthType"
+      values   = ["AWS_IAM"]
+    }
+  }
+}
+
+resource "aws_iam_user_policy" "frontend_lambda_invoke_url" {
+  name   = "${var.lambda_function_name}-invoke-url"
+  user   = aws_iam_user.frontend_lambda_invoker.name
+  policy = data.aws_iam_policy_document.frontend_lambda_invoke_url.json
+}
+
+resource "aws_iam_access_key" "frontend_lambda_invoker" {
+  user = aws_iam_user.frontend_lambda_invoker.name
+}
+
+resource "aws_lambda_permission" "allow_frontend_invoker_function_url" {
+  statement_id             = "AllowFrontendInvokerFunctionUrl"
   action                   = "lambda:InvokeFunctionUrl"
   function_name            = aws_lambda_function.backend.function_name
-  principal                = "*"
-  function_url_auth_type   = "NONE"
+  principal                = aws_iam_user.frontend_lambda_invoker.arn
+  function_url_auth_type   = "AWS_IAM"
 }

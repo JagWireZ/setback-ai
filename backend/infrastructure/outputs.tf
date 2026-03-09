@@ -19,6 +19,18 @@ output "dynamodb_table_arn" {
 }
 
 output "lambda_function_url" {
-  description = "Public Lambda function URL"
+  description = "Lambda function URL (AWS_IAM authenticated)"
   value       = aws_lambda_function_url.backend.function_url
+}
+
+output "frontend_lambda_invoker_access_key_id" {
+  description = "Access key id for frontend Lambda URL invoker"
+  value       = aws_iam_access_key.frontend_lambda_invoker.id
+  sensitive   = true
+}
+
+output "frontend_lambda_invoker_secret_access_key" {
+  description = "Secret access key for frontend Lambda URL invoker"
+  value       = aws_iam_access_key.frontend_lambda_invoker.secret
+  sensitive   = true
 }

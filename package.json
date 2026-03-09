@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "aws4fetch": "^1.0.20",
     "flowbite": "^4.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

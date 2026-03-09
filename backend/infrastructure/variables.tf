@@ -21,3 +21,9 @@ variable "dynamodb_table_name" {
   type        = string
   default     = "setback-game"
 }
+
+variable "frontend_allowed_origins" {
+  description = "Allowed browser origins for Lambda Function URL CORS"
+  type        = list(string)
+  default     = ["http://localhost:5173"]
+}
