@@ -2,6 +2,7 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Card, Game, Hand, Trick } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
+import { scoreRound } from "../helpers/reducer/gameState/scoreRound";
 
 const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -99,18 +100,25 @@ export const playCard = (
   const allHandsEmpty = nextHands.every((hand) => hand.cards.length === 0);
   if (allHandsEmpty) {
     const { turnPlayerId: _turnPlayerId, ...scoringPhase } = phase;
-    return withNextVersion(existingGame, {
-      phase: {
-        ...scoringPhase,
-        stage: "Scoring",
-        trickIndex: phase.trickIndex + 1,
-        cards: {
-          ...phase.cards,
-          hands: nextHands,
-          currentTrick: undefined,
-          completedTricks: [...phase.cards.completedTricks, completedTrick],
-        },
+    const nextPhase = {
+      ...scoringPhase,
+      stage: "Scoring" as const,
+      trickIndex: phase.trickIndex + 1,
+      cards: {
+        ...phase.cards,
+        hands: nextHands,
+        currentTrick: undefined,
+        completedTricks: [...phase.cards.completedTricks, completedTrick],
       },
+    };
+    const updatedScores = scoreRound({
+      ...existingGame,
+      phase: nextPhase,
+    });
+
+    return withNextVersion(existingGame, {
+      phase: nextPhase,
+      scores: updatedScores,
     });
   }
 
