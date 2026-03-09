@@ -91,7 +91,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
 resource "aws_lambda_function" "backend" {
   function_name = var.lambda_function_name
   role          = aws_iam_role.lambda_execution.arn
-  runtime       = "nodejs20.x"
+  runtime       = "nodejs22.x"
   description   = "setback-backend-${substr(local.dist_hash, 0, 12)}"
 
   # TypeScript compiles to dist/backend/src/handler.js in this project.
