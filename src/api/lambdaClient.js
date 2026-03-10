@@ -91,3 +91,38 @@ export const joinGame = ({ gameId, playerName }) =>
     gameId,
     playerName,
   })
+
+export const checkState = ({ gameId, playerToken }) =>
+  invokeLambda('checkState', {
+    gameId,
+    playerToken,
+  })
+
+export const getGameState = ({ gameId, playerToken, version }) =>
+  invokeLambda('getGameState', {
+    gameId,
+    playerToken,
+    version,
+  })
+
+export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
+  invokeLambda('movePlayer', {
+    gameId,
+    playerToken,
+    playerId,
+    direction,
+  })
+
+export const removePlayer = ({ gameId, playerToken, playerId }) =>
+  invokeLambda('removePlayer', {
+    gameId,
+    playerToken,
+    playerId,
+  })
+
+export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
+  invokeLambda('startGame', {
+    gameId,
+    playerToken,
+    dealerPlayerId,
+  })

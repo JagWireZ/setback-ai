@@ -17,11 +17,28 @@ export const startGame = (
     throw new Error("Game can only be started from Lobby phase");
   }
 
+  const selectedDealerPlayerId = event.payload.dealerPlayerId;
+  let nextPlayerOrder = existingGame.playerOrder;
+
+  if (selectedDealerPlayerId) {
+    const dealerIndex = existingGame.playerOrder.indexOf(selectedDealerPlayerId);
+    if (dealerIndex < 0) {
+      throw new Error("Selected dealer is not in player order");
+    }
+
+    nextPlayerOrder = [
+      ...existingGame.playerOrder.slice(dealerIndex),
+      ...existingGame.playerOrder.slice(0, dealerIndex),
+    ];
+  }
+
   const nextPhase = advancePhase({
     ...existingGame,
+    playerOrder: nextPlayerOrder,
   });
 
   return withNextVersion(existingGame, {
+    playerOrder: nextPlayerOrder,
     phase: nextPhase,
   });
 };

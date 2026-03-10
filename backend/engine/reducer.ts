@@ -7,6 +7,7 @@ import { startGame } from "./reducer/startGame";
 import { movePlayer } from "./reducer/movePlayer";
 import { getGameState } from "./reducer/getGameState";
 import { removeGame } from "./reducer/removeGame";
+import { removePlayer } from "./reducer/removePlayer";
 import { dealCards } from "./reducer/dealCards";
 import { submitBid } from "./reducer/submitBid";
 import { playCard } from "./reducer/playCard";
@@ -78,6 +79,11 @@ export const engineReducer = (
     case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
       const updatedGame = movePlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
+    }
+    case "removePlayer": {
+      requireOwnerToken(game, event.payload.playerToken);
+      const updatedGame = removePlayer(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "removeGame":

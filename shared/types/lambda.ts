@@ -9,6 +9,7 @@ export type LambdaAction =
   | 'submitBid'
   | 'playCard'
   | 'movePlayer'
+  | 'removePlayer'
   | 'removeGame'
   | 'getGameState'
 
@@ -29,6 +30,7 @@ type ActionPayloadMap = {
   }
   startGame: {
     gameId: string
+    dealerPlayerId?: string
   }
   dealCards: {
     gameId: string
@@ -46,6 +48,10 @@ type ActionPayloadMap = {
     gameId: string
     playerId: string
     direction: string
+  }
+  removePlayer: {
+    gameId: string
+    playerId: string
   }
   removeGame: {
     gameId: string

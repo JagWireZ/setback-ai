@@ -103,7 +103,7 @@ export function assertStartGamePayload(
     throw new Error("Invalid action for startGame payload validation");
   }
 
-  const { gameId, playerToken } = event.payload;
+  const { gameId, playerToken, dealerPlayerId } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("startGame requires payload.gameId");
@@ -111,6 +111,10 @@ export function assertStartGamePayload(
 
   if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
     throw new Error("startGame requires payload.playerToken");
+  }
+
+  if (typeof dealerPlayerId !== "undefined" && (typeof dealerPlayerId !== "string" || dealerPlayerId.trim().length === 0)) {
+    throw new Error("startGame payload.dealerPlayerId must be a non-empty string when provided");
   }
 
 }
@@ -198,6 +202,28 @@ export function assertMovePlayerPayload(
 
   if (direction !== "left" && direction !== "right") {
     throw new Error('movePlayer requires payload.direction as "left" or "right"');
+  }
+}
+
+export function assertRemovePlayerPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"removePlayer"> {
+  if (event.action !== "removePlayer") {
+    throw new Error("Invalid action for removePlayer payload validation");
+  }
+
+  const { gameId, playerToken, playerId } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("removePlayer requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("removePlayer requires payload.playerToken");
+  }
+
+  if (typeof playerId !== "string" || playerId.trim().length === 0) {
+    throw new Error("removePlayer requires payload.playerId");
   }
 }
 
