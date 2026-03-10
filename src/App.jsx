@@ -265,6 +265,48 @@ const clearGameIdInUrl = () => {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+const normalizeStoredSessionGame = async (gameId, playerToken) => {
+  try {
+    const ownerResult = await checkState({
+      gameId,
+      playerToken,
+    })
+
+    if (ownerResult?.game) {
+      const ownerPlayerId = ownerResult.game.players?.find((player) => player.type === 'human')?.id ?? ''
+      return {
+        role: 'owner',
+        game: ownerResult.game,
+        playerToken,
+        ownerPlayerId,
+      }
+    }
+  } catch {
+    // Fallback to player lookup below.
+  }
+
+  try {
+    const playerResult = await getGameState({
+      gameId,
+      playerToken,
+      version: 0,
+    })
+
+    if (playerResult?.game) {
+      return {
+        role: 'player',
+        game: playerResult.game,
+        playerToken,
+        version: playerResult?.version ?? playerResult.game?.version ?? 0,
+      }
+    }
+  } catch {
+    // Invalid or expired token.
+  }
+
+  return null
+}
+
 const getViewerHand = (game) => {
   if (!game?.phase || !('cards' in game.phase)) {
     return null
@@ -293,6 +335,7 @@ function GameTablePage({
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === 'undefined' ? 1024 : window.innerWidth,
   )
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
@@ -321,6 +364,7 @@ function GameTablePage({
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const previousCompletedTrickCountRef = useRef(0)
+  const bookWinnerTimeoutRef = useRef(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -377,6 +421,10 @@ function GameTablePage({
   }, [canSelectCards, viewerHand?.cards, selectedCardIndex])
 
   useEffect(() => {
+    setSelectedCardIndex(null)
+  }, [game.phase?.stage, currentTurnPlayerId])
+
+  useEffect(() => {
     const trickPlays = currentTrick?.plays ?? []
 
     if (!trickPlays[selectedTrickCardIndex ?? -1]) {
@@ -390,16 +438,31 @@ function GameTablePage({
 
     if (completedTricks.length > previousCompletedTrickCountRef.current && latestTrick?.winnerPlayerId) {
       setBookWinnerMessage(`${getPlayerName(game, latestTrick.winnerPlayerId)} won the book!`)
+      if (bookWinnerTimeoutRef.current) {
+        clearTimeout(bookWinnerTimeoutRef.current)
+      }
+      bookWinnerTimeoutRef.current = setTimeout(() => {
+        setBookWinnerMessage('')
+        bookWinnerTimeoutRef.current = null
+      }, 5000)
     }
 
     previousCompletedTrickCountRef.current = completedTricks.length
   }, [game?.version])
 
   useEffect(() => {
-    if ((currentTrick?.plays ?? []).length > 0 || game.phase?.stage !== 'Playing') {
+    if ((currentTrick?.plays ?? []).length > 0) {
       setBookWinnerMessage('')
     }
-  }, [currentTrick?.plays, game.phase?.stage])
+  }, [currentTrick?.plays])
+
+  useEffect(() => {
+    return () => {
+      if (bookWinnerTimeoutRef.current) {
+        clearTimeout(bookWinnerTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const availableActions = (() => {
     switch (game.phase?.stage) {
@@ -412,7 +475,7 @@ function GameTablePage({
       case 'Scoring':
         return ['Waiting for scoring to complete']
       case 'GameOver':
-        return isOwner ? ['Start Over', 'New Game', 'Join Game'] : ['Game is over']
+        return isOwner ? ['Start Over'] : ['Game is over']
       default:
         return []
     }
@@ -571,14 +634,24 @@ function GameTablePage({
         </article>
       </section>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-950/95 px-3 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-center gap-3">
-          <button
-            type="button"
-            className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 md:hidden"
-            onClick={() => setIsScoreModalOpen(true)}
-          >
-            Score
-          </button>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100"
+              onClick={() => setIsMenuModalOpen(true)}
+              aria-label="Open game menu"
+            >
+              ☰
+            </button>
+            <button
+              type="button"
+              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 md:hidden"
+              onClick={() => setIsScoreModalOpen(true)}
+            >
+              Score
+            </button>
+          </div>
           {canSortCards ? (
             <button
               type="button"
@@ -666,6 +739,41 @@ function GameTablePage({
           </div>
         </div>
       )}
+      {isMenuModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setIsMenuModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold">Menu</h2>
+            <div className="mt-4 flex flex-col gap-3">
+              <button
+                type="button"
+                className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800"
+                onClick={() => {
+                  setIsMenuModalOpen(false)
+                  onOpenNewGame?.()
+                }}
+              >
+                New Game
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800"
+                onClick={() => {
+                  setIsMenuModalOpen(false)
+                  onOpenJoinGame?.()
+                }}
+              >
+                Join Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -673,16 +781,21 @@ function GameTablePage({
 export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
+  const [isRejoinModalOpen, setIsRejoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [maxCards, setMaxCards] = useState('10')
   const [joinGameId, setJoinGameId] = useState('')
+  const [selectedRejoinGameId, setSelectedRejoinGameId] = useState('')
   const [joinPlayerName, setJoinPlayerName] = useState('')
   const [createErrors, setCreateErrors] = useState({})
   const [joinErrors, setJoinErrors] = useState({})
   const [isCreatingGame, setIsCreatingGame] = useState(false)
   const [isJoiningGame, setIsJoiningGame] = useState(false)
+  const [isRejoiningGame, setIsRejoiningGame] = useState(false)
+  const [isLoadingRejoinGames, setIsLoadingRejoinGames] = useState(false)
   const [requestError, setRequestError] = useState('')
   const [sessionInfo, setSessionInfo] = useState(null)
+  const [rejoinableGames, setRejoinableGames] = useState([])
 
   const [ownerSession, setOwnerSession] = useState(null)
   const [playerSession, setPlayerSession] = useState(null)
@@ -721,59 +834,37 @@ export default function App() {
         return
       }
 
-      try {
-        const ownerResult = await checkState({
-          gameId: gameIdFromUrl,
-          playerToken: storedSession.playerToken,
-        })
+      const restoredSession = await normalizeStoredSessionGame(gameIdFromUrl, storedSession.playerToken)
 
-        if (isCancelled) {
-          return
-        }
-
-        if (ownerResult?.game) {
-          const ownerPlayerId = ownerResult.game.players?.find((player) => player.type === 'human')?.id ?? ''
-          setOwnerSession({
-            gameId: gameIdFromUrl,
-            playerToken: storedSession.playerToken,
-            game: ownerResult.game,
-            ownerPlayerId,
-          })
-          setSelectedDealerPlayerId(ownerPlayerId)
-          setPlayerSession(null)
-          setIsJoinModalOpen(false)
-          saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'owner')
-          return
-        }
-      } catch {
-        // Fallback to standard player validation below.
+      if (isCancelled) {
+        return
       }
 
-      try {
-        const playerResult = await getGameState({
+      if (restoredSession?.role === 'owner') {
+        setOwnerSession({
           gameId: gameIdFromUrl,
           playerToken: storedSession.playerToken,
-          version: 0,
+          game: restoredSession.game,
+          ownerPlayerId: restoredSession.ownerPlayerId,
         })
+        setSelectedDealerPlayerId(restoredSession.ownerPlayerId)
+        setPlayerSession(null)
+        setIsJoinModalOpen(false)
+        saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'owner')
+        return
+      }
 
-        if (isCancelled) {
-          return
-        }
-
-        if (playerResult?.game || typeof playerResult?.version === 'number') {
-          setPlayerSession({
-            gameId: gameIdFromUrl,
-            playerToken: storedSession.playerToken,
-            game: playerResult?.game,
-            version: playerResult?.version ?? playerResult?.game?.version ?? 0,
-          })
-          setOwnerSession(null)
-          setIsJoinModalOpen(false)
-          saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'player')
-          return
-        }
-      } catch {
-        // Invalid or expired token; clear and continue with manual join.
+      if (restoredSession?.role === 'player') {
+        setPlayerSession({
+          gameId: gameIdFromUrl,
+          playerToken: storedSession.playerToken,
+          game: restoredSession.game,
+          version: restoredSession.version,
+        })
+        setOwnerSession(null)
+        setIsJoinModalOpen(false)
+        saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'player')
+        return
       }
 
       clearStoredGameSession(gameIdFromUrl)
@@ -789,6 +880,74 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (ownerSession?.gameId || playerSession?.gameId) {
+      return undefined
+    }
+
+    let isCancelled = false
+
+    const loadRejoinableGames = async () => {
+      setIsLoadingRejoinGames(true)
+
+      const storedSessions = readStoredSessions()
+      const gameIds = Object.keys(storedSessions)
+
+      if (gameIds.length === 0) {
+        if (!isCancelled) {
+          setRejoinableGames([])
+          setSelectedRejoinGameId('')
+          setIsLoadingRejoinGames(false)
+        }
+        return
+      }
+
+      const resolvedSessions = await Promise.all(
+        gameIds.map(async (gameId) => {
+          const storedSession = storedSessions[gameId]
+          if (typeof storedSession?.playerToken !== 'string' || !storedSession.playerToken.trim()) {
+            return null
+          }
+
+          const normalized = await normalizeStoredSessionGame(gameId, storedSession.playerToken)
+          if (!normalized?.game || normalized.game.phase?.stage === 'GameOver') {
+            return null
+          }
+
+          return {
+            gameId,
+            playerToken: storedSession.playerToken,
+            phase: normalized.game.phase?.stage ?? 'Unknown',
+            role: normalized.role,
+            updatedAt: storedSession.updatedAt ?? 0,
+          }
+        }),
+      )
+
+      if (isCancelled) {
+        return
+      }
+
+      const nextRejoinableGames = resolvedSessions
+        .filter(Boolean)
+        .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+
+      setRejoinableGames(nextRejoinableGames)
+      setSelectedRejoinGameId((current) =>
+        current && nextRejoinableGames.some((entry) => entry.gameId === current)
+          ? current
+          : nextRejoinableGames[0]?.gameId ?? '',
+      )
+      setIsLoadingRejoinGames(false)
+    }
+
+    loadRejoinableGames()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [ownerSession?.gameId, playerSession?.gameId])
+
   const closeCreateModal = () => {
     setIsCreateModalOpen(false)
     setPlayerName('')
@@ -801,6 +960,10 @@ export default function App() {
     setJoinGameId('')
     setJoinPlayerName('')
     setJoinErrors({})
+  }
+
+  const closeRejoinModal = () => {
+    setIsRejoinModalOpen(false)
   }
 
   const handleCreateGame = async (event) => {
@@ -911,6 +1074,64 @@ export default function App() {
       }
     } finally {
       setIsJoiningGame(false)
+    }
+  }
+
+  const handleRejoinGame = async (event) => {
+    event.preventDefault()
+
+    const selectedGame = rejoinableGames.find((game) => game.gameId === selectedRejoinGameId)
+    if (!selectedGame?.gameId || !selectedGame.playerToken) {
+      return
+    }
+
+    setRequestError('')
+    setIsRejoiningGame(true)
+
+    try {
+      const restoredSession = await normalizeStoredSessionGame(
+        selectedGame.gameId,
+        selectedGame.playerToken,
+      )
+
+      if (!restoredSession?.game || restoredSession.game.phase?.stage === 'GameOver') {
+        throw new Error('Stored game is no longer available to rejoin')
+      }
+
+      if (restoredSession.role === 'owner') {
+        setOwnerSession({
+          gameId: selectedGame.gameId,
+          playerToken: selectedGame.playerToken,
+          game: restoredSession.game,
+          ownerPlayerId: restoredSession.ownerPlayerId,
+        })
+        setSelectedDealerPlayerId(restoredSession.ownerPlayerId)
+        setPlayerSession(null)
+        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner')
+      } else {
+        setPlayerSession({
+          gameId: selectedGame.gameId,
+          playerToken: selectedGame.playerToken,
+          game: restoredSession.game,
+          version: restoredSession.version,
+        })
+        setOwnerSession(null)
+        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'player')
+      }
+
+      setSessionInfo({
+        action: 'rejoinGame',
+        gameId: selectedGame.gameId,
+      })
+      setLobbyError('')
+      setLobbyInfo('')
+      setGameIdInUrl(selectedGame.gameId)
+      closeRejoinModal()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to rejoin game'
+      setRequestError(message)
+    } finally {
+      setIsRejoiningGame(false)
     }
   }
 
@@ -1065,20 +1286,6 @@ export default function App() {
     previousCompletedTrickCountRef.current = completedTricks.length
 
     if (!trickCountIncreased) {
-      return
-    }
-
-    const nextTurnPlayerId =
-      activeGame.phase && 'turnPlayerId' in activeGame.phase ? activeGame.phase.turnPlayerId : undefined
-    const nextTurnPlayer = activeGame.players?.find((player) => player.id === nextTurnPlayerId)
-    const trickJustEnded =
-      activeGame.phase &&
-      'cards' in activeGame.phase &&
-      activeGame.phase.stage === 'Playing' &&
-      activeGame.phase.cards.currentTrick === undefined
-
-    if (!trickJustEnded || nextTurnPlayer?.type !== 'ai') {
-      aiPauseUntilRef.current = 0
       return
     }
 
@@ -1759,6 +1966,14 @@ export default function App() {
           >
             Join Game
           </button>
+          <button
+            type="button"
+            className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setIsRejoinModalOpen(true)}
+            disabled={isLoadingRejoinGames || rejoinableGames.length === 0}
+          >
+            Rejoin Game
+          </button>
         </div>
       </section>
 
@@ -1894,6 +2109,55 @@ export default function App() {
                   className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
                 >
                   {isJoiningGame ? 'Joining...' : 'Join Game'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isRejoinModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeRejoinModal}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold">Rejoin Game</h2>
+            <form className="mt-4 flex flex-col gap-4" onSubmit={handleRejoinGame}>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-slate-300">Stored Game</span>
+                <select
+                  value={selectedRejoinGameId}
+                  onChange={(event) => setSelectedRejoinGameId(event.target.value)}
+                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 focus:border-slate-400"
+                  disabled={isRejoiningGame || rejoinableGames.length === 0}
+                >
+                  {rejoinableGames.map((game) => (
+                    <option key={game.gameId} value={game.gameId}>
+                      {game.gameId} ({game.phase})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="mt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
+                  onClick={closeRejoinModal}
+                  disabled={isRejoiningGame}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRejoiningGame || rejoinableGames.length === 0}
+                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
+                >
+                  {isRejoiningGame ? 'Rejoining...' : 'Rejoin'}
                 </button>
               </div>
             </form>
