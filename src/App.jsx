@@ -67,7 +67,13 @@ const getCardDisplay = (card) => {
   }
 }
 
-function CardAsset({ card, className = '', showCornerSuit = true }) {
+function CardAsset({
+  card,
+  className = '',
+  showCornerSuit = true,
+  showCenterSymbol = true,
+  centerSymbolClassName = 'text-[124%] leading-none sm:text-[152%]',
+}) {
   const label = getCardLabel(card)
   const display = getCardDisplay(card)
   const suitColorClass = SUIT_COLORS[card?.suit] ?? 'text-slate-900'
@@ -92,7 +98,7 @@ function CardAsset({ card, className = '', showCornerSuit = true }) {
       </div>
       <div className={`absolute inset-0 flex flex-col items-center justify-center ${suitColorClass}`}>
         {display.accent ? <span className="mb-[6%] text-[18%] font-semibold tracking-[0.14em]">{display.accent}</span> : null}
-        <span className="text-[152%] leading-none">{display.center}</span>
+        {showCenterSymbol ? <span className={centerSymbolClassName}>{display.center}</span> : null}
         {display.accent ? <span className="mt-[4%] text-[18%] font-semibold tracking-[0.12em]">JOKER</span> : null}
       </div>
     </div>
@@ -284,6 +290,9 @@ function GameTablePage({
   isSortingCards,
 }) {
   const viewerHand = getViewerHand(game)
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth,
+  )
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
@@ -319,6 +328,42 @@ function GameTablePage({
     selectedCardIndex !== null && viewerHand?.cards?.[selectedCardIndex]
       ? viewerHand.cards[selectedCardIndex]
       : null
+  const handCardCount = viewerHand?.cards?.length ?? 0
+  const isMobileViewport = viewportWidth < 640
+  const handLayout = useMemo(() => {
+    if (!isMobileViewport) {
+      return {
+        cardWidth: '5rem',
+        overlapOffset: '-3.75rem',
+        useCompactSizing: false,
+      }
+    }
+
+    const availableWidthPx = Math.max(viewportWidth - 56, 220)
+    const visibleFraction = 0.42
+    const factor = 1 + Math.max(handCardCount - 1, 0) * visibleFraction
+    const cardWidthPx = Math.min(80, Math.max(52, availableWidthPx / factor))
+    const overlapOffsetPx = -(cardWidthPx * (1 - visibleFraction))
+
+    return {
+      cardWidth: `${cardWidthPx / 16}rem`,
+      overlapOffset: `${overlapOffsetPx / 16}rem`,
+      useCompactSizing: true,
+    }
+  }, [handCardCount, isMobileViewport, viewportWidth])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    const handleResize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
 
   useEffect(() => {
     if (!canSelectCards) {
@@ -482,7 +527,7 @@ function GameTablePage({
           </article>
         </div>
 
-        <article className="shrink-0 overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+        <article className="shrink-0 overflow-hidden sm:overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
           <div className="flex items-end justify-center pt-5 pb-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
               viewerHand.cards.map((card, index) => (
@@ -502,13 +547,20 @@ function GameTablePage({
                       : 'translate-y-0'
                   }`}
                   style={{
-                    marginLeft: index === 0 ? '0' : '-3.75rem',
+                    marginLeft: index === 0 ? '0' : handLayout.overlapOffset,
                     zIndex: selectedCardIndex === index ? 100 : index + 1,
                   }}
                   aria-label={getCardLabel(card)}
                 >
-                  <div className="aspect-[2.5/3.5] w-20 sm:w-24">
-                    <CardAsset card={card} />
+                  <div
+                    className={`aspect-[2.5/3.5] ${handLayout.useCompactSizing ? '' : 'w-20 sm:w-24'}`}
+                    style={handLayout.useCompactSizing ? { width: handLayout.cardWidth } : undefined}
+                  >
+                    <CardAsset
+                      card={card}
+                      showCenterSymbol={!handLayout.useCompactSizing}
+                      centerSymbolClassName="text-[104%] leading-none sm:text-[132%]"
+                    />
                   </div>
                 </button>
               ))
