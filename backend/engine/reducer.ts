@@ -11,6 +11,7 @@ import { removePlayer } from "./reducer/removePlayer";
 import { dealCards } from "./reducer/dealCards";
 import { submitBid } from "./reducer/submitBid";
 import { playCard } from "./reducer/playCard";
+import { sortCards } from "./reducer/sortCards";
 import { requireOwnerToken } from "./helpers/reducer/validation/requireOwnerToken";
 import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerToken";
 import { requireGame } from "./helpers/reducer/validation/requireGame";
@@ -79,6 +80,11 @@ export const engineReducer = (
     case "movePlayer": {
       requireOwnerToken(game, event.payload.playerToken);
       const updatedGame = movePlayer(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
+    }
+    case "sortCards": {
+      requirePlayerToken(game, event.payload.playerToken);
+      const updatedGame = sortCards(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "removePlayer": {

@@ -8,6 +8,7 @@ import {
   movePlayer,
   playCard,
   removePlayer,
+  sortCards,
   startGame,
   submitBid,
 } from './api/lambdaClient'
@@ -259,9 +260,11 @@ function GameTablePage({
   onDealCards,
   onSubmitBid,
   onPlayCard,
+  onSortCards,
   isDealingCards,
   isSubmittingBid,
   isPlayingCard,
+  isSortingCards,
 }) {
   const viewerHand = getViewerHand(game)
   const viewerPlayerId = viewerHand?.playerId
@@ -352,6 +355,8 @@ function GameTablePage({
         return []
     }
   })()
+
+  const canSortCards = game.phase?.stage !== 'Dealing' && (viewerHand?.cards?.length ?? 0) > 0 && typeof onSortCards === 'function'
 
   const isActionEnabled = (action) => {
     if (action === 'Deal Cards') {
@@ -462,7 +467,7 @@ function GameTablePage({
                     setSelectedCardIndex((currentIndex) => (currentIndex === index ? null : index))
                   }}
                   disabled={!canSelectCards || isPlayingCard}
-                  className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 disabled:opacity-50 ${
+                  className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
                     selectedCardIndex === index
                       ? '-translate-y-4'
                       : 'translate-y-0'
@@ -493,6 +498,16 @@ function GameTablePage({
           >
             Score
           </button>
+          {canSortCards ? (
+            <button
+              type="button"
+              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 disabled:opacity-50"
+              onClick={onSortCards}
+              disabled={isSortingCards}
+            >
+              {isSortingCards ? 'Sorting...' : 'Sort'}
+            </button>
+          ) : null}
           <div className="flex flex-wrap justify-center gap-2">
             {availableActions.length > 0 ? (
               availableActions.map((action) => (
@@ -580,14 +595,16 @@ export default function App() {
   const [isStartingGame, setIsStartingGame] = useState(false)
   const [isDealingCards, setIsDealingCards] = useState(false)
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
+  const [isSortModalOpen, setIsSortModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState('0')
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
+  const [isSortingCards, setIsSortingCards] = useState(false)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
-  const aiScheduledVersionRef = useRef(null)
+  const previousCompletedTrickCountRef = useRef(0)
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -865,6 +882,8 @@ export default function App() {
       return undefined
     }
 
+    refreshOwnerGame()
+
     const interval = setInterval(() => {
       refreshOwnerGame()
     }, 5000)
@@ -936,33 +955,36 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const completedTricks =
+      activeGame?.phase && 'cards' in activeGame.phase ? activeGame.phase.cards.completedTricks ?? [] : []
+
     if (!ownerSession?.gameId || !activeGame) {
-      aiScheduledVersionRef.current = null
+      previousCompletedTrickCountRef.current = completedTricks.length
       aiPauseUntilRef.current = 0
       return
     }
 
-    const phaseHasTurnPlayer = 'turnPlayerId' in activeGame.phase
-    const nextTurnPlayerId = phaseHasTurnPlayer ? activeGame.phase.turnPlayerId : undefined
+    const trickCountIncreased = completedTricks.length > previousCompletedTrickCountRef.current
+    previousCompletedTrickCountRef.current = completedTricks.length
+
+    if (!trickCountIncreased) {
+      return
+    }
+
+    const nextTurnPlayerId =
+      activeGame.phase && 'turnPlayerId' in activeGame.phase ? activeGame.phase.turnPlayerId : undefined
     const nextTurnPlayer = activeGame.players?.find((player) => player.id === nextTurnPlayerId)
-    const isAiTurn = Boolean(nextTurnPlayer && nextTurnPlayer.type === 'ai')
-    const canAiAct = ['Dealing', 'Bidding', 'Playing'].includes(activeGame.phase?.stage ?? '')
+    const trickJustEnded =
+      activeGame.phase &&
+      'cards' in activeGame.phase &&
+      activeGame.phase.stage === 'Playing' &&
+      activeGame.phase.cards.currentTrick === undefined
 
-    if (!phaseHasTurnPlayer || !isAiTurn || !canAiAct) {
-      aiScheduledVersionRef.current = null
+    if (!trickJustEnded || nextTurnPlayer?.type !== 'ai') {
       aiPauseUntilRef.current = 0
-      if (aiPauseTimeoutRef.current) {
-        clearTimeout(aiPauseTimeoutRef.current)
-        aiPauseTimeoutRef.current = null
-      }
       return
     }
 
-    if (aiScheduledVersionRef.current === activeGame.version) {
-      return
-    }
-
-    aiScheduledVersionRef.current = activeGame.version
     aiPauseUntilRef.current = Date.now() + 5000
     if (aiPauseTimeoutRef.current) {
       clearTimeout(aiPauseTimeoutRef.current)
@@ -1136,6 +1158,14 @@ export default function App() {
     setSelectedBid('0')
   }
 
+  const openSortCardsModal = () => {
+    setIsSortModalOpen(true)
+  }
+
+  const closeSortCardsModal = () => {
+    setIsSortModalOpen(false)
+  }
+
   const handleSubmitBid = async (event) => {
     event.preventDefault()
 
@@ -1184,6 +1214,54 @@ export default function App() {
       setLobbyError(message)
     } finally {
       setIsSubmittingBid(false)
+    }
+  }
+
+  const handleSortCards = async (mode) => {
+    const activeSession = ownerSession ?? playerSession
+    const activeGame = activeSession?.game
+    if (!activeSession?.gameId || !activeSession?.playerToken || activeGame?.phase?.stage === 'Dealing') {
+      return
+    }
+
+    setLobbyError('')
+    setLobbyInfo('')
+    setIsSortingCards(true)
+
+    try {
+      const result = await sortCards({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+        mode,
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+
+      closeSortCardsModal()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to sort cards'
+      setLobbyError(message)
+    } finally {
+      setIsSortingCards(false)
     }
   }
 
@@ -1242,9 +1320,11 @@ export default function App() {
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
+          onSortCards={openSortCardsModal}
           isDealingCards={isDealingCards}
           isSubmittingBid={isSubmittingBid}
           isPlayingCard={isPlayingCard}
+          isSortingCards={isSortingCards}
         />
 
         {isBidModalOpen && (
@@ -1296,6 +1376,37 @@ export default function App() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+        {isSortModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            onClick={closeSortCardsModal}
+          >
+            <div
+              className="w-full max-w-sm rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold">Sort Cards</h2>
+              <div className="mt-4 flex flex-col gap-3">
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+                  onClick={() => handleSortCards('bySuit')}
+                  disabled={isSortingCards}
+                >
+                  Sort by Suit
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+                  onClick={() => handleSortCards('byRank')}
+                  disabled={isSortingCards}
+                >
+                  Sort by Rank
+                </button>
+              </div>
             </div>
           </div>
         )}

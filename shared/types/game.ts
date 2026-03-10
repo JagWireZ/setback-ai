@@ -23,6 +23,8 @@ export type Card = {
   suit: Suit
 }
 
+export type SortMode = 'bySuit' | 'byRank'
+
 export type Hand = {
   playerId: string
   cards: Card[]

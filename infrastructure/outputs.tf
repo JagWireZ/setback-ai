@@ -42,3 +42,8 @@ output "frontend_website_url" {
   description = "Public S3 website URL for the frontend"
   value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
 }
+
+output "frontend_bucket_public_url" {
+  description = "Public HTTPS URL base for objects in the frontend S3 bucket"
+  value       = "https://${aws_s3_bucket.frontend.bucket_regional_domain_name}"
+}

@@ -147,3 +147,10 @@ export const playCard = ({ gameId, playerToken, card }) =>
     playerToken,
     card,
   })
+
+export const sortCards = ({ gameId, playerToken, mode }) =>
+  invokeLambda('sortCards', {
+    gameId,
+    playerToken,
+    mode,
+  })

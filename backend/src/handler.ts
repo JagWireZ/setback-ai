@@ -16,6 +16,7 @@ import {
   assertRemoveGamePayload,
   assertStartGamePayload,
   assertSubmitBidPayload,
+  assertSortCardsPayload,
 } from "./validation/lambdaPayload";
 
 export const handler = async (
@@ -84,19 +85,19 @@ const handleAction = async (
       assertDealCardsPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "startGame": {
       assertStartGamePayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "submitBid": {
       assertSubmitBidPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "playCard": {
       assertPlayCardPayload(event);
@@ -119,7 +120,12 @@ const handleAction = async (
         return toResult(latestGame, undefined, event.payload.playerToken);
       }
 
-      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
+      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+    }
+    case "sortCards": {
+      assertSortCardsPayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
     }
     case "movePlayer": {
       assertMovePlayerPayload(event);
@@ -149,18 +155,6 @@ const runAiAndReturnForViewer = async (
   viewerPlayerToken: string,
 ): Promise<unknown> => {
   await runAiTurnsForGame(gameId);
-  const latestGame = await getGameById(gameId);
-  if (!latestGame) {
-    throw new Error("Game not found");
-  }
-
-  return toResult(latestGame, undefined, viewerPlayerToken);
-};
-
-const returnLatestGameForViewer = async (
-  gameId: string,
-  viewerPlayerToken: string,
-): Promise<unknown> => {
   const latestGame = await getGameById(gameId);
   if (!latestGame) {
     throw new Error("Game not found");

@@ -1,4 +1,4 @@
-import type { Card, CardCount } from './game'
+import type { Card, CardCount, SortMode } from './game'
 
 export type LambdaAction =
   | 'createGame'
@@ -8,6 +8,7 @@ export type LambdaAction =
   | 'dealCards'
   | 'submitBid'
   | 'playCard'
+  | 'sortCards'
   | 'movePlayer'
   | 'removePlayer'
   | 'removeGame'
@@ -43,6 +44,10 @@ type ActionPayloadMap = {
   playCard: {
     gameId: string
     card: Card
+  }
+  sortCards: {
+    gameId: string
+    mode: SortMode
   }
   movePlayer: {
     gameId: string
