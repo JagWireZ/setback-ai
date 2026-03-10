@@ -44,6 +44,6 @@ output "frontend_website_url" {
 }
 
 output "frontend_bucket_public_url" {
-  description = "Public HTTPS URL base for objects in the frontend S3 bucket"
-  value       = "https://${aws_s3_bucket.frontend.bucket_regional_domain_name}"
+  description = "Public HTTPS URL for the frontend index document in the S3 bucket"
+  value       = "https://${aws_s3_bucket.frontend.bucket_regional_domain_name}/index.html"
 }

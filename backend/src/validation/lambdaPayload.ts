@@ -119,6 +119,24 @@ export function assertStartGamePayload(
 
 }
 
+export function assertStartOverPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"startOver"> {
+  if (event.action !== "startOver") {
+    throw new Error("Invalid action for startOver payload validation");
+  }
+
+  const { gameId, playerToken } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("startOver requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("startOver requires payload.playerToken");
+  }
+}
+
 export function assertSubmitBidPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"submitBid"> {

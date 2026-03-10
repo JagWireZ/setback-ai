@@ -15,6 +15,7 @@ import {
   assertPlayCardPayload,
   assertRemoveGamePayload,
   assertStartGamePayload,
+  assertStartOverPayload,
   assertSubmitBidPayload,
   assertSortCardsPayload,
 } from "./validation/lambdaPayload";
@@ -92,6 +93,11 @@ const handleAction = async (
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
       return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+    }
+    case "startOver": {
+      assertStartOverPayload(event);
+      const game = await getGameById(event.payload.gameId);
+      return engineReducer(game, event);
     }
     case "submitBid": {
       assertSubmitBidPayload(event);

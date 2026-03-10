@@ -4,6 +4,7 @@ import { createGame } from "./reducer/createGame";
 import { joinGame } from "./reducer/joinGame";
 import { checkState } from "./reducer/checkState";
 import { startGame } from "./reducer/startGame";
+import { startOver } from "./reducer/startOver";
 import { movePlayer } from "./reducer/movePlayer";
 import { getGameState } from "./reducer/getGameState";
 import { removeGame } from "./reducer/removeGame";
@@ -60,6 +61,11 @@ export const engineReducer = (
     case "startGame": {
       requireOwnerToken(game, event.payload.playerToken);
       const updatedGame = startGame(game, event);
+      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
+    }
+    case "startOver": {
+      requireOwnerToken(game, event.payload.playerToken);
+      const updatedGame = startOver(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "dealCards": {

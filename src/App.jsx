@@ -10,6 +10,7 @@ import {
   removePlayer,
   sortCards,
   startGame,
+  startOver,
   submitBid,
 } from './api/lambdaClient'
 
@@ -247,6 +248,17 @@ const setGameIdInUrl = (gameId) => {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+const clearGameIdInUrl = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  url.searchParams.delete('gameid')
+  url.searchParams.delete('gameId')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
 const getViewerHand = (game) => {
   if (!game?.phase || !('cards' in game.phase)) {
     return null
@@ -257,11 +269,16 @@ const getViewerHand = (game) => {
 
 function GameTablePage({
   game,
+  isOwner,
   onDealCards,
   onSubmitBid,
   onPlayCard,
   onSortCards,
+  onStartOver,
+  onOpenNewGame,
+  onOpenJoinGame,
   isDealingCards,
+  isStartingOver,
   isSubmittingBid,
   isPlayingCard,
   isSortingCards,
@@ -350,7 +367,7 @@ function GameTablePage({
       case 'Scoring':
         return ['Waiting for scoring to complete']
       case 'GameOver':
-        return ['Game is over']
+        return isOwner ? ['Start Over', 'New Game', 'Join Game'] : ['Game is over']
       default:
         return []
     }
@@ -369,6 +386,18 @@ function GameTablePage({
 
     if (action === 'Play Card') {
       return typeof onPlayCard === 'function' && canSelectCards && selectedCard !== null
+    }
+
+    if (action === 'Start Over') {
+      return typeof onStartOver === 'function'
+    }
+
+    if (action === 'New Game') {
+      return typeof onOpenNewGame === 'function'
+    }
+
+    if (action === 'Join Game') {
+      return typeof onOpenJoinGame === 'function'
     }
 
     return false
@@ -515,7 +544,14 @@ function GameTablePage({
                   key={action}
                   type="button"
                   className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 disabled:opacity-50"
-                  disabled={!isActionEnabled(action) || isDealingCards || isSubmittingBid}
+                  disabled={
+                    !isActionEnabled(action) ||
+                    isDealingCards ||
+                    isSubmittingBid ||
+                    isPlayingCard ||
+                    isSortingCards ||
+                    isStartingOver
+                  }
                   onClick={
                     action === 'Deal Cards'
                       ? onDealCards
@@ -527,11 +563,19 @@ function GameTablePage({
                                 onPlayCard(selectedCard)
                               }
                             }
+                          : action === 'Start Over'
+                            ? onStartOver
+                            : action === 'New Game'
+                              ? onOpenNewGame
+                              : action === 'Join Game'
+                                ? onOpenJoinGame
                           : undefined
                   }
                 >
                   {action === 'Deal Cards' && isDealingCards
                     ? 'Dealing...'
+                    : action === 'Start Over' && isStartingOver
+                      ? 'Starting...'
                     : action === 'Submit Bid' && isSubmittingBid
                       ? 'Submitting...'
                       : action === 'Play Card' && isPlayingCard
@@ -600,6 +644,7 @@ export default function App() {
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
+  const [isStartingOver, setIsStartingOver] = useState(false)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
   const aiPauseUntilRef = useRef(0)
@@ -1104,6 +1149,75 @@ export default function App() {
     }
   }
 
+  const resetActiveSessionState = () => {
+    const activeGameId = ownerSession?.gameId ?? playerSession?.gameId
+    if (activeGameId) {
+      clearStoredGameSession(activeGameId)
+    }
+
+    if (aiPauseTimeoutRef.current) {
+      clearTimeout(aiPauseTimeoutRef.current)
+      aiPauseTimeoutRef.current = null
+    }
+
+    aiPauseUntilRef.current = 0
+    previousCompletedTrickCountRef.current = 0
+    setOwnerSession(null)
+    setPlayerSession(null)
+    setLobbyError('')
+    setLobbyInfo('')
+    clearGameIdInUrl()
+  }
+
+  const handleStartOver = async () => {
+    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
+      return
+    }
+
+    setLobbyError('')
+    setLobbyInfo('')
+    setIsStartingOver(true)
+
+    try {
+      const result = await startOver({
+        gameId: ownerSession.gameId,
+        playerToken: ownerSession.playerToken,
+      })
+
+      setOwnerSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              game: result?.game ?? prev.game,
+            }
+          : prev,
+      )
+      setSelectedDealerPlayerId(ownerSession.ownerPlayerId ?? '')
+      setLobbyInfo('Game reset to lobby.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start over'
+      setLobbyError(message)
+    } finally {
+      setIsStartingOver(false)
+    }
+  }
+
+  const handleOpenNewGame = () => {
+    resetActiveSessionState()
+    setRequestError('')
+    setSessionInfo(null)
+    setIsJoinModalOpen(false)
+    setIsCreateModalOpen(true)
+  }
+
+  const handleOpenJoinGame = () => {
+    resetActiveSessionState()
+    setRequestError('')
+    setSessionInfo(null)
+    setIsCreateModalOpen(false)
+    setIsJoinModalOpen(true)
+  }
+
   const handleDealCards = async () => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken) {
@@ -1317,11 +1431,16 @@ export default function App() {
       <>
         <GameTablePage
           game={activeGame}
+          isOwner={Boolean(ownerSession)}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
           onSortCards={openSortCardsModal}
+          onStartOver={handleStartOver}
+          onOpenNewGame={handleOpenNewGame}
+          onOpenJoinGame={handleOpenJoinGame}
           isDealingCards={isDealingCards}
+          isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
           isPlayingCard={isPlayingCard}
           isSortingCards={isSortingCards}

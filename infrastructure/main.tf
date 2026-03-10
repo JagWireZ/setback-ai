@@ -166,7 +166,10 @@ resource "aws_lambda_function_url" "backend" {
   authorization_type = "AWS_IAM"
 
   cors {
-    allow_origins = var.frontend_allowed_origins
+    allow_origins = distinct(concat(
+      var.frontend_allowed_origins,
+      ["https://${aws_s3_bucket.frontend.bucket_regional_domain_name}"],
+    ))
     allow_methods = ["POST"]
     allow_headers = [
       "content-type",

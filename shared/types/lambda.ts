@@ -5,6 +5,7 @@ export type LambdaAction =
   | 'joinGame'
   | 'checkState'
   | 'startGame'
+  | 'startOver'
   | 'dealCards'
   | 'submitBid'
   | 'playCard'
@@ -32,6 +33,9 @@ type ActionPayloadMap = {
   startGame: {
     gameId: string
     dealerPlayerId?: string
+  }
+  startOver: {
+    gameId: string
   }
   dealCards: {
     gameId: string

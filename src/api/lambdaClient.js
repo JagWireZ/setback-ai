@@ -127,6 +127,12 @@ export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
     dealerPlayerId,
   })
 
+export const startOver = ({ gameId, playerToken }) =>
+  invokeLambda('startOver', {
+    gameId,
+    playerToken,
+  })
+
 export const dealCards = ({ gameId, playerToken }) =>
   invokeLambda('dealCards', {
     gameId,
