@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   checkState,
   createGame,
+  dealCards,
   getGameState,
   joinGame,
   movePlayer,
+  playCard,
   removePlayer,
   startGame,
+  submitBid,
 } from './api/lambdaClient'
 
 const getPlayerName = (game, playerId) =>
@@ -20,7 +23,15 @@ const getViewerHand = (game) => {
   return game.phase.cards.hands?.[0] ?? null
 }
 
-function GameTablePage({ game }) {
+function GameTablePage({
+  game,
+  onDealCards,
+  onSubmitBid,
+  onPlayCard,
+  isDealingCards,
+  isSubmittingBid,
+  isPlayingCard,
+}) {
   const viewerHand = getViewerHand(game)
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
@@ -29,8 +40,27 @@ function GameTablePage({ game }) {
   const bids = game?.phase && 'bids' in game.phase ? game.phase.bids : []
   const highestBid = bids.length ? Math.max(...bids.map((bid) => bid.amount)) : null
   const currentTrick = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick : undefined
+  const trumpCard = game?.phase && 'cards' in game.phase ? game.phase.cards.trump : undefined
+  const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : 0
+  const [selectedCardIndex, setSelectedCardIndex] = useState(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
+  const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
+  const selectedCard =
+    selectedCardIndex !== null && viewerHand?.cards?.[selectedCardIndex]
+      ? viewerHand.cards[selectedCardIndex]
+      : null
+
+  useEffect(() => {
+    if (!canSelectCards) {
+      setSelectedCardIndex(null)
+      return
+    }
+
+    if (!viewerHand?.cards?.[selectedCardIndex ?? -1]) {
+      setSelectedCardIndex(null)
+    }
+  }, [canSelectCards, viewerHand?.cards, selectedCardIndex])
 
   const availableActions = (() => {
     switch (game.phase?.stage) {
@@ -48,6 +78,22 @@ function GameTablePage({ game }) {
         return []
     }
   })()
+
+  const isActionEnabled = (action) => {
+    if (action === 'Deal Cards') {
+      return typeof onDealCards === 'function'
+    }
+
+    if (action === 'Submit Bid') {
+      return typeof onSubmitBid === 'function'
+    }
+
+    if (action === 'Play Card') {
+      return typeof onPlayCard === 'function' && canSelectCards && selectedCard !== null
+    }
+
+    return false
+  }
 
   return (
     <main className="h-screen overflow-hidden bg-slate-950 px-3 py-3 text-slate-100">
@@ -68,10 +114,28 @@ function GameTablePage({ game }) {
             <ul className="mt-3 flex flex-col gap-2">
               {(game.players ?? []).map((player) => {
                 const score = game.scores?.find((entry) => entry.playerId === player.id)
+                const playerBid = bids.find((bid) => bid.playerId === player.id)?.amount
                 return (
-                  <li key={player.id} className="flex items-center justify-between rounded border border-slate-700 px-3 py-2 text-sm">
-                    <span>{player.name}</span>
-                    <span>{score?.total ?? 0}</span>
+                  <li key={player.id} className="rounded border border-slate-700 px-3 py-2 text-sm">
+                    <p className="font-medium">{player.name}</p>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-300">
+                      <div>
+                        <p className="uppercase tracking-wide text-slate-400">Total</p>
+                        <p className="mt-1 text-sm text-slate-100">{score?.total ?? 0}</p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-wide text-slate-400">Possible</p>
+                        <p className="mt-1 text-sm text-slate-100">{score?.possible ?? 0}</p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-wide text-slate-400">Bid</p>
+                        <p className="mt-1 text-sm text-slate-100">
+                          {typeof playerBid === 'number'
+                            ? playerBid
+                            : score?.rounds?.[currentRoundIndex]?.bid ?? '-'}
+                        </p>
+                      </div>
+                    </div>
                   </li>
                 )
               })}
@@ -82,7 +146,12 @@ function GameTablePage({ game }) {
           </article>
 
           <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-            <h2 className="text-lg font-semibold">Table</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Table</h2>
+              <p className="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200">
+                Trump: {trumpCard ? `${trumpCard.rank} ${trumpCard.suit}` : 'Not set'}
+              </p>
+            </div>
             <p className="mt-2 text-sm text-slate-300">Current trick</p>
             <ul className="mt-2 flex flex-col gap-2">
               {(currentTrick?.plays ?? []).length > 0 ? (
@@ -105,22 +174,72 @@ function GameTablePage({ game }) {
           <div className="mt-2 flex flex-wrap gap-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
               viewerHand.cards.map((card, index) => (
-                <span key={`${card.rank}-${card.suit}-${index}`} className="rounded border border-slate-600 px-2 py-1 text-sm">
+                <button
+                  key={`${card.rank}-${card.suit}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    if (!canSelectCards) {
+                      return
+                    }
+                    setSelectedCardIndex(index)
+                  }}
+                  disabled={!canSelectCards || isPlayingCard}
+                  className={`rounded border px-2 py-1 text-sm disabled:opacity-50 ${
+                    selectedCardIndex === index
+                      ? 'border-emerald-400 bg-emerald-900/30 text-emerald-200'
+                      : 'border-slate-600'
+                  }`}
+                >
                   {card.rank} {card.suit}
-                </span>
+                </button>
               ))
             ) : (
               <p className="text-sm text-slate-400">No cards in hand yet.</p>
             )}
           </div>
-          <p className="mt-4 text-sm text-slate-300">Available actions</p>
-          <ul className="mt-2 flex flex-col gap-1 text-sm text-slate-200">
-            {availableActions.length > 0 ? (
-              availableActions.map((action) => <li key={action}>{action}</li>)
-            ) : (
-              <li>No actions available.</li>
-            )}
-          </ul>
+          <div className="mt-6 flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {availableActions.length > 0 ? (
+                availableActions.map((action) => (
+                  <button
+                    key={action}
+                    type="button"
+                    className="rounded-md border border-slate-500 px-3 py-1.5 text-sm text-slate-100 disabled:opacity-50"
+                    disabled={!isActionEnabled(action) || isDealingCards || isSubmittingBid}
+                    onClick={
+                      action === 'Deal Cards'
+                        ? onDealCards
+                        : action === 'Submit Bid'
+                          ? onSubmitBid
+                          : action === 'Play Card'
+                            ? () => {
+                                if (selectedCard) {
+                                  onPlayCard(selectedCard)
+                                }
+                              }
+                          : undefined
+                    }
+                  >
+                    {action === 'Deal Cards' && isDealingCards
+                      ? 'Dealing...'
+                      : action === 'Submit Bid' && isSubmittingBid
+                        ? 'Submitting...'
+                        : action === 'Play Card' && isPlayingCard
+                          ? 'Playing...'
+                        : action}
+                  </button>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className="rounded-md border border-slate-500 px-3 py-1.5 text-sm text-slate-100"
+                  disabled
+                >
+                  No actions available
+                </button>
+              )}
+            </div>
+          </div>
         </article>
       </section>
     </main>
@@ -146,6 +265,11 @@ export default function App() {
   const [lobbyError, setLobbyError] = useState('')
   const [lobbyInfo, setLobbyInfo] = useState('')
   const [isStartingGame, setIsStartingGame] = useState(false)
+  const [isDealingCards, setIsDealingCards] = useState(false)
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false)
+  const [selectedBid, setSelectedBid] = useState('0')
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false)
+  const [isPlayingCard, setIsPlayingCard] = useState(false)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
 
@@ -381,6 +505,9 @@ export default function App() {
   const activeLobbySession = ownerSession ?? playerSession
   const isOwnerLobby = Boolean(ownerSession)
   const activeGame = activeLobbySession?.game
+  const activeRoundIndex =
+    activeGame?.phase && 'roundIndex' in activeGame.phase ? activeGame.phase.roundIndex : 0
+  const currentRoundCardCount = activeGame?.options?.rounds?.[activeRoundIndex]?.cardCount ?? 0
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -512,10 +639,212 @@ export default function App() {
     }
   }
 
+  const handleDealCards = async () => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    setLobbyError('')
+    setLobbyInfo('')
+    setIsDealingCards(true)
+
+    try {
+      const result = await dealCards({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to deal cards'
+      setLobbyError(message)
+    } finally {
+      setIsDealingCards(false)
+    }
+  }
+
+  const openSubmitBidModal = () => {
+    setSelectedBid('0')
+    setIsBidModalOpen(true)
+  }
+
+  const closeSubmitBidModal = () => {
+    setIsBidModalOpen(false)
+    setSelectedBid('0')
+  }
+
+  const handleSubmitBid = async (event) => {
+    event.preventDefault()
+
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    setLobbyError('')
+    setLobbyInfo('')
+    setIsSubmittingBid(true)
+
+    try {
+      const result = await submitBid({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+        bid: Number(selectedBid),
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+
+      closeSubmitBidModal()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to submit bid'
+      setLobbyError(message)
+    } finally {
+      setIsSubmittingBid(false)
+    }
+  }
+
+  const handlePlayCard = async (card) => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    setLobbyError('')
+    setLobbyInfo('')
+    setIsPlayingCard(true)
+
+    try {
+      const result = await playCard({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+        card,
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to play card'
+      setLobbyError(message)
+    } finally {
+      setIsPlayingCard(false)
+    }
+  }
+
   const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
 
   if (activeGame && activeGame.phase?.stage !== 'Lobby') {
-    return <GameTablePage game={activeGame} />
+    return (
+      <>
+        <GameTablePage
+          game={activeGame}
+          onDealCards={handleDealCards}
+          onSubmitBid={openSubmitBidModal}
+          onPlayCard={handlePlayCard}
+          isDealingCards={isDealingCards}
+          isSubmittingBid={isSubmittingBid}
+          isPlayingCard={isPlayingCard}
+        />
+
+        {isBidModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl">
+              <h2 className="text-xl font-semibold">Submit Bid</h2>
+              <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmitBid}>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm text-slate-300">Bid Amount</span>
+                  <select
+                    value={selectedBid}
+                    onChange={(event) => setSelectedBid(event.target.value)}
+                    className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 focus:border-slate-400"
+                  >
+                    {Array.from({ length: currentRoundCardCount + 1 }, (_, index) => String(index)).map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="mt-2 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
+                    onClick={closeSubmitBidModal}
+                    disabled={isSubmittingBid}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
+                    disabled={isSubmittingBid}
+                  >
+                    {isSubmittingBid ? 'Submitting...' : 'Submit'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </>
+    )
   }
 
   if (activeLobbySession?.gameId && activeLobbySession?.game) {

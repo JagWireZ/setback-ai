@@ -126,3 +126,23 @@ export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
     playerToken,
     dealerPlayerId,
   })
+
+export const dealCards = ({ gameId, playerToken }) =>
+  invokeLambda('dealCards', {
+    gameId,
+    playerToken,
+  })
+
+export const submitBid = ({ gameId, playerToken, bid }) =>
+  invokeLambda('submitBid', {
+    gameId,
+    playerToken,
+    bid,
+  })
+
+export const playCard = ({ gameId, playerToken, card }) =>
+  invokeLambda('playCard', {
+    gameId,
+    playerToken,
+    card,
+  })
