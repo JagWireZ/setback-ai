@@ -9,6 +9,124 @@ import {
   startGame,
 } from './api/lambdaClient'
 
+const getPlayerName = (game, playerId) =>
+  game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
+
+const getViewerHand = (game) => {
+  if (!game?.phase || !('cards' in game.phase)) {
+    return null
+  }
+
+  return game.phase.cards.hands?.[0] ?? null
+}
+
+function GameTablePage({ game }) {
+  const viewerHand = getViewerHand(game)
+  const viewerPlayerId = viewerHand?.playerId
+  const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
+  const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
+  const totalRounds = game?.options?.rounds?.length ?? 0
+  const bids = game?.phase && 'bids' in game.phase ? game.phase.bids : []
+  const highestBid = bids.length ? Math.max(...bids.map((bid) => bid.amount)) : null
+  const currentTrick = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick : undefined
+
+  const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
+
+  const availableActions = (() => {
+    switch (game.phase?.stage) {
+      case 'Dealing':
+        return isViewerTurn ? ['Deal Cards'] : ['Waiting for dealer']
+      case 'Bidding':
+        return isViewerTurn ? ['Submit Bid'] : ['Waiting for turn to bid']
+      case 'Playing':
+        return isViewerTurn ? ['Play Card'] : ['Waiting for turn to play']
+      case 'Scoring':
+        return ['Waiting for scoring to complete']
+      case 'GameOver':
+        return ['Game is over']
+      default:
+        return []
+    }
+  })()
+
+  return (
+    <main className="h-screen overflow-hidden bg-slate-950 px-3 py-3 text-slate-100">
+      <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3">
+        <article className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <div className="grid grid-cols-1 gap-2 text-sm text-slate-200 sm:grid-cols-3 sm:items-center">
+            <p className="sm:justify-self-start">Round: {currentRound} of {totalRounds || '?'}</p>
+            <p className="sm:justify-self-center">Phase: {game.phase?.stage}</p>
+            <p className="sm:justify-self-end">
+              {currentTurnPlayerId ? `${getPlayerName(game, currentTurnPlayerId)}'s Turn` : "N/A's Turn"}
+            </p>
+          </div>
+        </article>
+
+        <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[30%_1fr]">
+          <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <h2 className="text-lg font-semibold">Score</h2>
+            <ul className="mt-3 flex flex-col gap-2">
+              {(game.players ?? []).map((player) => {
+                const score = game.scores?.find((entry) => entry.playerId === player.id)
+                return (
+                  <li key={player.id} className="flex items-center justify-between rounded border border-slate-700 px-3 py-2 text-sm">
+                    <span>{player.name}</span>
+                    <span>{score?.total ?? 0}</span>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="mt-4 text-sm text-slate-300">
+              Current bid: {highestBid ?? 'No bids yet'}
+            </p>
+          </article>
+
+          <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <h2 className="text-lg font-semibold">Table</h2>
+            <p className="mt-2 text-sm text-slate-300">Current trick</p>
+            <ul className="mt-2 flex flex-col gap-2">
+              {(currentTrick?.plays ?? []).length > 0 ? (
+                currentTrick.plays.map((play, index) => (
+                  <li key={`${play.playerId}-${index}`} className="flex items-center justify-between rounded border border-slate-700 px-3 py-2 text-sm">
+                    <span>{getPlayerName(game, play.playerId)}</span>
+                    <span>{play.card.rank} {play.card.suit}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-slate-400">No cards played in this trick yet.</li>
+              )}
+            </ul>
+          </article>
+        </div>
+
+        <article className="min-h-0 shrink-0 basis-[34%] overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <h2 className="text-lg font-semibold">Player</h2>
+          <p className="mt-2 text-sm text-slate-300">Your hand</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(viewerHand?.cards ?? []).length > 0 ? (
+              viewerHand.cards.map((card, index) => (
+                <span key={`${card.rank}-${card.suit}-${index}`} className="rounded border border-slate-600 px-2 py-1 text-sm">
+                  {card.rank} {card.suit}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400">No cards in hand yet.</p>
+            )}
+          </div>
+          <p className="mt-4 text-sm text-slate-300">Available actions</p>
+          <ul className="mt-2 flex flex-col gap-1 text-sm text-slate-200">
+            {availableActions.length > 0 ? (
+              availableActions.map((action) => <li key={action}>{action}</li>)
+            ) : (
+              <li>No actions available.</li>
+            )}
+          </ul>
+        </article>
+      </section>
+    </main>
+  )
+}
+
 export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
@@ -262,6 +380,7 @@ export default function App() {
 
   const activeLobbySession = ownerSession ?? playerSession
   const isOwnerLobby = Boolean(ownerSession)
+  const activeGame = activeLobbySession?.game
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -394,6 +513,10 @@ export default function App() {
   }
 
   const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
+
+  if (activeGame && activeGame.phase?.stage !== 'Lobby') {
+    return <GameTablePage game={activeGame} />
+  }
 
   if (activeLobbySession?.gameId && activeLobbySession?.game) {
     return (
