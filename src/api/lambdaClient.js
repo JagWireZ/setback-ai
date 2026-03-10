@@ -133,11 +133,12 @@ export const dealCards = ({ gameId, playerToken }) =>
     playerToken,
   })
 
-export const submitBid = ({ gameId, playerToken, bid }) =>
+export const submitBid = ({ gameId, playerToken, bid, trip }) =>
   invokeLambda('submitBid', {
     gameId,
     playerToken,
     bid,
+    ...(typeof trip === 'boolean' ? { trip } : {}),
   })
 
 export const playCard = ({ gameId, playerToken, card }) =>

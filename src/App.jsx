@@ -15,6 +15,92 @@ import {
 const getPlayerName = (game, playerId) =>
   game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
 
+const GAME_SESSIONS_STORAGE_KEY = 'setback.gameSessions.v1'
+
+const readStoredSessions = () => {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+
+  try {
+    const raw = window.localStorage.getItem(GAME_SESSIONS_STORAGE_KEY)
+    if (!raw) {
+      return {}
+    }
+
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'object' && parsed !== null ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const writeStoredSessions = (sessions) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(GAME_SESSIONS_STORAGE_KEY, JSON.stringify(sessions))
+}
+
+const saveStoredGameSession = (gameId, playerToken, role) => {
+  if (!gameId || !playerToken) {
+    return
+  }
+
+  const sessions = readStoredSessions()
+  sessions[gameId] = {
+    playerToken,
+    role,
+    updatedAt: Date.now(),
+  }
+  writeStoredSessions(sessions)
+}
+
+const getStoredGameSession = (gameId) => {
+  if (!gameId) {
+    return null
+  }
+
+  const sessions = readStoredSessions()
+  const session = sessions[gameId]
+  if (!session || typeof session.playerToken !== 'string' || !session.playerToken.trim()) {
+    return null
+  }
+
+  return session
+}
+
+const clearStoredGameSession = (gameId) => {
+  if (!gameId) {
+    return
+  }
+
+  const sessions = readStoredSessions()
+  delete sessions[gameId]
+  writeStoredSessions(sessions)
+}
+
+const getGameIdFromUrl = () => {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  const params = new URL(window.location.href).searchParams
+  return params.get('gameid')?.trim() ?? params.get('gameId')?.trim() ?? ''
+}
+
+const setGameIdInUrl = (gameId) => {
+  if (typeof window === 'undefined' || !gameId) {
+    return
+  }
+
+  const url = new URL(window.location.href)
+  url.searchParams.set('gameid', gameId)
+  url.searchParams.delete('gameId')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
 const getViewerHand = (game) => {
   if (!game?.phase || !('cards' in game.phase)) {
     return null
@@ -37,11 +123,25 @@ function GameTablePage({
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
   const totalRounds = game?.options?.rounds?.length ?? 0
+  const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : 0
+  const currentRoundConfig = game?.options?.rounds?.[currentRoundIndex]
   const bids = game?.phase && 'bids' in game.phase ? game.phase.bids : []
-  const highestBid = bids.length ? Math.max(...bids.map((bid) => bid.amount)) : null
   const currentTrick = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick : undefined
   const trumpCard = game?.phase && 'cards' in game.phase ? game.phase.cards.trump : undefined
-  const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : 0
+  const booksByPlayerId = useMemo(() => {
+    const books = new Map()
+    const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
+
+    for (const trick of completedTricks) {
+      if (!trick?.winnerPlayerId) {
+        continue
+      }
+
+      books.set(trick.winnerPlayerId, (books.get(trick.winnerPlayerId) ?? 0) + 1)
+    }
+
+    return books
+  }, [game?.phase])
   const [selectedCardIndex, setSelectedCardIndex] = useState(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
@@ -100,7 +200,9 @@ function GameTablePage({
       <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3">
         <article className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
           <div className="grid grid-cols-1 gap-2 text-sm text-slate-200 sm:grid-cols-3 sm:items-center">
-            <p className="sm:justify-self-start">Round: {currentRound} of {totalRounds || '?'}</p>
+            <p className="sm:justify-self-start">
+              Round: {currentRoundConfig ? `${currentRoundConfig.cardCount} ${String(currentRoundConfig.direction).toUpperCase()}` : 'N/A'}
+            </p>
             <p className="sm:justify-self-center">Phase: {game.phase?.stage}</p>
             <p className="sm:justify-self-end">
               {currentTurnPlayerId ? `${getPlayerName(game, currentTurnPlayerId)}'s Turn` : "N/A's Turn"}
@@ -114,25 +216,30 @@ function GameTablePage({
             <ul className="mt-3 flex flex-col gap-2">
               {(game.players ?? []).map((player) => {
                 const score = game.scores?.find((entry) => entry.playerId === player.id)
-                const playerBid = bids.find((bid) => bid.playerId === player.id)?.amount
+                const playerBidEntry = bids.find((bid) => bid.playerId === player.id)
+                const playerBid =
+                  playerBidEntry?.trip === true
+                    ? 'T'
+                    : typeof playerBidEntry?.amount === 'number'
+                      ? playerBidEntry.amount
+                      : score?.rounds?.[currentRoundIndex]?.bid ?? '-'
+                const playerBooks =
+                  booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
                 return (
                   <li key={player.id} className="rounded border border-slate-700 px-3 py-2 text-sm">
-                    <p className="font-medium">{player.name}</p>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-300">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="uppercase tracking-wide text-slate-400">Total</p>
-                        <p className="mt-1 text-sm text-slate-100">{score?.total ?? 0}</p>
+                        <p className="font-medium">{player.name}</p>
+                        <p className="mt-1 text-lg font-semibold text-slate-100">{score?.total ?? 0}</p>
                       </div>
-                      <div>
-                        <p className="uppercase tracking-wide text-slate-400">Possible</p>
-                        <p className="mt-1 text-sm text-slate-100">{score?.possible ?? 0}</p>
-                      </div>
-                      <div>
-                        <p className="uppercase tracking-wide text-slate-400">Bid</p>
-                        <p className="mt-1 text-sm text-slate-100">
-                          {typeof playerBid === 'number'
-                            ? playerBid
-                            : score?.rounds?.[currentRoundIndex]?.bid ?? '-'}
+                      <div className="flex flex-col items-end gap-1 text-xs text-slate-300">
+                        <p>
+                          <span className="uppercase tracking-wide text-slate-400">Bid</span>{' '}
+                          <span className="ml-3 text-sm text-slate-100">{playerBid}</span>
+                        </p>
+                        <p>
+                          <span className="uppercase tracking-wide text-slate-400">Books</span>{' '}
+                          <span className="ml-3 text-sm text-slate-100">{playerBooks}</span>
                         </p>
                       </div>
                     </div>
@@ -140,9 +247,6 @@ function GameTablePage({
                 )
               })}
             </ul>
-            <p className="mt-4 text-sm text-slate-300">
-              Current bid: {highestBid ?? 'No bids yet'}
-            </p>
           </article>
 
           <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
@@ -274,17 +378,89 @@ export default function App() {
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    const gameIdFromUrl = new URL(window.location.href).searchParams.get('gameId')?.trim()
+    const gameIdFromUrl = getGameIdFromUrl()
     if (!gameIdFromUrl) {
-      return
+      return undefined
     }
 
+    let isCancelled = false
     setJoinGameId(gameIdFromUrl)
-    setIsJoinModalOpen(true)
+
+    const attemptSessionRestore = async () => {
+      const storedSession = getStoredGameSession(gameIdFromUrl)
+      if (!storedSession?.playerToken) {
+        if (!isCancelled) {
+          setIsJoinModalOpen(true)
+        }
+        return
+      }
+
+      try {
+        const ownerResult = await checkState({
+          gameId: gameIdFromUrl,
+          playerToken: storedSession.playerToken,
+        })
+
+        if (isCancelled) {
+          return
+        }
+
+        if (ownerResult?.game) {
+          const ownerPlayerId = ownerResult.game.players?.find((player) => player.type === 'human')?.id ?? ''
+          setOwnerSession({
+            gameId: gameIdFromUrl,
+            playerToken: storedSession.playerToken,
+            game: ownerResult.game,
+            ownerPlayerId,
+          })
+          setSelectedDealerPlayerId(ownerPlayerId)
+          setPlayerSession(null)
+          setIsJoinModalOpen(false)
+          saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'owner')
+          return
+        }
+      } catch {
+        // Fallback to standard player validation below.
+      }
+
+      try {
+        const playerResult = await getGameState({
+          gameId: gameIdFromUrl,
+          playerToken: storedSession.playerToken,
+          version: 0,
+        })
+
+        if (isCancelled) {
+          return
+        }
+
+        if (playerResult?.game || typeof playerResult?.version === 'number') {
+          setPlayerSession({
+            gameId: gameIdFromUrl,
+            playerToken: storedSession.playerToken,
+            game: playerResult?.game,
+            version: playerResult?.version ?? playerResult?.game?.version ?? 0,
+          })
+          setOwnerSession(null)
+          setIsJoinModalOpen(false)
+          saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'player')
+          return
+        }
+      } catch {
+        // Invalid or expired token; clear and continue with manual join.
+      }
+
+      clearStoredGameSession(gameIdFromUrl)
+      if (!isCancelled) {
+        setIsJoinModalOpen(true)
+      }
+    }
+
+    attemptSessionRestore()
+
+    return () => {
+      isCancelled = true
+    }
   }, [])
 
   const closeCreateModal = () => {
@@ -345,6 +521,8 @@ export default function App() {
       setPlayerSession(null)
       setLobbyError('')
       setLobbyInfo('')
+      setGameIdInUrl(result?.game?.id)
+      saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner')
       closeCreateModal()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create game'
@@ -394,6 +572,8 @@ export default function App() {
       setOwnerSession(null)
       setLobbyError('')
       setLobbyInfo('')
+      setGameIdInUrl(result?.game?.id)
+      saveStoredGameSession(result?.game?.id, result?.playerToken, 'player')
       closeJoinModal()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to join game'
@@ -508,6 +688,7 @@ export default function App() {
   const activeRoundIndex =
     activeGame?.phase && 'roundIndex' in activeGame.phase ? activeGame.phase.roundIndex : 0
   const currentRoundCardCount = activeGame?.options?.rounds?.[activeRoundIndex]?.cardCount ?? 0
+  const isTripRound = [1, 2, 3].includes(currentRoundCardCount)
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -527,7 +708,8 @@ export default function App() {
     }
 
     const url = new URL(window.location.href)
-    url.searchParams.set('gameId', activeLobbySession.gameId)
+    url.searchParams.set('gameid', activeLobbySession.gameId)
+    url.searchParams.delete('gameId')
     return url.toString()
   }, [activeLobbySession?.gameId])
 
@@ -706,10 +888,12 @@ export default function App() {
     setIsSubmittingBid(true)
 
     try {
+      const isTripBid = selectedBid === 'trip'
       const result = await submitBid({
         gameId: activeSession.gameId,
         playerToken: activeSession.playerToken,
-        bid: Number(selectedBid),
+        bid: isTripBid ? currentRoundCardCount : Number(selectedBid),
+        ...(isTripBid ? { trip: true } : {}),
       })
 
       if (ownerSession) {
@@ -819,6 +1003,11 @@ export default function App() {
                         {value}
                       </option>
                     ))}
+                    {isTripRound && (
+                      <option value="trip">
+                        Trip
+                      </option>
+                    )}
                   </select>
                 </label>
 
