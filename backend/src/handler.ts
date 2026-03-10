@@ -84,25 +84,42 @@ const handleAction = async (
       assertDealCardsPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "startGame": {
       assertStartGamePayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "submitBid": {
       assertSubmitBidPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "playCard": {
       assertPlayCardPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      const latestGame = await getGameById(event.payload.gameId);
+      if (!latestGame) {
+        throw new Error("Game not found");
+      }
+
+      const previousCompletedTrickCount =
+        game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
+      const latestCompletedTrickCount =
+        latestGame.phase && "cards" in latestGame.phase
+          ? latestGame.phase.cards.completedTricks.length
+          : 0;
+      const trickJustCompleted = latestCompletedTrickCount > previousCompletedTrickCount;
+
+      if (trickJustCompleted) {
+        return toResult(latestGame, undefined, event.payload.playerToken);
+      }
+
+      return returnLatestGameForViewer(event.payload.gameId, event.payload.playerToken);
     }
     case "movePlayer": {
       assertMovePlayerPayload(event);
@@ -132,6 +149,18 @@ const runAiAndReturnForViewer = async (
   viewerPlayerToken: string,
 ): Promise<unknown> => {
   await runAiTurnsForGame(gameId);
+  const latestGame = await getGameById(gameId);
+  if (!latestGame) {
+    throw new Error("Game not found");
+  }
+
+  return toResult(latestGame, undefined, viewerPlayerToken);
+};
+
+const returnLatestGameForViewer = async (
+  gameId: string,
+  viewerPlayerToken: string,
+): Promise<unknown> => {
   const latestGame = await getGameById(gameId);
   if (!latestGame) {
     throw new Error("Game not found");

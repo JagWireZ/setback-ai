@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   checkState,
   createGame,
@@ -14,6 +14,151 @@ import {
 
 const getPlayerName = (game, playerId) =>
   game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
+
+const SUIT_SYMBOLS = {
+  Hearts: '♥️',
+  Diamonds: '♦️',
+  Clubs: '♣️',
+  Spades: '♠️',
+  Joker: '⭐',
+}
+
+const SUIT_COLORS = {
+  Hearts: 'text-red-700',
+  Diamonds: 'text-red-700',
+  Clubs: 'text-slate-900',
+  Spades: 'text-slate-900',
+  Joker: 'text-amber-500',
+}
+
+const getCardLabel = (card) => {
+  if (!card?.rank || !card?.suit) {
+    return 'Unknown card'
+  }
+
+  if (card.suit === 'Joker') {
+    return card.rank === 'BJ' ? 'Big Joker' : card.rank === 'LJ' ? 'Little Joker' : 'Joker'
+  }
+
+  const suitLabel = card.suit.slice(0, -1) === 'Diamond' ? 'Diamonds' : card.suit
+  return `${card.rank} of ${suitLabel}`
+}
+
+const getCardDisplay = (card) => {
+  if (!card?.rank || !card?.suit) {
+    return { rank: '?', suit: '', center: '?' }
+  }
+
+  if (card.suit === 'Joker') {
+    return {
+      rank: card.rank,
+      suit: SUIT_SYMBOLS.Joker,
+      center: SUIT_SYMBOLS.Joker,
+      accent: card.rank === 'BJ' ? 'BIG' : 'LITTLE',
+    }
+  }
+
+  return {
+    rank: card.rank,
+    suit: SUIT_SYMBOLS[card.suit],
+    center: SUIT_SYMBOLS[card.suit],
+  }
+}
+
+function CardAsset({ card, className = '', showCornerSuit = true }) {
+  const label = getCardLabel(card)
+  const display = getCardDisplay(card)
+  const suitColorClass = SUIT_COLORS[card?.suit] ?? 'text-slate-900'
+
+  return (
+    <div
+      aria-label={label}
+      role="img"
+      className={`relative h-full w-full overflow-hidden rounded-[10%] border-2 border-slate-800 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.28)] ${className}`}
+    >
+      <div className={`absolute left-[10%] top-[8%] flex flex-col leading-none ${suitColorClass}`}>
+        <span className="text-[1.35rem] font-bold leading-none tracking-tight sm:text-[1.25rem]">{display.rank}</span>
+        {showCornerSuit ? (
+          <span className="mt-[0.2rem] text-[1rem] leading-none sm:mt-[0.35rem] sm:text-[0.825rem]">{display.suit}</span>
+        ) : null}
+      </div>
+      <div className={`absolute bottom-[8%] right-[10%] flex rotate-180 flex-col leading-none ${suitColorClass}`}>
+        <span className="text-[1.35rem] font-bold leading-none tracking-tight sm:text-[1.25rem]">{display.rank}</span>
+        {showCornerSuit ? (
+          <span className="mt-[0.2rem] text-[1rem] leading-none sm:mt-[0.35rem] sm:text-[0.825rem]">{display.suit}</span>
+        ) : null}
+      </div>
+      <div className={`absolute inset-0 flex flex-col items-center justify-center ${suitColorClass}`}>
+        {display.accent ? <span className="mb-[6%] text-[18%] font-semibold tracking-[0.14em]">{display.accent}</span> : null}
+        <span className="text-[152%] leading-none">{display.center}</span>
+        {display.accent ? <span className="mt-[4%] text-[18%] font-semibold tracking-[0.12em]">JOKER</span> : null}
+      </div>
+    </div>
+  )
+}
+
+function CardBack({ className = '' }) {
+  return (
+    <div
+      aria-label="Face-down deck"
+      role="img"
+      className={`relative h-full w-full overflow-hidden rounded-[10%] border-2 border-slate-800 bg-white shadow-[0_2px_8px_rgba(15,23,42,0.28)] ${className}`}
+    >
+      <div
+        className="absolute inset-[7%] rounded-[8%] border-2 border-white bg-red-800"
+        style={{
+          backgroundColor: '#b91c1c',
+          backgroundImage:
+            'linear-gradient(45deg, rgba(255,255,255,0.25) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.25) 75%), linear-gradient(45deg, rgba(255,255,255,0.25) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.25) 75%)',
+          backgroundPosition: '0 0, 10px 10px',
+          backgroundSize: '20px 20px',
+        }}
+      >
+        <div className="absolute inset-[6%] rounded-[6%] border border-red-100/90" />
+      </div>
+    </div>
+  )
+}
+
+function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
+  return (
+    <ul className="mt-3 flex flex-col gap-2">
+      {(game.players ?? []).map((player) => {
+        const score = game.scores?.find((entry) => entry.playerId === player.id)
+        const playerBidEntry = bids.find((bid) => bid.playerId === player.id)
+        const playerBid =
+          playerBidEntry?.trip === true
+            ? 'T'
+            : typeof playerBidEntry?.amount === 'number'
+              ? playerBidEntry.amount
+              : score?.rounds?.[currentRoundIndex]?.bid ?? '-'
+        const playerBooks =
+          booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
+
+        return (
+          <li key={player.id} className="rounded border border-slate-700 px-3 py-2 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{player.name}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">{score?.total ?? 0}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 text-xs text-slate-300">
+                <p>
+                  <span className="uppercase tracking-wide text-slate-400">Bid</span>{' '}
+                  <span className="ml-3 text-sm text-slate-100">{playerBid}</span>
+                </p>
+                <p>
+                  <span className="uppercase tracking-wide text-slate-400">Books</span>{' '}
+                  <span className="ml-3 text-sm text-slate-100">{playerBooks}</span>
+                </p>
+              </div>
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
 
 const GAME_SESSIONS_STORAGE_KEY = 'setback.gameSessions.v1'
 
@@ -143,6 +288,10 @@ function GameTablePage({
     return books
   }, [game?.phase])
   const [selectedCardIndex, setSelectedCardIndex] = useState(null)
+  const [selectedTrickCardIndex, setSelectedTrickCardIndex] = useState(null)
+  const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
+  const [bookWinnerMessage, setBookWinnerMessage] = useState('')
+  const previousCompletedTrickCountRef = useRef(0)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -161,6 +310,31 @@ function GameTablePage({
       setSelectedCardIndex(null)
     }
   }, [canSelectCards, viewerHand?.cards, selectedCardIndex])
+
+  useEffect(() => {
+    const trickPlays = currentTrick?.plays ?? []
+
+    if (!trickPlays[selectedTrickCardIndex ?? -1]) {
+      setSelectedTrickCardIndex(null)
+    }
+  }, [currentTrick?.plays, selectedTrickCardIndex])
+
+  useEffect(() => {
+    const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
+    const latestTrick = completedTricks[completedTricks.length - 1]
+
+    if (completedTricks.length > previousCompletedTrickCountRef.current && latestTrick?.winnerPlayerId) {
+      setBookWinnerMessage(`${getPlayerName(game, latestTrick.winnerPlayerId)} won the book!`)
+    }
+
+    previousCompletedTrickCountRef.current = completedTricks.length
+  }, [game?.version])
+
+  useEffect(() => {
+    if ((currentTrick?.plays ?? []).length > 0 || game.phase?.stage !== 'Playing') {
+      setBookWinnerMessage('')
+    }
+  }, [currentTrick?.plays, game.phase?.stage])
 
   const availableActions = (() => {
     switch (game.phase?.stage) {
@@ -197,85 +371,85 @@ function GameTablePage({
 
   return (
     <main className="h-screen overflow-hidden bg-slate-950 px-3 py-3 text-slate-100">
-      <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3">
+      <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3 pb-24">
         <article className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-          <div className="grid grid-cols-1 gap-2 text-sm text-slate-200 sm:grid-cols-3 sm:items-center">
-            <p className="sm:justify-self-start">
-              Round: {currentRoundConfig ? `${currentRoundConfig.cardCount} ${String(currentRoundConfig.direction).toUpperCase()}` : 'N/A'}
-            </p>
-            <p className="sm:justify-self-center">Phase: {game.phase?.stage}</p>
-            <p className="sm:justify-self-end">
-              {currentTurnPlayerId ? `${getPlayerName(game, currentTurnPlayerId)}'s Turn` : "N/A's Turn"}
-            </p>
+          <div className="flex items-start justify-between gap-4 text-sm text-slate-200">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <p>
+                {currentRoundConfig ? `${currentRoundConfig.cardCount} ${String(currentRoundConfig.direction).toUpperCase()}` : 'N/A'} | {game.phase?.stage ?? 'N/A'}
+              </p>
+              <p className="truncate">
+                {currentTurnPlayerId ? `${getPlayerName(game, currentTurnPlayerId)}'s Turn` : "N/A's Turn"}
+              </p>
+            </div>
+            {trumpCard ? (
+              <div className="flex shrink-0 items-center gap-2 self-start">
+                <p className="text-sm text-slate-300">Trump</p>
+                <div className="relative h-[84px] w-[78px] shrink-0">
+                  <div className="absolute left-0 top-0 h-[84px] w-[60px]">
+                    <CardBack />
+                  </div>
+                  <div className="absolute top-0 h-[84px] w-[60px]" style={{ left: '0.75rem' }}>
+                    <CardAsset card={trumpCard} showCornerSuit={false} />
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         </article>
 
         <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[30%_1fr]">
-          <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <article className="hidden min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4 md:block">
             <h2 className="text-lg font-semibold">Score</h2>
-            <ul className="mt-3 flex flex-col gap-2">
-              {(game.players ?? []).map((player) => {
-                const score = game.scores?.find((entry) => entry.playerId === player.id)
-                const playerBidEntry = bids.find((bid) => bid.playerId === player.id)
-                const playerBid =
-                  playerBidEntry?.trip === true
-                    ? 'T'
-                    : typeof playerBidEntry?.amount === 'number'
-                      ? playerBidEntry.amount
-                      : score?.rounds?.[currentRoundIndex]?.bid ?? '-'
-                const playerBooks =
-                  booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
-                return (
-                  <li key={player.id} className="rounded border border-slate-700 px-3 py-2 text-sm">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{player.name}</p>
-                        <p className="mt-1 text-lg font-semibold text-slate-100">{score?.total ?? 0}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 text-xs text-slate-300">
-                        <p>
-                          <span className="uppercase tracking-wide text-slate-400">Bid</span>{' '}
-                          <span className="ml-3 text-sm text-slate-100">{playerBid}</span>
-                        </p>
-                        <p>
-                          <span className="uppercase tracking-wide text-slate-400">Books</span>{' '}
-                          <span className="ml-3 text-sm text-slate-100">{playerBooks}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
+            <ScoreSummary
+              game={game}
+              bids={bids}
+              booksByPlayerId={booksByPlayerId}
+              currentRoundIndex={currentRoundIndex}
+            />
           </article>
 
-          <article className="min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Table</h2>
-              <p className="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200">
-                Trump: {trumpCard ? `${trumpCard.rank} ${trumpCard.suit}` : 'Not set'}
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-slate-300">Current trick</p>
-            <ul className="mt-2 flex flex-col gap-2">
-              {(currentTrick?.plays ?? []).length > 0 ? (
+          <article className="flex min-h-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
+              {bookWinnerMessage ? (
+                <li className="self-center text-center text-lg text-emerald-200">{bookWinnerMessage}</li>
+              ) : (currentTrick?.plays ?? []).length > 0 ? (
                 currentTrick.plays.map((play, index) => (
-                  <li key={`${play.playerId}-${index}`} className="flex items-center justify-between rounded border border-slate-700 px-3 py-2 text-sm">
-                    <span>{getPlayerName(game, play.playerId)}</span>
-                    <span>{play.card.rank} {play.card.suit}</span>
+                  <li
+                    key={`${play.playerId}-${index}`}
+                    className="flex w-fit shrink-0 flex-col items-center text-sm"
+                    style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: selectedTrickCardIndex === index ? 100 : index + 1 }}
+                  >
+                    <div className="mb-3 flex h-5 items-end justify-center">
+                      {selectedTrickCardIndex === index ? (
+                        <p className="text-center text-lg text-slate-200">{getPlayerName(game, play.playerId)}</p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
+                        selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
+                      }`}
+                      onClick={() =>
+                        setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
+                      }
+                      aria-label={getPlayerName(game, play.playerId)}
+                    >
+                      <div className="aspect-[2.5/3.5] w-24 sm:w-28">
+                        <CardAsset card={play.card} />
+                      </div>
+                    </button>
                   </li>
                 ))
               ) : (
-                <li className="text-sm text-slate-400">No cards played in this trick yet.</li>
+                <li className="self-center text-sm text-slate-400">No cards played in this trick yet.</li>
               )}
             </ul>
           </article>
         </div>
 
-        <article className="min-h-0 shrink-0 basis-[34%] overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-          <h2 className="text-lg font-semibold">Player</h2>
-          <p className="mt-2 text-sm text-slate-300">Your hand</p>
-          <div className="mt-2 flex flex-wrap gap-2">
+        <article className="shrink-0 overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <div className="flex items-end justify-center pt-5 pb-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
               viewerHand.cards.map((card, index) => (
                 <button
@@ -285,67 +459,102 @@ function GameTablePage({
                     if (!canSelectCards) {
                       return
                     }
-                    setSelectedCardIndex(index)
+                    setSelectedCardIndex((currentIndex) => (currentIndex === index ? null : index))
                   }}
                   disabled={!canSelectCards || isPlayingCard}
-                  className={`rounded border px-2 py-1 text-sm disabled:opacity-50 ${
+                  className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 disabled:opacity-50 ${
                     selectedCardIndex === index
-                      ? 'border-emerald-400 bg-emerald-900/30 text-emerald-200'
-                      : 'border-slate-600'
+                      ? '-translate-y-4'
+                      : 'translate-y-0'
                   }`}
+                  style={{
+                    marginLeft: index === 0 ? '0' : '-3.75rem',
+                    zIndex: selectedCardIndex === index ? 100 : index + 1,
+                  }}
+                  aria-label={getCardLabel(card)}
                 >
-                  {card.rank} {card.suit}
+                  <div className="aspect-[2.5/3.5] w-20 sm:w-24">
+                    <CardAsset card={card} />
+                  </div>
                 </button>
               ))
             ) : (
               <p className="text-sm text-slate-400">No cards in hand yet.</p>
             )}
           </div>
-          <div className="mt-6 flex justify-end">
-            <div className="flex flex-wrap justify-end gap-2">
-              {availableActions.length > 0 ? (
-                availableActions.map((action) => (
-                  <button
-                    key={action}
-                    type="button"
-                    className="rounded-md border border-slate-500 px-3 py-1.5 text-sm text-slate-100 disabled:opacity-50"
-                    disabled={!isActionEnabled(action) || isDealingCards || isSubmittingBid}
-                    onClick={
-                      action === 'Deal Cards'
-                        ? onDealCards
-                        : action === 'Submit Bid'
-                          ? onSubmitBid
-                          : action === 'Play Card'
-                            ? () => {
-                                if (selectedCard) {
-                                  onPlayCard(selectedCard)
-                                }
-                              }
-                          : undefined
-                    }
-                  >
-                    {action === 'Deal Cards' && isDealingCards
-                      ? 'Dealing...'
-                      : action === 'Submit Bid' && isSubmittingBid
-                        ? 'Submitting...'
-                        : action === 'Play Card' && isPlayingCard
-                          ? 'Playing...'
-                        : action}
-                  </button>
-                ))
-              ) : (
-                <button
-                  type="button"
-                  className="rounded-md border border-slate-500 px-3 py-1.5 text-sm text-slate-100"
-                  disabled
-                >
-                  No actions available
-                </button>
-              )}
-            </div>
-          </div>
         </article>
       </section>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-950/95 px-3 py-4 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-center gap-3">
+          <button
+            type="button"
+            className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 md:hidden"
+            onClick={() => setIsScoreModalOpen(true)}
+          >
+            Score
+          </button>
+          <div className="flex flex-wrap justify-center gap-2">
+            {availableActions.length > 0 ? (
+              availableActions.map((action) => (
+                <button
+                  key={action}
+                  type="button"
+                  className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 disabled:opacity-50"
+                  disabled={!isActionEnabled(action) || isDealingCards || isSubmittingBid}
+                  onClick={
+                    action === 'Deal Cards'
+                      ? onDealCards
+                      : action === 'Submit Bid'
+                        ? onSubmitBid
+                        : action === 'Play Card'
+                          ? () => {
+                              if (selectedCard) {
+                                onPlayCard(selectedCard)
+                              }
+                            }
+                          : undefined
+                  }
+                >
+                  {action === 'Deal Cards' && isDealingCards
+                    ? 'Dealing...'
+                    : action === 'Submit Bid' && isSubmittingBid
+                      ? 'Submitting...'
+                      : action === 'Play Card' && isPlayingCard
+                        ? 'Playing...'
+                        : action}
+                </button>
+              ))
+            ) : (
+              <button
+                type="button"
+                className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100"
+                disabled
+              >
+                No actions available
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      {isScoreModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 md:hidden"
+          onClick={() => setIsScoreModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-center text-lg font-semibold text-slate-100">Score</h2>
+            <ScoreSummary
+              game={game}
+              bids={bids}
+              booksByPlayerId={booksByPlayerId}
+              currentRoundIndex={currentRoundIndex}
+            />
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -376,6 +585,9 @@ export default function App() {
   const [isPlayingCard, setIsPlayingCard] = useState(false)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
+  const aiPauseUntilRef = useRef(0)
+  const aiPauseTimeoutRef = useRef(null)
+  const aiScheduledVersionRef = useRef(null)
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -593,6 +805,10 @@ export default function App() {
       return
     }
 
+    if (Date.now() < aiPauseUntilRef.current) {
+      return
+    }
+
     try {
       const result = await checkState({
         gameId: ownerSession.gameId,
@@ -648,8 +864,6 @@ export default function App() {
     if (!ownerSession?.gameId || !ownerSession?.playerToken) {
       return undefined
     }
-
-    refreshOwnerGame()
 
     const interval = setInterval(() => {
       refreshOwnerGame()
@@ -712,6 +926,53 @@ export default function App() {
     url.searchParams.delete('gameId')
     return url.toString()
   }, [activeLobbySession?.gameId])
+
+  useEffect(() => {
+    return () => {
+      if (aiPauseTimeoutRef.current) {
+        clearTimeout(aiPauseTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ownerSession?.gameId || !activeGame) {
+      aiScheduledVersionRef.current = null
+      aiPauseUntilRef.current = 0
+      return
+    }
+
+    const phaseHasTurnPlayer = 'turnPlayerId' in activeGame.phase
+    const nextTurnPlayerId = phaseHasTurnPlayer ? activeGame.phase.turnPlayerId : undefined
+    const nextTurnPlayer = activeGame.players?.find((player) => player.id === nextTurnPlayerId)
+    const isAiTurn = Boolean(nextTurnPlayer && nextTurnPlayer.type === 'ai')
+    const canAiAct = ['Dealing', 'Bidding', 'Playing'].includes(activeGame.phase?.stage ?? '')
+
+    if (!phaseHasTurnPlayer || !isAiTurn || !canAiAct) {
+      aiScheduledVersionRef.current = null
+      aiPauseUntilRef.current = 0
+      if (aiPauseTimeoutRef.current) {
+        clearTimeout(aiPauseTimeoutRef.current)
+        aiPauseTimeoutRef.current = null
+      }
+      return
+    }
+
+    if (aiScheduledVersionRef.current === activeGame.version) {
+      return
+    }
+
+    aiScheduledVersionRef.current = activeGame.version
+    aiPauseUntilRef.current = Date.now() + 5000
+    if (aiPauseTimeoutRef.current) {
+      clearTimeout(aiPauseTimeoutRef.current)
+    }
+    aiPauseTimeoutRef.current = setTimeout(() => {
+      aiPauseUntilRef.current = 0
+      aiPauseTimeoutRef.current = null
+      refreshOwnerGame()
+    }, 5000)
+  }, [activeGame, ownerSession?.gameId])
 
   const handleCopyShareLink = async () => {
     if (!shareLink) {
@@ -987,8 +1248,14 @@ export default function App() {
         />
 
         {isBidModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-            <div className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            onClick={closeSubmitBidModal}
+          >
+            <div
+              className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
               <h2 className="text-xl font-semibold">Submit Bid</h2>
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmitBid}>
                 <label className="flex flex-col gap-2">
@@ -1214,8 +1481,14 @@ export default function App() {
       </section>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeCreateModal}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h2 className="text-xl font-semibold">Create Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleCreateGame}>
               <label className="flex flex-col gap-2">
@@ -1281,8 +1554,14 @@ export default function App() {
       )}
 
       {isJoinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeJoinModal}
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h2 className="text-xl font-semibold">Join Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleJoinGame}>
               <label className="flex flex-col gap-2">
