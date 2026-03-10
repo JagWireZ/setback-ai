@@ -356,9 +356,14 @@ export const reviewGameState = (game: Game): Game => {
   let current = game;
 
   for (let step = 0; step < MAX_REVIEW_STEPS; step += 1) {
+    const shouldPauseAfterStep =
+      current.phase.stage === "Bidding" || current.phase.stage === "Playing";
     const updatedGame = applyAutomationStep(current);
     if (!updatedGame) {
       return current;
+    }
+    if (shouldPauseAfterStep) {
+      return updatedGame;
     }
     current = updatedGame;
   }

@@ -265,6 +265,9 @@ const clearGameIdInUrl = () => {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+const AI_ACTION_DELAY_MS = 1500
+const TRICK_COMPLETE_DELAY_MS = 5000
+
 const normalizeStoredSessionGame = async (gameId, playerToken) => {
   try {
     const ownerResult = await checkState({
@@ -345,9 +348,10 @@ function GameTablePage({
   const bids = game?.phase && 'bids' in game.phase ? game.phase.bids : []
   const currentTrick = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick : undefined
   const trumpCard = game?.phase && 'cards' in game.phase ? game.phase.cards.trump : undefined
+  const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
+  const latestCompletedTrick = completedTricks[completedTricks.length - 1]
   const booksByPlayerId = useMemo(() => {
     const books = new Map()
-    const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
 
     for (const trick of completedTricks) {
       if (!trick?.winnerPlayerId) {
@@ -368,6 +372,20 @@ function GameTablePage({
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
+  const viewerTurnMessage =
+    game.phase?.stage === 'Playing'
+      ? 'Your Turn to Play'
+      : game.phase?.stage === 'Bidding'
+        ? 'Your Turn to Bid'
+      : game.phase?.stage === 'Dealing'
+          ? 'Your Turn to Deal'
+          : 'Your Turn'
+  const displayedTrick = bookWinnerMessage && latestCompletedTrick ? latestCompletedTrick : currentTrick
+  const displayedTrickPlays = displayedTrick?.plays ?? []
+  const winningDisplayedTrickCardIndex =
+    bookWinnerMessage && latestCompletedTrick?.winnerPlayerId
+      ? latestCompletedTrick.plays.findIndex((play) => play.playerId === latestCompletedTrick.winnerPlayerId)
+      : null
   const selectedCard =
     selectedCardIndex !== null && viewerHand?.cards?.[selectedCardIndex]
       ? viewerHand.cards[selectedCardIndex]
@@ -425,15 +443,17 @@ function GameTablePage({
   }, [game.phase?.stage, currentTurnPlayerId])
 
   useEffect(() => {
-    const trickPlays = currentTrick?.plays ?? []
+    if (winningDisplayedTrickCardIndex !== null && winningDisplayedTrickCardIndex >= 0) {
+      setSelectedTrickCardIndex(winningDisplayedTrickCardIndex)
+      return
+    }
 
-    if (!trickPlays[selectedTrickCardIndex ?? -1]) {
+    if (!displayedTrickPlays[selectedTrickCardIndex ?? -1]) {
       setSelectedTrickCardIndex(null)
     }
-  }, [currentTrick?.plays, selectedTrickCardIndex])
+  }, [displayedTrickPlays, selectedTrickCardIndex, winningDisplayedTrickCardIndex])
 
   useEffect(() => {
-    const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
     const latestTrick = completedTricks[completedTricks.length - 1]
 
     if (completedTricks.length > previousCompletedTrickCountRef.current && latestTrick?.winnerPlayerId) {
@@ -444,7 +464,7 @@ function GameTablePage({
       bookWinnerTimeoutRef.current = setTimeout(() => {
         setBookWinnerMessage('')
         bookWinnerTimeoutRef.current = null
-      }, 5000)
+      }, TRICK_COMPLETE_DELAY_MS)
     }
 
     previousCompletedTrickCountRef.current = completedTricks.length
@@ -516,13 +536,12 @@ function GameTablePage({
       <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3 pb-24">
         <article className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
           <div className="flex items-start justify-between gap-4 text-sm text-slate-200">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <p>
-                {currentRoundConfig ? `${currentRoundConfig.cardCount} ${String(currentRoundConfig.direction).toUpperCase()}` : 'N/A'} | {game.phase?.stage ?? 'N/A'}
-              </p>
-              <p className="truncate">
-                {currentTurnPlayerId ? `${getPlayerName(game, currentTurnPlayerId)}'s Turn` : "N/A's Turn"}
-              </p>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <img
+                src="/logo-512x512.png"
+                alt="Setback"
+                className="h-20 w-20 shrink-0 rounded-md"
+              />
             </div>
             {trumpCard ? (
               <div className="flex shrink-0 items-center gap-2 self-start">
@@ -542,7 +561,17 @@ function GameTablePage({
 
         <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[30%_1fr]">
           <article className="hidden min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4 md:block">
-            <h2 className="text-lg font-semibold">Score</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Score</h2>
+              {currentRoundConfig ? (
+                <p className="text-lg font-medium text-slate-300">
+                  <span>{`Round ${currentRoundConfig.cardCount} `}</span>
+                  <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
+                </p>
+              ) : (
+                <p className="text-lg font-medium text-slate-300">Round N/A</p>
+              )}
+            </div>
             <ScoreSummary
               game={game}
               bids={bids}
@@ -551,12 +580,26 @@ function GameTablePage({
             />
           </article>
 
-          <article className="flex min-h-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <article className="flex min-h-0 flex-col rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+            <div className="mb-3 flex min-h-7 items-center justify-center">
+              {isViewerTurn ? (
+                <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-6 py-2 text-xl font-semibold text-emerald-200">
+                  {viewerTurnMessage}
+                </p>
+              ) : currentTurnPlayerId ? (
+                <p className="text-sm text-slate-400">
+                  Waiting on {getPlayerName(game, currentTurnPlayerId)}...
+                </p>
+              ) : null}
+            </div>
+            {bookWinnerMessage ? (
+              <div className="mb-3 flex items-center justify-center">
+                <p className="text-center text-lg text-emerald-200">{bookWinnerMessage}</p>
+              </div>
+            ) : null}
             <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
-              {bookWinnerMessage ? (
-                <li className="self-center text-center text-lg text-emerald-200">{bookWinnerMessage}</li>
-              ) : (currentTrick?.plays ?? []).length > 0 ? (
-                currentTrick.plays.map((play, index) => (
+              {displayedTrickPlays.length > 0 ? (
+                displayedTrickPlays.map((play, index) => (
                   <li
                     key={`${play.playerId}-${index}`}
                     className="flex w-fit shrink-0 flex-col items-center text-sm"
@@ -572,9 +615,12 @@ function GameTablePage({
                       className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
                         selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
                       }`}
-                      onClick={() =>
+                      onClick={() => {
+                        if (bookWinnerMessage) {
+                          return
+                        }
                         setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
-                      }
+                      }}
                       aria-label={getPlayerName(game, play.playerId)}
                     >
                       <div className="aspect-[2.5/3.5] w-24 sm:w-28">
@@ -729,7 +775,17 @@ function GameTablePage({
             className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-center text-lg font-semibold text-slate-100">Score</h2>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-100">Score</h2>
+              {currentRoundConfig ? (
+                <p className="text-lg font-medium text-slate-300">
+                  <span>{`Round ${currentRoundConfig.cardCount} `}</span>
+                  <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
+                </p>
+              ) : (
+                <p className="text-lg font-medium text-slate-300">Round N/A</p>
+              )}
+            </div>
             <ScoreSummary
               game={game}
               bids={bids}
@@ -1204,7 +1260,7 @@ export default function App() {
 
     const interval = setInterval(() => {
       refreshOwnerGame()
-    }, 5000)
+    }, AI_ACTION_DELAY_MS)
 
     return () => clearInterval(interval)
   }, [ownerSession?.gameId, ownerSession?.playerToken])
@@ -1228,7 +1284,7 @@ export default function App() {
 
     const interval = setInterval(() => {
       refreshPlayerGame()
-    }, 5000)
+    }, AI_ACTION_DELAY_MS)
 
     return () => clearInterval(interval)
   }, [playerSession?.gameId, playerSession?.playerToken, playerSession?.version])
@@ -1289,7 +1345,7 @@ export default function App() {
       return
     }
 
-    aiPauseUntilRef.current = Date.now() + 5000
+    aiPauseUntilRef.current = Date.now() + TRICK_COMPLETE_DELAY_MS
     if (aiPauseTimeoutRef.current) {
       clearTimeout(aiPauseTimeoutRef.current)
     }
@@ -1297,7 +1353,7 @@ export default function App() {
       aiPauseUntilRef.current = 0
       aiPauseTimeoutRef.current = null
       refreshOwnerGame()
-    }, 5000)
+    }, TRICK_COMPLETE_DELAY_MS)
   }, [activeGame, ownerSession?.gameId])
 
   const handleCopyShareLink = async () => {
