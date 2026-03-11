@@ -150,20 +150,20 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
           booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
 
         return (
-          <li key={player.id} className="rounded border border-slate-700 px-3 py-2 text-sm">
+          <li key={player.id} className="rounded border panel-surface-strong px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-medium">{player.name}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">{score?.total ?? 0}</p>
+                <p className="mt-1 text-lg font-semibold text-white">{score?.total ?? 0}</p>
               </div>
-              <div className="flex flex-col items-end gap-1 text-xs text-slate-300">
+              <div className="flex flex-col items-end gap-1 text-xs text-muted">
                 <p>
-                  <span className="uppercase tracking-wide text-slate-400">Bid</span>{' '}
-                  <span className="ml-3 text-sm text-slate-100">{playerBid}</span>
+                  <span className="uppercase tracking-wide text-dim">Bid</span>{' '}
+                  <span className="ml-3 text-sm text-white">{playerBid}</span>
                 </p>
                 <p>
-                  <span className="uppercase tracking-wide text-slate-400">Books</span>{' '}
-                  <span className="ml-3 text-sm text-slate-100">{playerBooks}</span>
+                  <span className="uppercase tracking-wide text-dim">Books</span>{' '}
+                  <span className="ml-3 text-sm text-white">{playerBooks}</span>
                 </p>
               </div>
             </div>
@@ -667,10 +667,11 @@ function GameTablePage({
   }
 
   return (
-    <main className="h-screen overflow-hidden bg-slate-950 px-3 py-3 text-slate-100">
-      <section className="mx-auto flex h-full w-full max-w-6xl flex-col gap-3 pb-24">
-        <article className="shrink-0 rounded-lg border border-slate-700 bg-slate-900/60 p-4">
-          <div className="flex items-start justify-between gap-4 text-sm text-slate-200">
+    <main className="theme-shell h-screen overflow-hidden px-3 py-3">
+      <section className="mx-auto flex h-full w-full max-w-6xl flex-col pb-24">
+        <div className="table-surface flex h-full min-h-0 flex-col rounded-[28px] border p-4 sm:p-5">
+        <article className="shrink-0 p-1">
+          <div className="flex items-start justify-between gap-4 text-sm text-muted">
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <img
                 src="/logo-512x512.png"
@@ -680,7 +681,7 @@ function GameTablePage({
             </div>
             {trumpCard ? (
               <div className="flex shrink-0 items-center gap-2 self-start">
-                <p className="text-sm text-slate-300">Trump</p>
+                <p className="text-sm text-dim">Trump</p>
                 <div className="relative h-[84px] w-[78px] shrink-0">
                   <div className="absolute left-0 top-0 h-[84px] w-[60px]">
                     <CardBack />
@@ -694,35 +695,37 @@ function GameTablePage({
           </div>
         </article>
 
-        <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[30%_1fr]">
-          <article className="hidden min-h-0 overflow-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4 md:block">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">Score</h2>
-              {currentRoundConfig ? (
-                <p className="text-lg font-medium text-slate-300">
-                  <span>{`Round ${currentRoundConfig.cardCount} `}</span>
-                  <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
-                </p>
-              ) : (
-                <p className="text-lg font-medium text-slate-300">Round N/A</p>
-              )}
+        <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[30%_1fr]">
+          <article className="hidden min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-black/5 pb-4 pl-4 pr-1 pt-4 md:block">
+            <div className="score-scroll h-full overflow-auto pr-1">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">Score</h2>
+                {currentRoundConfig ? (
+                  <p className="text-lg font-medium text-muted">
+                    <span>{`Round ${currentRoundConfig.cardCount} `}</span>
+                    <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
+                  </p>
+                ) : (
+                  <p className="text-lg font-medium text-muted">Round N/A</p>
+                )}
+              </div>
+              <ScoreSummary
+                game={game}
+                bids={bids}
+                booksByPlayerId={booksByPlayerId}
+                currentRoundIndex={currentRoundIndex}
+              />
             </div>
-            <ScoreSummary
-              game={game}
-              bids={bids}
-              booksByPlayerId={booksByPlayerId}
-              currentRoundIndex={currentRoundIndex}
-            />
           </article>
 
-          <article className="flex min-h-0 flex-col rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <article className="flex min-h-0 flex-col p-1">
             <div className="mb-3 flex min-h-7 items-center justify-center">
               {isViewerTurn ? (
-                <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-6 py-2 text-xl font-semibold text-emerald-200">
+                <p className="status-info px-6 py-2 text-xl font-semibold">
                   {viewerTurnMessage}
                 </p>
               ) : currentTurnPlayerId ? (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-dim">
                   {waitingAction
                     ? `Waiting on ${getPlayerName(game, currentTurnPlayerId)} to ${waitingAction}`
                     : `Waiting on ${getPlayerName(game, currentTurnPlayerId)}...`}
@@ -731,7 +734,7 @@ function GameTablePage({
             </div>
             {bookWinnerMessage ? (
               <div className="mb-3 flex items-center justify-center">
-                <p className="text-center text-lg text-emerald-200">{bookWinnerMessage}</p>
+                <p className="text-center text-lg text-[#d8e6ff]">{bookWinnerMessage}</p>
               </div>
             ) : null}
             <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
@@ -744,7 +747,7 @@ function GameTablePage({
                   >
                     <div className="mb-3 flex h-5 items-end justify-center">
                       {selectedTrickCardIndex === index ? (
-                        <p className="text-center text-lg text-slate-200">{getPlayerName(game, play.playerId)}</p>
+                        <p className="text-center text-lg text-white">{getPlayerName(game, play.playerId)}</p>
                       ) : null}
                     </div>
                     <button
@@ -767,13 +770,13 @@ function GameTablePage({
                   </li>
                 ))
               ) : (
-                <li className="self-center text-sm text-slate-400">No cards played in this trick yet.</li>
+                <li className="self-center text-sm text-dim">No cards played in this trick yet.</li>
               )}
             </ul>
           </article>
         </div>
 
-        <article className="shrink-0 overflow-hidden sm:overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+        <article className="shrink-0 overflow-hidden p-1 sm:overflow-x-auto">
           <div className="flex items-end justify-center pt-5 pb-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
               viewerHand.cards.map((card, index) => (
@@ -811,17 +814,18 @@ function GameTablePage({
                 </button>
               ))
             ) : (
-              <p className="text-sm text-slate-400">No cards in hand yet.</p>
+              <p className="text-sm text-dim">No cards in hand yet.</p>
             )}
           </div>
         </article>
+        </div>
       </section>
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-700 bg-slate-950/95 px-3 py-4 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t panel-surface px-3 py-4 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100"
+              className="btn-secondary min-h-12 px-4 py-3 text-sm"
               onClick={() => setIsMenuModalOpen(true)}
               aria-label="Open game menu"
             >
@@ -829,7 +833,7 @@ function GameTablePage({
             </button>
             <button
               type="button"
-              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 md:hidden"
+              className="btn-secondary min-h-12 px-4 py-3 text-sm md:hidden"
               onClick={() => setIsScoreModalOpen(true)}
             >
               Score
@@ -838,7 +842,7 @@ function GameTablePage({
           {canSortCards ? (
             <button
               type="button"
-              className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 disabled:opacity-50"
+              className="btn-secondary min-h-12 px-4 py-3 text-sm disabled:opacity-50"
               onClick={onSortCards}
               disabled={isSortingCards}
             >
@@ -861,10 +865,10 @@ function GameTablePage({
                   <button
                     key={action}
                     type="button"
-                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-slate-100 disabled:opacity-50 ${
+                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
                       shouldFlashDealButton
-                        ? 'animate-pulse border-amber-300 bg-amber-400/15 shadow-[0_0_18px_rgba(251,191,36,0.35)]'
-                        : 'border-slate-500'
+                        ? 'animate-pulse border-[#4d86ee] bg-[#2f6fdb]/25 shadow-[0_0_18px_rgba(47,111,219,0.45)]'
+                        : 'btn-secondary'
                     }`}
                     disabled={isDisabled}
                     onClick={
@@ -902,7 +906,7 @@ function GameTablePage({
             ) : (
               <button
                 type="button"
-                className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100"
+                className="btn-secondary min-h-12 px-4 py-3 text-sm"
                 disabled
               >
                 No actions available
@@ -917,18 +921,18 @@ function GameTablePage({
           onClick={() => setIsScoreModalOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl"
+            className="dialog-surface w-full max-w-md rounded-xl p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-slate-100">Score</h2>
+              <h2 className="text-lg font-semibold text-white">Score</h2>
               {currentRoundConfig ? (
-                <p className="text-lg font-medium text-slate-300">
+                <p className="text-lg font-medium text-muted">
                   <span>{`Round ${currentRoundConfig.cardCount} `}</span>
                   <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
                 </p>
               ) : (
-                <p className="text-lg font-medium text-slate-300">Round N/A</p>
+                <p className="text-lg font-medium text-muted">Round N/A</p>
               )}
             </div>
             <ScoreSummary
@@ -946,14 +950,14 @@ function GameTablePage({
           onClick={() => setIsMenuModalOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            className="dialog-surface w-full max-w-sm p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Menu</h2>
             <div className="mt-4 flex flex-col gap-3">
               <button
                 type="button"
-                className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800"
+                className="btn-secondary px-4 py-3 text-left"
                 onClick={() => {
                   setIsMenuModalOpen(false)
                   onOpenNewGame?.()
@@ -963,7 +967,7 @@ function GameTablePage({
               </button>
               <button
                 type="button"
-                className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800"
+                className="btn-secondary px-4 py-3 text-left"
                 onClick={() => {
                   setIsMenuModalOpen(false)
                   onOpenJoinGame?.()
@@ -1934,17 +1938,17 @@ export default function App() {
             onClick={closeSubmitBidModal}
           >
             <div
-              className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              className="dialog-surface w-full max-w-md p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">Submit Bid</h2>
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmitBid}>
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm text-slate-300">Bid Amount</span>
+                  <span className="text-sm text-muted">Bid Amount</span>
                   <select
                     value={selectedBid}
                     onChange={(event) => setSelectedBid(event.target.value)}
-                    className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 focus:border-slate-400"
+                    className="input-surface"
                   >
                     {Array.from({ length: currentRoundCardCount + 1 }, (_, index) => String(index)).map((value) => (
                       <option key={value} value={value}>
@@ -1962,7 +1966,7 @@ export default function App() {
                 <div className="mt-2 flex justify-end gap-3">
                   <button
                     type="button"
-                    className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
+                    className="btn-secondary px-4 py-2"
                     onClick={closeSubmitBidModal}
                     disabled={isSubmittingBid}
                   >
@@ -1970,7 +1974,7 @@ export default function App() {
                   </button>
                   <button
                     type="submit"
-                    className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
+                    className="btn-primary px-4 py-2 disabled:opacity-50"
                     disabled={isSubmittingBid}
                   >
                     {isSubmittingBid ? 'Submitting...' : 'Submit'}
@@ -1986,14 +1990,14 @@ export default function App() {
             onClick={closeSortCardsModal}
           >
             <div
-              className="w-full max-w-sm rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              className="dialog-surface w-full max-w-sm p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">Sort Cards</h2>
               <div className="mt-4 flex flex-col gap-3">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+                  className="btn-secondary px-4 py-3 text-left disabled:opacity-50"
                   onClick={() => handleSortCards('bySuit')}
                   disabled={isSortingCards}
                 >
@@ -2001,7 +2005,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-slate-500 px-4 py-3 text-left text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+                  className="btn-secondary px-4 py-3 text-left disabled:opacity-50"
                   onClick={() => handleSortCards('byRank')}
                   disabled={isSortingCards}
                 >
@@ -2016,7 +2020,7 @@ export default function App() {
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           >
             <div
-              className="w-full max-w-lg rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              className="dialog-surface w-full max-w-lg p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">
@@ -2026,14 +2030,14 @@ export default function App() {
                 {endOfRoundSummary.players.map((player) => (
                   <li
                     key={player.playerId}
-                    className="rounded-md border border-slate-700 bg-slate-950/60 px-3 py-3"
+                    className="panel-surface-strong rounded-md border px-3 py-3"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium text-slate-100">{player.name}</p>
-                      <div className="flex items-center gap-4 text-sm text-slate-300">
+                      <p className="font-medium text-white">{player.name}</p>
+                      <div className="flex items-center gap-4 text-sm text-muted">
                         <span>{`Bid ${player.bid}`}</span>
                         <span>{`Books ${player.books}`}</span>
-                        <span className="font-medium text-slate-100">{`Score ${player.score}`}</span>
+                        <span className="font-medium text-white">{`Score ${player.score}`}</span>
                       </div>
                     </div>
                   </li>
@@ -2042,7 +2046,7 @@ export default function App() {
               <div className="mt-4 flex justify-end">
                 <button
                   type="button"
-                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
+                  className="btn-primary px-4 py-2"
                   onClick={() => setIsEndOfRoundModalDismissed(true)}
                 >
                   Continue
@@ -2057,39 +2061,39 @@ export default function App() {
 
   if (activeLobbySession?.gameId && activeLobbySession?.game) {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100">
+      <main className="theme-shell min-h-screen px-4 py-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col gap-6">
           <header className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight">
               {isOwnerLobby ? 'Game Owner Lobby' : 'Game Lobby'}
             </h1>
-            <p className="text-slate-300">Game ID: {activeLobbySession.gameId}</p>
-            <p className="text-slate-300">Phase: {activeLobbySession.game.phase?.stage}</p>
+            <p className="text-muted">Game ID: {activeLobbySession.gameId}</p>
+            <p className="text-muted">Phase: {activeLobbySession.game.phase?.stage}</p>
           </header>
 
           {lobbyError && (
-            <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            <p className="status-error">
               {lobbyError}
             </p>
           )}
           {lobbyInfo && (
-            <p className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+            <p className="status-info">
               {lobbyInfo}
             </p>
           )}
 
-          <section className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <section className="panel-surface rounded-lg border p-4">
             <h2 className="text-lg font-semibold">Share Link</h2>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 readOnly
                 value={shareLink}
-                className="w-full rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                className="input-surface w-full text-sm"
               />
               <button
                 type="button"
-                className="rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-200"
+                className="btn-primary px-4 py-2 text-sm"
                 onClick={handleCopyShareLink}
               >
                 Copy Link
@@ -2097,17 +2101,17 @@ export default function App() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-700 bg-slate-900/60 p-4">
+          <section className="panel-surface rounded-lg border p-4">
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-lg font-semibold">Players</h2>
               {isOwnerLobby && (
-                <label className="flex items-center gap-2 text-sm text-slate-300">
+                <label className="flex items-center gap-2 text-sm text-muted">
                   <span>Dealer</span>
                   <select
                     value={selectedDealerPlayerId}
                     onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
                     disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-                    className="rounded-md border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm text-slate-100 disabled:opacity-50"
+                    className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
                     aria-label="Select dealer"
                   >
                     {orderedPlayers.map((player) => (
@@ -2125,7 +2129,7 @@ export default function App() {
                 return (
                   <li
                     key={player.id}
-                    className={`rounded-md border border-slate-700 bg-slate-900 px-3 py-3 ${
+                    className={`panel-surface-strong rounded-md border px-3 py-3 ${
                       isOwnerLobby
                         ? 'grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'
                         : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
@@ -2133,7 +2137,7 @@ export default function App() {
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{player.name}</span>
-                      <span className="rounded border border-slate-500 px-2 py-0.5 text-xs uppercase tracking-wide text-slate-300">
+                      <span className="rounded border px-2 py-0.5 text-xs uppercase tracking-wide text-muted" style={{ borderColor: 'var(--border-color)' }}>
                         {player.type}
                       </span>
                     </div>
@@ -2142,7 +2146,7 @@ export default function App() {
                         <>
                           <button
                             type="button"
-                            className="rounded-md border border-slate-500 px-3 py-1.5 text-xl font-black hover:bg-slate-800 disabled:opacity-50"
+                            className="btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
                             onClick={() => handleMovePlayer(player.id, 'left')}
                             disabled={isPending || isStartingGame}
                             aria-label={`Move ${player.name} up`}
@@ -2151,7 +2155,7 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            className="rounded-md border border-slate-500 px-3 py-1.5 text-xl font-black hover:bg-slate-800 disabled:opacity-50"
+                            className="btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
                             onClick={() => handleMovePlayer(player.id, 'right')}
                             disabled={isPending || isStartingGame}
                             aria-label={`Move ${player.name} down`}
@@ -2160,7 +2164,7 @@ export default function App() {
                           </button>
                           <button
                             type="button"
-                            className="rounded-md border border-red-500/50 px-3 py-1.5 text-xl font-black text-red-200 hover:bg-red-900/30 disabled:opacity-50"
+                            className="btn-danger px-3 py-1.5 text-xl font-black disabled:opacity-50"
                             onClick={() => handleRemovePlayer(player.id)}
                             disabled={
                               player.type === 'ai' ||
@@ -2185,14 +2189,14 @@ export default function App() {
             {isOwnerLobby ? (
               <button
                 type="button"
-                className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 hover:bg-slate-200 disabled:opacity-50"
+                className="btn-primary px-4 py-2 disabled:opacity-50"
                 onClick={handleStartGame}
                 disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
               >
                 {isStartingGame ? 'Starting...' : 'Start Game'}
               </button>
             ) : (
-              <p className="text-sm text-slate-300">Waiting for game to start...</p>
+              <p className="text-sm text-muted">Waiting for game to start...</p>
             )}
           </div>
         </section>
@@ -2201,37 +2205,37 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
+    <main className="theme-shell min-h-screen">
       <section className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-6 px-6 text-center">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Setback</h1>
         {requestError && (
-          <p className="w-full max-w-md rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <p className="status-error w-full max-w-md">
             {requestError}
           </p>
         )}
         {sessionInfo && (
-          <p className="w-full max-w-md rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+          <p className="status-info w-full max-w-md">
             {sessionInfo.action === 'createGame' ? 'Game created' : 'Joined game'}: {sessionInfo.gameId}
           </p>
         )}
         <div className="flex w-full max-w-xs flex-col gap-3">
           <button
             type="button"
-            className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
+            className="btn-primary px-4 py-2"
             onClick={() => setIsCreateModalOpen(true)}
           >
             New Game
           </button>
           <button
             type="button"
-            className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
+            className="btn-secondary px-4 py-2"
             onClick={() => setIsJoinModalOpen(true)}
           >
             Join Game
           </button>
           <button
             type="button"
-            className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => setIsRejoinModalOpen(true)}
             disabled={isLoadingRejoinGames || rejoinableGames.length === 0}
           >
@@ -2246,13 +2250,13 @@ export default function App() {
           onClick={closeCreateModal}
         >
           <div
-            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            className="dialog-surface w-full max-w-md p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Create Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleCreateGame}>
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-slate-300">Player Name</span>
+                <span className="text-sm text-muted">Player Name</span>
                 <input
                   type="text"
                   value={playerName}
@@ -2260,7 +2264,7 @@ export default function App() {
                     setPlayerName(event.target.value)
                     setCreateErrors((prev) => ({ ...prev, playerName: undefined }))
                   }}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 placeholder:text-slate-400 focus:border-slate-400"
+                  className="input-surface"
                   placeholder="Enter your name"
                 />
                 {createErrors.playerName && (
@@ -2269,14 +2273,14 @@ export default function App() {
               </label>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-slate-300">Max Cards</span>
+                <span className="text-sm text-muted">Max Cards</span>
                 <select
                   value={maxCards}
                   onChange={(event) => {
                     setMaxCards(event.target.value)
                     setCreateErrors((prev) => ({ ...prev, maxCards: undefined }))
                   }}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 focus:border-slate-400"
+                  className="input-surface"
                 >
                   {Array.from({ length: 10 }, (_, index) => {
                     const value = String(10 - index)
@@ -2293,18 +2297,18 @@ export default function App() {
               </label>
 
               <div className="mt-2 flex justify-end gap-3">
-                <button
-                  type="button"
-                  className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
-                  onClick={closeCreateModal}
-                >
+                  <button
+                    type="button"
+                  className="btn-secondary px-4 py-2"
+                    onClick={closeCreateModal}
+                  >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isCreatingGame}
-                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
-                >
+                  <button
+                    type="submit"
+                    disabled={isCreatingGame}
+                  className="btn-primary px-4 py-2"
+                  >
                   {isCreatingGame ? 'Creating...' : 'Create Game'}
                 </button>
               </div>
@@ -2319,13 +2323,13 @@ export default function App() {
           onClick={closeJoinModal}
         >
           <div
-            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            className="dialog-surface w-full max-w-md p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Join Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleJoinGame}>
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-slate-300">Game ID</span>
+                <span className="text-sm text-muted">Game ID</span>
                 <input
                   type="text"
                   value={joinGameId}
@@ -2333,7 +2337,7 @@ export default function App() {
                     setJoinGameId(event.target.value)
                     setJoinErrors((prev) => ({ ...prev, gameId: undefined }))
                   }}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 placeholder:text-slate-400 focus:border-slate-400"
+                  className="input-surface"
                   placeholder="Enter game ID"
                 />
                 {joinErrors.gameId && (
@@ -2342,7 +2346,7 @@ export default function App() {
               </label>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-slate-300">Player Name</span>
+                <span className="text-sm text-muted">Player Name</span>
                 <input
                   type="text"
                   value={joinPlayerName}
@@ -2350,7 +2354,7 @@ export default function App() {
                     setJoinPlayerName(event.target.value)
                     setJoinErrors((prev) => ({ ...prev, playerName: undefined }))
                   }}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 placeholder:text-slate-400 focus:border-slate-400"
+                  className="input-surface"
                   placeholder="Enter your name"
                 />
                 {joinErrors.playerName && (
@@ -2359,18 +2363,18 @@ export default function App() {
               </label>
 
               <div className="mt-2 flex justify-end gap-3">
-                <button
-                  type="button"
-                  className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
-                  onClick={closeJoinModal}
-                >
+                  <button
+                    type="button"
+                  className="btn-secondary px-4 py-2"
+                    onClick={closeJoinModal}
+                  >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={isJoiningGame}
-                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
-                >
+                  <button
+                    type="submit"
+                    disabled={isJoiningGame}
+                  className="btn-primary px-4 py-2"
+                  >
                   {isJoiningGame ? 'Joining...' : 'Join Game'}
                 </button>
               </div>
@@ -2385,17 +2389,17 @@ export default function App() {
           onClick={closeRejoinModal}
         >
           <div
-            className="w-full max-w-md rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+            className="dialog-surface w-full max-w-md p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Rejoin Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleRejoinGame}>
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-slate-300">Stored Game</span>
+                <span className="text-sm text-muted">Stored Game</span>
                 <select
                   value={selectedRejoinGameId}
                   onChange={(event) => setSelectedRejoinGameId(event.target.value)}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-slate-100 outline-none ring-0 focus:border-slate-400"
+                  className="input-surface"
                   disabled={isRejoiningGame || rejoinableGames.length === 0}
                 >
                   {rejoinableGames.map((game) => (
@@ -2409,7 +2413,7 @@ export default function App() {
               <div className="mt-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-md border border-slate-500 px-4 py-2 font-medium text-slate-100 transition hover:bg-slate-800"
+                  className="btn-secondary px-4 py-2"
                   onClick={closeRejoinModal}
                   disabled={isRejoiningGame}
                 >
@@ -2418,7 +2422,7 @@ export default function App() {
                 <button
                   type="submit"
                   disabled={isRejoiningGame || rejoinableGames.length === 0}
-                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
+                  className="btn-primary px-4 py-2 disabled:opacity-50"
                 >
                   {isRejoiningGame ? 'Rejoining...' : 'Continue'}
                 </button>
