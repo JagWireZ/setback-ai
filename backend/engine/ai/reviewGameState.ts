@@ -306,6 +306,16 @@ const applyAutomationStep = (game: Game): Game | undefined => {
     });
   }
 
+  if (game.phase.stage === "EndOfRound") {
+    if (Date.now() < game.phase.advanceAfter) {
+      return undefined;
+    }
+
+    return withNextVersion(game, {
+      phase: advancePhase(game),
+    });
+  }
+
   const aiTurn = getAiTurnPlayer(game);
   if (!aiTurn) {
     return undefined;

@@ -129,9 +129,15 @@ function CardBack({ className = '' }) {
 }
 
 function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
+  const playersById = new Map((game.players ?? []).map((player) => [player.id, player]))
+  const orderedPlayers =
+    (game.playerOrder ?? [])
+      .map((playerId) => playersById.get(playerId))
+      .filter(Boolean)
+
   return (
     <ul className="mt-3 flex flex-col gap-2">
-      {(game.players ?? []).map((player) => {
+      {(orderedPlayers.length > 0 ? orderedPlayers : game.players ?? []).map((player) => {
         const score = game.scores?.find((entry) => entry.playerId === player.id)
         const playerBidEntry = bids.find((bid) => bid.playerId === player.id)
         const playerBid =
@@ -234,6 +240,56 @@ const clearStoredGameSession = (gameId) => {
   writeStoredSessions(sessions)
 }
 
+const isGameNotFoundError = (error) => {
+  const message = error instanceof Error ? error.message : ''
+  return message.toLowerCase().includes('game not found')
+}
+
+const isInvalidPlayerTokenError = (error) => {
+  const message = error instanceof Error ? error.message : ''
+  return message.toLowerCase().includes('invalid player token')
+}
+
+const isOwnerTokenRequiredError = (error) => {
+  const message = error instanceof Error ? error.message : ''
+  return message.toLowerCase().includes('owner token required')
+}
+
+const pruneMissingStoredGameSessions = async () => {
+  const storedSessions = readStoredSessions()
+  const entries = Object.entries(storedSessions)
+
+  if (entries.length === 0) {
+    return storedSessions
+  }
+
+  const nextSessions = { ...storedSessions }
+
+  await Promise.all(
+    entries.map(async ([gameId, storedSession]) => {
+      if (typeof storedSession?.playerToken !== 'string' || !storedSession.playerToken.trim()) {
+        delete nextSessions[gameId]
+        return
+      }
+
+      try {
+        await getGameState({
+          gameId,
+          playerToken: storedSession.playerToken,
+          version: 0,
+        })
+      } catch (error) {
+        if (isGameNotFoundError(error) || isInvalidPlayerTokenError(error)) {
+          delete nextSessions[gameId]
+        }
+      }
+    }),
+  )
+
+  writeStoredSessions(nextSessions)
+  return nextSessions
+}
+
 const getGameIdFromUrl = () => {
   if (typeof window === 'undefined') {
     return ''
@@ -268,46 +324,117 @@ const clearGameIdInUrl = () => {
 const AI_ACTION_DELAY_MS = 1500
 const TRICK_COMPLETE_DELAY_MS = 5000
 
-const normalizeStoredSessionGame = async (gameId, playerToken) => {
-  try {
+const getRoundDirectionArrow = (direction) => (direction === 'up' ? '⬆' : '⬇')
+
+const getCompletedRoundCount = (game) =>
+  Array.isArray(game?.scores) ? Math.max(0, ...game.scores.map((score) => score?.rounds?.length ?? 0)) : 0
+
+const buildRoundSummary = (game, roundIndex) => {
+  if (!game || roundIndex < 0) {
+    return null
+  }
+
+  const roundConfig = game.options?.rounds?.[roundIndex]
+  if (!roundConfig) {
+    return null
+  }
+
+  return {
+    roundIndex,
+    cardCount: roundConfig.cardCount,
+    direction: roundConfig.direction,
+    players: (game.playerOrder ?? []).map((playerId) => {
+      const player = game.players?.find((entry) => entry.id === playerId)
+      const roundResult = game.scores?.find((score) => score.playerId === playerId)?.rounds?.[roundIndex]
+
+      return {
+        playerId,
+        name: player?.name ?? 'Unknown',
+        bid: roundResult?.bid ?? 0,
+        books: roundResult?.books ?? 0,
+        score: roundResult?.total ?? 0,
+      }
+    }),
+  }
+}
+
+const normalizeStoredSessionGame = async (gameId, playerToken, preferredRole) => {
+  const tryOwnerRestore = async () => {
     const ownerResult = await checkState({
       gameId,
       playerToken,
     })
 
-    if (ownerResult?.game) {
-      const ownerPlayerId = ownerResult.game.players?.find((player) => player.type === 'human')?.id ?? ''
-      return {
-        role: 'owner',
-        game: ownerResult.game,
-        playerToken,
-        ownerPlayerId,
-      }
+    if (!ownerResult?.game) {
+      return null
     }
-  } catch {
-    // Fallback to player lookup below.
+
+    const ownerPlayerId = ownerResult.game.players?.find((player) => player.type === 'human')?.id ?? ''
+    return {
+      role: 'owner',
+      game: ownerResult.game,
+      playerToken,
+      ownerPlayerId,
+    }
   }
 
-  try {
+  const tryPlayerRestore = async () => {
     const playerResult = await getGameState({
       gameId,
       playerToken,
       version: 0,
     })
 
-    if (playerResult?.game) {
-      return {
-        role: 'player',
-        game: playerResult.game,
-        playerToken,
-        version: playerResult?.version ?? playerResult.game?.version ?? 0,
-      }
+    if (!playerResult?.game) {
+      return null
     }
-  } catch {
-    // Invalid or expired token.
+
+    return {
+      role: 'player',
+      game: playerResult.game,
+      playerToken,
+      version: playerResult?.version ?? playerResult.game?.version ?? 0,
+    }
   }
 
-  return null
+  if (preferredRole === 'player') {
+    try {
+      return await tryPlayerRestore()
+    } catch {
+      return null
+    }
+  }
+
+  if (preferredRole === 'owner') {
+    try {
+      return await tryOwnerRestore()
+    } catch (error) {
+      if (
+        isGameNotFoundError(error) ||
+        isInvalidPlayerTokenError(error) ||
+        isOwnerTokenRequiredError(error)
+      ) {
+        return null
+      }
+    }
+
+    return null
+  }
+
+  try {
+    const ownerSession = await tryOwnerRestore()
+    if (ownerSession) {
+      return ownerSession
+    }
+  } catch {
+    // Fallback to player lookup below.
+  }
+
+  try {
+    return await tryPlayerRestore()
+  } catch {
+    return null
+  }
 }
 
 const getViewerHand = (game) => {
@@ -377,9 +504,17 @@ function GameTablePage({
       ? 'Your Turn to Play'
       : game.phase?.stage === 'Bidding'
         ? 'Your Turn to Bid'
-      : game.phase?.stage === 'Dealing'
+        : game.phase?.stage === 'Dealing'
           ? 'Your Turn to Deal'
           : 'Your Turn'
+  const waitingAction =
+    game.phase?.stage === 'Playing'
+      ? 'Play'
+      : game.phase?.stage === 'Bidding'
+        ? 'Bid'
+        : game.phase?.stage === 'Dealing'
+          ? 'Deal'
+          : ''
   const displayedTrick = bookWinnerMessage && latestCompletedTrick ? latestCompletedTrick : currentTrick
   const displayedTrickPlays = displayedTrick?.plays ?? []
   const winningDisplayedTrickCardIndex =
@@ -588,7 +723,9 @@ function GameTablePage({
                 </p>
               ) : currentTurnPlayerId ? (
                 <p className="text-sm text-slate-400">
-                  Waiting on {getPlayerName(game, currentTurnPlayerId)}...
+                  {waitingAction
+                    ? `Waiting on ${getPlayerName(game, currentTurnPlayerId)} to ${waitingAction}`
+                    : `Waiting on ${getPlayerName(game, currentTurnPlayerId)}...`}
                 </p>
               ) : null}
             </div>
@@ -710,50 +847,58 @@ function GameTablePage({
           ) : null}
           <div className="flex flex-wrap justify-center gap-2">
             {availableActions.length > 0 ? (
-              availableActions.map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  className="min-h-12 rounded-md border border-slate-500 px-4 py-3 text-sm text-slate-100 disabled:opacity-50"
-                  disabled={
-                    !isActionEnabled(action) ||
-                    isDealingCards ||
-                    isSubmittingBid ||
-                    isPlayingCard ||
-                    isSortingCards ||
-                    isStartingOver
-                  }
-                  onClick={
-                    action === 'Deal Cards'
-                      ? onDealCards
-                      : action === 'Submit Bid'
-                        ? onSubmitBid
-                        : action === 'Play Card'
-                          ? () => {
-                              if (selectedCard) {
-                                onPlayCard(selectedCard)
+              availableActions.map((action) => {
+                const isDisabled =
+                  !isActionEnabled(action) ||
+                  isDealingCards ||
+                  isSubmittingBid ||
+                  isPlayingCard ||
+                  isSortingCards ||
+                  isStartingOver
+                const shouldFlashDealButton = action === 'Deal Cards' && isViewerTurn && !isDisabled
+
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-slate-100 disabled:opacity-50 ${
+                      shouldFlashDealButton
+                        ? 'animate-pulse border-amber-300 bg-amber-400/15 shadow-[0_0_18px_rgba(251,191,36,0.35)]'
+                        : 'border-slate-500'
+                    }`}
+                    disabled={isDisabled}
+                    onClick={
+                      action === 'Deal Cards'
+                        ? onDealCards
+                        : action === 'Submit Bid'
+                          ? onSubmitBid
+                          : action === 'Play Card'
+                            ? () => {
+                                if (selectedCard) {
+                                  onPlayCard(selectedCard)
+                                }
                               }
-                            }
-                          : action === 'Start Over'
-                            ? onStartOver
-                            : action === 'New Game'
-                              ? onOpenNewGame
-                              : action === 'Join Game'
-                                ? onOpenJoinGame
-                          : undefined
-                  }
-                >
-                  {action === 'Deal Cards' && isDealingCards
-                    ? 'Dealing...'
-                    : action === 'Start Over' && isStartingOver
-                      ? 'Starting...'
-                    : action === 'Submit Bid' && isSubmittingBid
-                      ? 'Submitting...'
-                      : action === 'Play Card' && isPlayingCard
-                        ? 'Playing...'
-                        : action}
-                </button>
-              ))
+                            : action === 'Start Over'
+                              ? onStartOver
+                              : action === 'New Game'
+                                ? onOpenNewGame
+                                : action === 'Join Game'
+                                  ? onOpenJoinGame
+                            : undefined
+                    }
+                  >
+                    {action === 'Deal Cards' && isDealingCards
+                      ? 'Dealing...'
+                      : action === 'Start Over' && isStartingOver
+                        ? 'Starting...'
+                        : action === 'Submit Bid' && isSubmittingBid
+                          ? 'Submitting...'
+                          : action === 'Play Card' && isPlayingCard
+                            ? 'Playing...'
+                          : action}
+                  </button>
+                )
+              })
             ) : (
               <button
                 type="button"
@@ -866,6 +1011,7 @@ export default function App() {
   const [isPlayingCard, setIsPlayingCard] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
+  const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
   const aiPauseUntilRef = useRef(0)
@@ -890,7 +1036,11 @@ export default function App() {
         return
       }
 
-      const restoredSession = await normalizeStoredSessionGame(gameIdFromUrl, storedSession.playerToken)
+      const restoredSession = await normalizeStoredSessionGame(
+        gameIdFromUrl,
+        storedSession.playerToken,
+        storedSession.role,
+      )
 
       if (isCancelled) {
         return
@@ -941,12 +1091,16 @@ export default function App() {
       return undefined
     }
 
+    if (getGameIdFromUrl()) {
+      return undefined
+    }
+
     let isCancelled = false
 
     const loadRejoinableGames = async () => {
       setIsLoadingRejoinGames(true)
 
-      const storedSessions = readStoredSessions()
+      const storedSessions = await pruneMissingStoredGameSessions()
       const gameIds = Object.keys(storedSessions)
 
       if (gameIds.length === 0) {
@@ -965,7 +1119,11 @@ export default function App() {
             return null
           }
 
-          const normalized = await normalizeStoredSessionGame(gameId, storedSession.playerToken)
+          const normalized = await normalizeStoredSessionGame(
+            gameId,
+            storedSession.playerToken,
+            storedSession.role,
+          )
           if (!normalized?.game || normalized.game.phase?.stage === 'GameOver') {
             return null
           }
@@ -1148,6 +1306,7 @@ export default function App() {
       const restoredSession = await normalizeStoredSessionGame(
         selectedGame.gameId,
         selectedGame.playerToken,
+        selectedGame.role,
       )
 
       if (!restoredSession?.game || restoredSession.game.phase?.stage === 'GameOver') {
@@ -1296,6 +1455,14 @@ export default function App() {
     activeGame?.phase && 'roundIndex' in activeGame.phase ? activeGame.phase.roundIndex : 0
   const currentRoundCardCount = activeGame?.options?.rounds?.[activeRoundIndex]?.cardCount ?? 0
   const isTripRound = [1, 2, 3].includes(currentRoundCardCount)
+  const endOfRoundSummary =
+    activeGame?.phase?.stage === 'EndOfRound'
+      ? buildRoundSummary(activeGame, activeGame.phase.roundIndex)
+      : null
+
+  useEffect(() => {
+    setIsEndOfRoundModalDismissed(false)
+  }, [activeGame?.phase?.stage, endOfRoundSummary?.roundIndex])
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -1844,6 +2011,46 @@ export default function App() {
             </div>
           </div>
         )}
+        {endOfRoundSummary && !isEndOfRoundModalDismissed && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          >
+            <div
+              className="w-full max-w-lg rounded-lg bg-slate-900 p-6 text-left shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold">
+                {`End of Round ${endOfRoundSummary.cardCount} ${getRoundDirectionArrow(endOfRoundSummary.direction)}`}
+              </h2>
+              <ul className="mt-4 flex flex-col gap-2">
+                {endOfRoundSummary.players.map((player) => (
+                  <li
+                    key={player.playerId}
+                    className="rounded-md border border-slate-700 bg-slate-950/60 px-3 py-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium text-slate-100">{player.name}</p>
+                      <div className="flex items-center gap-4 text-sm text-slate-300">
+                        <span>{`Bid ${player.bid}`}</span>
+                        <span>{`Books ${player.books}`}</span>
+                        <span className="font-medium text-slate-100">{`Score ${player.score}`}</span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200"
+                  onClick={() => setIsEndOfRoundModalDismissed(true)}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     )
   }
@@ -2028,7 +2235,7 @@ export default function App() {
             onClick={() => setIsRejoinModalOpen(true)}
             disabled={isLoadingRejoinGames || rejoinableGames.length === 0}
           >
-            Rejoin Game
+            Continue Game
           </button>
         </div>
       </section>
@@ -2213,7 +2420,7 @@ export default function App() {
                   disabled={isRejoiningGame || rejoinableGames.length === 0}
                   className="rounded-md bg-slate-100 px-4 py-2 font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50"
                 >
-                  {isRejoiningGame ? 'Rejoining...' : 'Rejoin'}
+                  {isRejoiningGame ? 'Rejoining...' : 'Continue'}
                 </button>
               </div>
             </form>

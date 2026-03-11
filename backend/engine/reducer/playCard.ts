@@ -5,6 +5,8 @@ import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { scoreRound } from "../helpers/reducer/gameState/scoreRound";
 
+const END_OF_ROUND_DELAY_MS = 10000;
+
 const RANK_VALUE: Record<string, number> = {
   "2": 2,
   "3": 3,
@@ -253,13 +255,13 @@ export const playCard = (
       },
     };
     const updatedScores = scoreRound(scoringState);
-    const nextPhase = advancePhase({
-      ...scoringState,
-      scores: updatedScores,
-    });
 
     return withNextVersion(existingGame, {
-      phase: nextPhase,
+      phase: {
+        ...scoringState.phase,
+        stage: "EndOfRound" as const,
+        advanceAfter: Date.now() + END_OF_ROUND_DELAY_MS,
+      },
       scores: updatedScores,
     });
   }

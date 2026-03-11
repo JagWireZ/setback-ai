@@ -98,6 +98,9 @@ export const advancePhase = (game: Game): Phase => {
       };
     }
     case "Scoring": {
+      throw new Error("Scoring phase should transition through EndOfRound");
+    }
+    case "EndOfRound": {
       const isLastRound = game.phase.roundIndex >= game.options.rounds.length - 1;
       return isLastRound ? { stage: "GameOver" } : buildDealingPhase(game, game.phase.roundIndex + 1);
     }

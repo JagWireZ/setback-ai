@@ -57,7 +57,7 @@ export type Trick = {
   winnerPlayerId?: string
 }
 
-export type PhaseStage = 'Lobby' | 'Dealing' | 'Bidding' | 'Playing' | 'Scoring' | 'GameOver'
+export type PhaseStage = 'Lobby' | 'Dealing' | 'Bidding' | 'Playing' | 'Scoring' | 'EndOfRound' | 'GameOver'
 
 export type PhaseCards = {
   deck: Card[]
@@ -99,6 +99,11 @@ export type ScoringPhase = RoundPhaseBase & {
   stage: 'Scoring'
 }
 
+export type EndOfRoundPhase = RoundPhaseBase & {
+  stage: 'EndOfRound'
+  advanceAfter: number
+}
+
 export type GameOverPhase = {
   stage: 'GameOver'
 }
@@ -109,6 +114,7 @@ export type Phase =
   | BiddingPhase
   | PlayingPhase
   | ScoringPhase
+  | EndOfRoundPhase
   | GameOverPhase
 
 // Player types
