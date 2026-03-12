@@ -3470,7 +3470,14 @@ export default function App() {
                 </ul>
               </section>
 
-              <div className="flex justify-end">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2"
+                  onClick={resetActiveSessionState}
+                >
+                  Back
+                </button>
                 {isOwnerLobby ? (
                   <button
                     type="button"
