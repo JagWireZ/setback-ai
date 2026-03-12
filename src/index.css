@@ -7,9 +7,9 @@
     --app-bg: #232323;
     --panel-bg: #2d2d2d;
     --panel-bg-strong: #343434;
-    --table-bg: #15603d;
-    --table-bg-strong: #0f4d31;
-    --table-border: #2a7b56;
+    --table-bg: #2f2f2f;
+    --table-bg-strong: #383838;
+    --table-border: #4a4a4a;
     --accent-blue: #2f6fdb;
     --accent-blue-strong: #1f58b7;
     --accent-red: #c74343;
@@ -84,6 +84,28 @@
       var(--table-bg-strong);
   }
 
+  .lobby-panel {
+    border-color: rgba(255, 255, 255, 0.14);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.12)),
+      rgba(45, 45, 45, 0.88);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .lobby-panel-strong {
+    border-color: rgba(255, 255, 255, 0.16);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.16)),
+      rgba(52, 52, 52, 0.9);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .lobby-badge {
+    border-color: rgba(255, 255, 255, 0.18);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+  }
+
   .dialog-surface {
     @apply rounded-lg border shadow-xl;
     border-color: var(--border-color);
@@ -137,17 +159,38 @@
   }
 
   .status-error {
-    @apply rounded-md border px-3 py-2 text-sm;
-    border-color: rgba(199, 67, 67, 0.45);
-    background-color: rgba(199, 67, 67, 0.14);
+    @apply rounded-md border px-3 py-2 text-sm font-medium;
+    border-color: rgba(199, 67, 67, 0.62);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.08)),
+      rgba(199, 67, 67, 0.2);
     color: #ffd7d7;
+    box-shadow: 0 10px 24px rgba(199, 67, 67, 0.18);
   }
 
   .status-info {
-    @apply rounded-md border px-3 py-2 text-sm;
-    border-color: rgba(47, 111, 219, 0.45);
-    background-color: rgba(47, 111, 219, 0.14);
+    @apply rounded-md border px-3 py-2 text-sm font-medium;
+    border-color: rgba(47, 111, 219, 0.62);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.08)),
+      rgba(47, 111, 219, 0.2);
     color: #d8e6ff;
+    box-shadow: 0 10px 24px rgba(47, 111, 219, 0.18);
+  }
+
+  .status-turn {
+    @apply rounded-md border px-3 py-2 text-sm font-semibold;
+    border-color: rgba(34, 130, 88, 0.78);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.1)),
+      rgba(22, 101, 52, 0.28);
+    color: #d9f7e5;
+    box-shadow: 0 10px 24px rgba(22, 101, 52, 0.22);
+  }
+
+  .hand-active {
+    border-color: rgba(34, 130, 88, 0.68);
+    box-shadow: 0 0 28px rgba(22, 101, 52, 0.18);
   }
 
   .text-muted {

@@ -17,6 +17,79 @@ import {
 const getPlayerName = (game, playerId) =>
   game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
 
+const getBidDisplay = (bidEntry) => {
+  if (bidEntry?.trip === true) {
+    return 'Trip'
+  }
+
+  if (typeof bidEntry?.amount === 'number') {
+    return String(bidEntry.amount)
+  }
+
+  return '...'
+}
+
+const getNormalizedPlaySuit = (card, trumpSuit) => (card?.suit === 'Joker' ? trumpSuit : card?.suit)
+
+const isTrumpPlayCard = (card, trumpSuit) => getNormalizedPlaySuit(card, trumpSuit) === trumpSuit
+
+const handHasSuit = (cards, suit, trumpSuit) =>
+  cards.some((card) => getNormalizedPlaySuit(card, trumpSuit) === suit)
+
+const canLeadTrumpSuit = (cards, trumpSuit, trumpBroken) => {
+  if (trumpBroken) {
+    return true
+  }
+
+  return cards.every((card) => isTrumpPlayCard(card, trumpSuit))
+}
+
+const getInvalidPlayMessage = (game, viewerHand, candidateCard) => {
+  if (!candidateCard || game?.phase?.stage !== 'Playing' || !viewerHand?.playerId || game.phase.turnPlayerId !== viewerHand.playerId) {
+    return ''
+  }
+
+  const trumpSuit = game.phase.cards.trump?.suit
+  if (!trumpSuit) {
+    return ''
+  }
+
+  const currentTrick = game.phase.cards.currentTrick
+  if (currentTrick?.plays?.some((play) => play.playerId === viewerHand.playerId)) {
+    return ''
+  }
+
+  const leadCard = currentTrick?.plays?.[0]?.card
+  const leadSuit = leadCard ? getNormalizedPlaySuit(leadCard, trumpSuit) : undefined
+  const selectedSuit = getNormalizedPlaySuit(candidateCard, trumpSuit)
+  const selectedIsTrump = isTrumpPlayCard(candidateCard, trumpSuit)
+  const playerHasLeadSuit = leadSuit ? handHasSuit(viewerHand.cards ?? [], leadSuit, trumpSuit) : false
+
+  if (!leadSuit) {
+    if (selectedIsTrump && !canLeadTrumpSuit(viewerHand.cards ?? [], trumpSuit, game.phase.cards.trumpBroken)) {
+      return `You cannot lead with ${trumpSuit} until trump is broken.`
+    }
+
+    return ''
+  }
+
+  if (playerHasLeadSuit && selectedSuit !== leadSuit) {
+    return `You must follow ${leadSuit}.`
+  }
+
+  return ''
+}
+
+const toUserFacingActionError = (error, fallbackMessage) => {
+  const message = error instanceof Error ? error.message : fallbackMessage
+
+  if (message.includes('TransactionConflict') || message.includes('Transaction cancelled')) {
+    return 'Another move updated the game at the same time. Please try again.'
+  }
+
+  return message
+}
+
 const SUIT_SYMBOLS = {
   Hearts: '♥️',
   Diamonds: '♦️',
@@ -73,6 +146,7 @@ function CardAsset({
   showCornerSuit = true,
   showCenterSymbol = true,
   centerSymbolClassName = 'text-[124%] leading-none sm:text-[152%]',
+  jokerTextClassName = 'text-[32%] font-bold tracking-[0.1em]',
 }) {
   const label = getCardLabel(card)
   const display = getCardDisplay(card)
@@ -97,9 +171,9 @@ function CardAsset({
         ) : null}
       </div>
       <div className={`absolute inset-0 flex flex-col items-center justify-center ${suitColorClass}`}>
-        {display.accent ? <span className="mb-[6%] text-[18%] font-semibold tracking-[0.14em]">{display.accent}</span> : null}
+        {display.accent ? <span className={`mb-[4%] ${jokerTextClassName}`}>{display.accent}</span> : null}
         {showCenterSymbol ? <span className={centerSymbolClassName}>{display.center}</span> : null}
-        {display.accent ? <span className="mt-[4%] text-[18%] font-semibold tracking-[0.12em]">JOKER</span> : null}
+        {display.accent ? <span className={`mt-[2%] ${jokerTextClassName}`}>JOKER</span> : null}
       </div>
     </div>
   )
@@ -134,6 +208,7 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
     (game.playerOrder ?? [])
       .map((playerId) => playersById.get(playerId))
       .filter(Boolean)
+  const currentDealerPlayerId = game?.phase && 'dealerPlayerId' in game.phase ? game.phase.dealerPlayerId : ''
 
   return (
     <ul className="mt-3 flex flex-col gap-2">
@@ -153,7 +228,14 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
           <li key={player.id} className="rounded border panel-surface-strong px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-medium">{player.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{player.name}</p>
+                  {player.id === currentDealerPlayerId ? (
+                    <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                      Dealer
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-lg font-semibold text-white">{score?.total ?? 0}</p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs text-muted">
@@ -171,6 +253,113 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
         )
       })}
     </ul>
+  )
+}
+
+function ScoreHistory({ game, onClose }) {
+  const playersById = new Map((game.players ?? []).map((player) => [player.id, player]))
+  const orderedPlayers =
+    (game.playerOrder ?? [])
+      .map((playerId) => playersById.get(playerId))
+      .filter(Boolean)
+  const displayPlayers = orderedPlayers.length > 0 ? orderedPlayers : game.players ?? []
+  const completedRoundCount = getCompletedRoundCount(game)
+  const historyRounds = Array.from({ length: completedRoundCount }, (_, roundIndex) => {
+    const roundConfig = game.options?.rounds?.[roundIndex]
+
+    return {
+      roundIndex,
+      cardCount: roundConfig?.cardCount ?? '?',
+      direction: roundConfig?.direction ?? 'up',
+      players: displayPlayers
+        .map((player) => {
+          const score = game.scores?.find((entry) => entry.playerId === player.id)
+          const round = score?.rounds?.[roundIndex]
+
+          return {
+            playerId: player.id,
+            name: player.name,
+            bid: round?.bid ?? '-',
+            books: round?.books ?? 0,
+            score: round?.total ?? 0,
+            rainbow: round?.rainbow ?? false,
+          }
+        })
+        .sort((left, right) => right.score - left.score),
+    }
+  })
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="dialog-surface w-full max-w-4xl p-6 text-left"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">Game History</h2>
+          <button
+            type="button"
+            className="btn-secondary px-3 py-2 text-sm"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+        {historyRounds.length === 0 ? (
+          <p className="mt-4 text-sm text-dim">No completed rounds yet.</p>
+        ) : (
+          <div className="mt-4 max-h-[70vh] overflow-auto pr-1">
+            <div className="flex flex-col gap-4">
+              {historyRounds.map((round) => {
+                const winningScore = round.players[0]?.score ?? null
+
+                return (
+                  <section key={round.roundIndex} className="panel-surface rounded-2xl border p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-lg font-semibold">
+                        {`Round ${round.cardCount} ${getRoundDirectionArrow(round.direction)}`}
+                      </h3>
+                    </div>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-dim">
+                            <th className="pb-2 pr-4 font-medium">Player</th>
+                            <th className="pb-2 pr-4 font-medium">Bid</th>
+                            <th className="pb-2 pr-4 font-medium">Books</th>
+                            <th className="pb-2 pr-4 font-medium">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {round.players.map((player) => (
+                            <tr
+                              key={player.playerId}
+                              className={`border-t ${
+                                winningScore !== null && player.score === winningScore
+                                  ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
+                                  : 'border-white/10'
+                              }`}
+                            >
+                              <td className="py-2 pr-4 font-medium text-white">{player.name}</td>
+                              <td className="py-2 pr-4 text-white">{player.bid}</td>
+                              <td className="py-2 pr-4 text-white">{player.books}</td>
+                              <td className="py-2 pr-4 text-white">{player.score}{player.rainbow ? ' 🌈' : ''}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -448,6 +637,8 @@ const getViewerHand = (game) => {
 function GameTablePage({
   game,
   isOwner,
+  errorMessage,
+  onSetGameError,
   onDealCards,
   onSubmitBid,
   onPlayCard,
@@ -465,6 +656,7 @@ function GameTablePage({
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === 'undefined' ? 1024 : window.innerWidth,
   )
+  const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
@@ -477,6 +669,15 @@ function GameTablePage({
   const trumpCard = game?.phase && 'cards' in game.phase ? game.phase.cards.trump : undefined
   const completedTricks = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks ?? [] : []
   const latestCompletedTrick = completedTricks[completedTricks.length - 1]
+  const orderedPlayers = useMemo(() => {
+    const playersById = new Map((game.players ?? []).map((player) => [player.id, player]))
+    const ordered = (game.playerOrder ?? [])
+      .map((playerId) => playersById.get(playerId))
+      .filter(Boolean)
+
+    return ordered.length > 0 ? ordered : game.players ?? []
+  }, [game.playerOrder, game.players])
+  const bidsByPlayerId = useMemo(() => new Map(bids.map((bid) => [bid.playerId, bid])), [bids])
   const booksByPlayerId = useMemo(() => {
     const books = new Map()
 
@@ -493,9 +694,11 @@ function GameTablePage({
   const [selectedCardIndex, setSelectedCardIndex] = useState(null)
   const [selectedTrickCardIndex, setSelectedTrickCardIndex] = useState(null)
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
+  const mobileActionBarRef = useRef(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -622,21 +825,45 @@ function GameTablePage({
   const availableActions = (() => {
     switch (game.phase?.stage) {
       case 'Dealing':
-        return isViewerTurn ? ['Deal Cards'] : ['Waiting for dealer']
+        return isViewerTurn ? ['Deal Cards'] : []
       case 'Bidding':
-        return isViewerTurn ? ['Submit Bid'] : ['Waiting for turn to bid']
+        return isViewerTurn ? ['Submit Bid'] : []
       case 'Playing':
-        return isViewerTurn ? ['Play Card'] : ['Waiting for turn to play']
+        return isViewerTurn ? ['Play Card'] : []
       case 'Scoring':
-        return ['Waiting for scoring to complete']
+        return []
       case 'GameOver':
-        return isOwner ? ['Start Over'] : ['Game is over']
+        return isOwner ? ['Start Over'] : []
       default:
         return []
     }
   })()
 
   const canSortCards = game.phase?.stage !== 'Dealing' && (viewerHand?.cards?.length ?? 0) > 0 && typeof onSortCards === 'function'
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mobileActionBarRef.current) {
+      return undefined
+    }
+
+    const updateHeight = () => {
+      setMobileActionBarHeight(mobileActionBarRef.current?.getBoundingClientRect().height ?? 0)
+    }
+
+    updateHeight()
+
+    const observer = new ResizeObserver(() => {
+      updateHeight()
+    })
+
+    observer.observe(mobileActionBarRef.current)
+    window.addEventListener('resize', updateHeight)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [canSortCards, availableActions.length])
 
   const isActionEnabled = (action) => {
     if (action === 'Deal Cards') {
@@ -666,12 +893,122 @@ function GameTablePage({
     return false
   }
 
+  const actionBarContent = (
+    <div className="flex flex-wrap items-center justify-center gap-3 px-3 py-3">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+          onClick={() => setIsMenuModalOpen(true)}
+          aria-label="Open game menu"
+        >
+          ☰
+        </button>
+        <button
+          type="button"
+          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] md:hidden"
+          onClick={() => setIsScoreModalOpen(true)}
+        >
+          Score
+        </button>
+      </div>
+      {canSortCards ? (
+        <button
+          type="button"
+          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] disabled:opacity-50"
+          onClick={onSortCards}
+          disabled={isSortingCards}
+        >
+          {isSortingCards ? 'Sorting...' : 'Sort'}
+        </button>
+      ) : null}
+      <div className="flex flex-wrap justify-center gap-2">
+        {availableActions.length > 0 ? (
+          availableActions.map((action) => {
+            const isDisabled =
+              !isActionEnabled(action) ||
+              isDealingCards ||
+              isSubmittingBid ||
+              isPlayingCard ||
+              isSortingCards ||
+              isStartingOver
+            const shouldFlashActionButton =
+              ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
+              (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
+            const isPrimaryAction =
+              !isDisabled &&
+              (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
+
+            return (
+              <button
+                key={action}
+                type="button"
+                className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
+                  shouldFlashActionButton
+                    ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
+                    : isPrimaryAction
+                      ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
+                      : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
+                }`}
+                disabled={isDisabled}
+                onClick={
+                  action === 'Deal Cards'
+                    ? onDealCards
+                    : action === 'Submit Bid'
+                      ? onSubmitBid
+                      : action === 'Play Card'
+                        ? () => {
+                            if (selectedCard) {
+                              onPlayCard(selectedCard)
+                            }
+                          }
+                        : action === 'Start Over'
+                          ? onStartOver
+                          : action === 'New Game'
+                            ? onOpenNewGame
+                            : action === 'Join Game'
+                              ? onOpenJoinGame
+                          : undefined
+                }
+              >
+                {action === 'Deal Cards' && isDealingCards
+                  ? 'Dealing...'
+                  : action === 'Start Over' && isStartingOver
+                    ? 'Starting...'
+                    : action === 'Submit Bid' && isSubmittingBid
+                      ? 'Submitting...'
+                      : action === 'Play Card' && isPlayingCard
+                        ? 'Playing...'
+                      : action}
+              </button>
+            )
+          })
+        ) : (
+          <button
+            type="button"
+            className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+            disabled
+          >
+            No actions available
+          </button>
+        )}
+      </div>
+    </div>
+  )
+
   return (
-    <main className="theme-shell h-screen overflow-hidden px-3 py-3">
-      <section className="mx-auto flex h-full w-full max-w-6xl flex-col pb-24">
-        <div className="table-surface flex h-full min-h-0 flex-col rounded-[28px] border p-4 sm:p-5">
-        <article className="shrink-0 p-1">
-          <div className="flex items-start justify-between gap-4 text-sm text-muted">
+    <main
+      className="theme-shell h-[100dvh] overflow-hidden md:h-screen md:px-3 md:py-3"
+      style={{ '--mobile-action-bar-height': `${mobileActionBarHeight}px` }}
+    >
+      <section className="mx-auto flex h-[calc(100dvh-var(--mobile-action-bar-height,0px))] w-full max-w-none flex-col md:h-full md:max-w-6xl">
+        <div
+          className="table-surface flex h-full min-h-0 w-full flex-col rounded-none border-0 md:rounded-3xl md:border md:border-b-0"
+          style={{ borderColor: 'var(--border-color)' }}
+        >
+        <div className="flex min-h-0 flex-1 flex-col p-2 pb-2 sm:p-3 md:pb-3">
+        <article className="shrink-0 px-1 py-3 -translate-y-[15%]">
+          <div className="flex items-center justify-between gap-4 text-sm text-muted">
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <img
                 src="/logo-512x512.png"
@@ -696,32 +1033,39 @@ function GameTablePage({
         </article>
 
         <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[30%_1fr]">
-          <article className="hidden min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-black/5 pb-4 pl-4 pr-1 pt-4 md:block">
-            <div className="score-scroll h-full overflow-auto pr-1">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold">Score</h2>
-                {currentRoundConfig ? (
-                  <p className="text-lg font-medium text-muted">
-                    <span>{`Round ${currentRoundConfig.cardCount} `}</span>
-                    <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
-                  </p>
-                ) : (
-                  <p className="text-lg font-medium text-muted">Round N/A</p>
-                )}
-              </div>
-              <ScoreSummary
-                game={game}
-                bids={bids}
-                booksByPlayerId={booksByPlayerId}
-                currentRoundIndex={currentRoundIndex}
-              />
+          <article className="score-scroll hidden min-h-0 max-h-full self-start overflow-auto rounded-2xl border border-white/10 bg-[rgba(35,35,35,0.25)] pb-4 pl-4 pr-1 pt-4 md:block">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Score</h2>
+              {currentRoundConfig ? (
+                <p className="text-lg font-medium text-muted">
+                  <span>{`Round ${currentRoundConfig.cardCount} `}</span>
+                  <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
+                </p>
+              ) : (
+                <p className="text-lg font-medium text-muted">Round N/A</p>
+              )}
+            </div>
+            <ScoreSummary
+              game={game}
+              bids={bids}
+              booksByPlayerId={booksByPlayerId}
+              currentRoundIndex={currentRoundIndex}
+            />
+            <div className="mt-4 flex justify-end pr-3">
+              <button
+                type="button"
+                className="text-sm font-medium text-[#9ed3b4] transition hover:text-[#d9f7e5]"
+                onClick={() => setIsHistoryModalOpen(true)}
+              >
+                See History
+              </button>
             </div>
           </article>
 
           <article className="flex min-h-0 flex-col p-1">
             <div className="mb-3 flex min-h-7 items-center justify-center">
               {isViewerTurn ? (
-                <p className="status-info px-6 py-2 text-xl font-semibold">
+                <p className="status-turn px-6 py-2 text-xl font-semibold">
                   {viewerTurnMessage}
                 </p>
               ) : currentTurnPlayerId ? (
@@ -732,6 +1076,51 @@ function GameTablePage({
                 </p>
               ) : null}
             </div>
+            {game.phase?.stage === 'Bidding' ? (
+              <section className="mb-3 rounded-2xl border border-[rgba(34,130,88,0.34)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.08)),rgba(22,101,52,0.16)] px-3 py-3 sm:px-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d9f7e5]">Bids</h2>
+                  <p className="text-xs text-[#9ed3b4]">
+                    {bids.length}/{orderedPlayers.length} in
+                  </p>
+                </div>
+                <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {orderedPlayers.map((player) => {
+                    const bidEntry = bidsByPlayerId.get(player.id)
+                    const isCurrentBidder = currentTurnPlayerId === player.id
+                    const hasBid = Boolean(bidEntry)
+
+                    return (
+                      <li
+                        key={player.id}
+                        className={`rounded-xl border px-3 py-2 text-left ${
+                          isCurrentBidder
+                            ? 'border-[rgba(34,130,88,0.78)] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(0,0,0,0.08)),rgba(22,101,52,0.24)] shadow-[0_0_18px_rgba(22,101,52,0.22)]'
+                            : 'border-white/10 bg-[rgba(255,255,255,0.05)]'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium text-white">{player.name}</p>
+                          {isCurrentBidder ? (
+                            <span className="rounded-full border border-[rgba(34,130,88,0.56)] bg-[rgba(34,130,88,0.2)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[#d9f7e5]">
+                              Up
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 flex items-end justify-between gap-2">
+                          <p className={`text-lg font-semibold ${hasBid ? 'text-[#d9f7e5]' : 'text-dim'}`}>
+                            {getBidDisplay(bidEntry)}
+                          </p>
+                          <p className="text-[0.68rem] uppercase tracking-[0.14em] text-dim">
+                            {hasBid ? 'Locked' : isCurrentBidder ? 'Bidding' : 'Waiting'}
+                          </p>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            ) : null}
             {bookWinnerMessage ? (
               <div className="mb-3 flex items-center justify-center">
                 <p className="text-center text-lg text-[#d8e6ff]">{bookWinnerMessage}</p>
@@ -764,156 +1153,111 @@ function GameTablePage({
                       aria-label={getPlayerName(game, play.playerId)}
                     >
                       <div className="aspect-[2.5/3.5] w-24 sm:w-28">
-                        <CardAsset card={play.card} />
+                        <CardAsset
+                          card={play.card}
+                          jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
+                        />
                       </div>
                     </button>
                   </li>
                 ))
               ) : (
-                <li className="self-center text-sm text-dim">No cards played in this trick yet.</li>
+                <li className="self-center text-sm text-dim">
+                  {game.phase?.stage === 'Bidding' ? 'Bidding in progress.' : 'No cards played in this trick yet.'}
+                </li>
               )}
             </ul>
           </article>
         </div>
 
-        <article className="shrink-0 overflow-hidden p-1 sm:overflow-x-auto">
-          <div className="flex items-end justify-center pt-5 pb-2">
+        {errorMessage ? (
+          <div className="mt-3 flex justify-center">
+            <p className="max-w-xl rounded-md bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.05)),rgba(199,67,67,0.08)] px-3 py-2 text-center text-sm text-[#f1c5c5]">
+              {errorMessage}
+            </p>
+          </div>
+        ) : null}
+        <article
+          className={`mt-3 shrink-0 overflow-hidden rounded-3xl border p-1 sm:overflow-x-auto ${
+            canSelectCards
+              ? 'hand-active'
+              : 'border-white/10'
+          }`}
+        >
+          <div className="flex min-h-[11rem] items-center justify-center pt-5 pb-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
-              viewerHand.cards.map((card, index) => (
-                <button
-                  key={`${card.rank}-${card.suit}-${index}`}
-                  type="button"
-                  onClick={() => {
-                    if (!canSelectCards) {
-                      return
-                    }
-                    setSelectedCardIndex((currentIndex) => (currentIndex === index ? null : index))
-                  }}
-                  disabled={!canSelectCards || isPlayingCard}
-                  className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
-                    selectedCardIndex === index
-                      ? '-translate-y-4'
-                      : 'translate-y-0'
-                  }`}
-                  style={{
-                    marginLeft: index === 0 ? '0' : handLayout.overlapOffset,
-                    zIndex: selectedCardIndex === index ? 100 : index + 1,
-                  }}
-                  aria-label={getCardLabel(card)}
-                >
-                  <div
-                    className={`aspect-[2.5/3.5] ${handLayout.useCompactSizing ? '' : 'w-20 sm:w-24'}`}
-                    style={handLayout.useCompactSizing ? { width: handLayout.cardWidth } : undefined}
-                  >
-                    <CardAsset
-                      card={card}
-                      showCenterSymbol={!handLayout.useCompactSizing}
-                      centerSymbolClassName="text-[104%] leading-none sm:text-[132%]"
-                    />
-                  </div>
-                </button>
-              ))
-            ) : (
-              <p className="text-sm text-dim">No cards in hand yet.</p>
-            )}
-          </div>
-        </article>
-        </div>
-      </section>
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t panel-surface px-3 py-4 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="btn-secondary min-h-12 px-4 py-3 text-sm"
-              onClick={() => setIsMenuModalOpen(true)}
-              aria-label="Open game menu"
-            >
-              ☰
-            </button>
-            <button
-              type="button"
-              className="btn-secondary min-h-12 px-4 py-3 text-sm md:hidden"
-              onClick={() => setIsScoreModalOpen(true)}
-            >
-              Score
-            </button>
-          </div>
-          {canSortCards ? (
-            <button
-              type="button"
-              className="btn-secondary min-h-12 px-4 py-3 text-sm disabled:opacity-50"
-              onClick={onSortCards}
-              disabled={isSortingCards}
-            >
-              {isSortingCards ? 'Sorting...' : 'Sort'}
-            </button>
-          ) : null}
-          <div className="flex flex-wrap justify-center gap-2">
-            {availableActions.length > 0 ? (
-              availableActions.map((action) => {
-                const isDisabled =
-                  !isActionEnabled(action) ||
-                  isDealingCards ||
-                  isSubmittingBid ||
-                  isPlayingCard ||
-                  isSortingCards ||
-                  isStartingOver
-                const shouldFlashDealButton = action === 'Deal Cards' && isViewerTurn && !isDisabled
+              viewerHand.cards.map((card, index) => {
+                const invalidPlayMessage = canSelectCards ? getInvalidPlayMessage(game, viewerHand, card) : ''
+                const isInvalidPlay = invalidPlayMessage.length > 0
 
                 return (
                   <button
-                    key={action}
+                    key={`${card.rank}-${card.suit}-${index}`}
                     type="button"
-                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
-                      shouldFlashDealButton
-                        ? 'animate-pulse border-[#4d86ee] bg-[#2f6fdb]/25 shadow-[0_0_18px_rgba(47,111,219,0.45)]'
-                        : 'btn-secondary'
+                    onClick={() => {
+                      if (!canSelectCards) {
+                        return
+                      }
+
+                      if (isInvalidPlay) {
+                        setSelectedCardIndex(null)
+                        onSetGameError?.(invalidPlayMessage)
+                        return
+                      }
+
+                      onSetGameError?.('')
+                      setSelectedCardIndex((currentIndex) => (currentIndex === index ? null : index))
+                    }}
+                    disabled={!canSelectCards || isPlayingCard}
+                    className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-all duration-150 ${
+                      selectedCardIndex === index ? '-translate-y-4' : 'translate-y-0'
                     }`}
-                    disabled={isDisabled}
-                    onClick={
-                      action === 'Deal Cards'
-                        ? onDealCards
-                        : action === 'Submit Bid'
-                          ? onSubmitBid
-                          : action === 'Play Card'
-                            ? () => {
-                                if (selectedCard) {
-                                  onPlayCard(selectedCard)
-                                }
-                              }
-                            : action === 'Start Over'
-                              ? onStartOver
-                              : action === 'New Game'
-                                ? onOpenNewGame
-                                : action === 'Join Game'
-                                  ? onOpenJoinGame
-                            : undefined
-                    }
+                    style={{
+                      marginLeft: index === 0 ? '0' : handLayout.overlapOffset,
+                      zIndex: selectedCardIndex === index ? 100 : index + 1,
+                    }}
+                    aria-label={getCardLabel(card)}
                   >
-                    {action === 'Deal Cards' && isDealingCards
-                      ? 'Dealing...'
-                      : action === 'Start Over' && isStartingOver
-                        ? 'Starting...'
-                        : action === 'Submit Bid' && isSubmittingBid
-                          ? 'Submitting...'
-                          : action === 'Play Card' && isPlayingCard
-                            ? 'Playing...'
-                          : action}
+                    <div
+                      className={`aspect-[2.5/3.5] ${handLayout.useCompactSizing ? '' : 'w-20 sm:w-24'}`}
+                      style={{
+                        ...(handLayout.useCompactSizing ? { width: handLayout.cardWidth } : {}),
+                        filter: canSelectCards
+                          ? isInvalidPlay
+                            ? 'brightness(0.50)'
+                            : 'drop-shadow(0 0 12px rgba(120, 255, 180, 0.22))'
+                          : undefined,
+                      }}
+                    >
+                      <CardAsset
+                        card={card}
+                        showCenterSymbol={!handLayout.useCompactSizing}
+                        centerSymbolClassName="text-[104%] leading-none sm:text-[132%]"
+                        jokerTextClassName="text-[42%] font-bold tracking-[0.06em]"
+                      />
+                    </div>
                   </button>
                 )
               })
             ) : (
-              <button
-                type="button"
-                className="btn-secondary min-h-12 px-4 py-3 text-sm"
-                disabled
-              >
-                No actions available
-              </button>
+              <p className="text-sm text-dim">No cards in hand yet.</p>
             )}
           </div>
+          <div className="hidden md:block">
+            {actionBarContent}
+          </div>
+        </article>
         </div>
+        </div>
+      </section>
+      <div
+        ref={mobileActionBarRef}
+        className="fixed inset-x-0 bottom-0 z-40 md:hidden"
+        style={{
+          backgroundColor: 'rgba(20, 20, 20, 0.25)',
+        }}
+      >
+        {actionBarContent}
       </div>
       {isScoreModalOpen && (
         <div
@@ -941,9 +1285,24 @@ function GameTablePage({
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
             />
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                className="text-sm font-medium text-[#9ed3b4] transition hover:text-[#d9f7e5]"
+                onClick={() => setIsHistoryModalOpen(true)}
+              >
+                See History
+              </button>
+            </div>
           </div>
         </div>
       )}
+      {isHistoryModalOpen ? (
+        <ScoreHistory
+          game={game}
+          onClose={() => setIsHistoryModalOpen(false)}
+        />
+      ) : null}
       {isMenuModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
@@ -1004,7 +1363,7 @@ export default function App() {
 
   const [ownerSession, setOwnerSession] = useState(null)
   const [playerSession, setPlayerSession] = useState(null)
-  const [lobbyError, setLobbyError] = useState('')
+  const [gameError, setGameError] = useState('')
   const [lobbyInfo, setLobbyInfo] = useState('')
   const [isStartingGame, setIsStartingGame] = useState(false)
   const [isDealingCards, setIsDealingCards] = useState(false)
@@ -1016,11 +1375,14 @@ export default function App() {
   const [isSortingCards, setIsSortingCards] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
+  const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
+  const isMutationInFlight =
+    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSortingCards || isStartingOver
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -1226,7 +1588,7 @@ export default function App() {
         result?.game?.players?.find((player) => player.type === 'human')?.id ?? '',
       )
       setPlayerSession(null)
-      setLobbyError('')
+      setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner')
@@ -1277,7 +1639,7 @@ export default function App() {
         version: result?.version ?? result?.game?.version ?? 0,
       })
       setOwnerSession(null)
-      setLobbyError('')
+      setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'player')
@@ -1342,7 +1704,7 @@ export default function App() {
         action: 'rejoinGame',
         gameId: selectedGame.gameId,
       })
-      setLobbyError('')
+      setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(selectedGame.gameId)
       closeRejoinModal()
@@ -1356,6 +1718,10 @@ export default function App() {
 
   const refreshOwnerGame = async () => {
     if (!ownerSession?.gameId || !ownerSession?.playerToken) {
+      return
+    }
+
+    if (isMutationInFlight) {
       return
     }
 
@@ -1380,13 +1746,17 @@ export default function App() {
         }
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to refresh game state'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to refresh game state')
+      setGameError(message)
     }
   }
 
   const refreshPlayerGame = async () => {
     if (!playerSession?.gameId || !playerSession?.playerToken) {
+      return
+    }
+
+    if (isMutationInFlight) {
       return
     }
 
@@ -1409,8 +1779,8 @@ export default function App() {
         }
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to refresh game state'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to refresh game state')
+      setGameError(message)
     }
   }
 
@@ -1426,7 +1796,7 @@ export default function App() {
     }, AI_ACTION_DELAY_MS)
 
     return () => clearInterval(interval)
-  }, [ownerSession?.gameId, ownerSession?.playerToken])
+  }, [ownerSession?.gameId, ownerSession?.playerToken, isMutationInFlight])
 
   useEffect(() => {
     if (!ownerSession?.ownerPlayerId) {
@@ -1450,7 +1820,7 @@ export default function App() {
     }, AI_ACTION_DELAY_MS)
 
     return () => clearInterval(interval)
-  }, [playerSession?.gameId, playerSession?.playerToken, playerSession?.version])
+  }, [playerSession?.gameId, playerSession?.playerToken, playerSession?.version, isMutationInFlight])
 
   const activeLobbySession = ownerSession ?? playerSession
   const isOwnerLobby = Boolean(ownerSession)
@@ -1465,8 +1835,16 @@ export default function App() {
       : null
 
   useEffect(() => {
-    setIsEndOfRoundModalDismissed(false)
-  }, [activeGame?.phase?.stage, endOfRoundSummary?.roundIndex])
+    if (!endOfRoundSummary) {
+      return
+    }
+
+    const isNewRoundSummary = persistedEndOfRoundSummary?.roundIndex !== endOfRoundSummary.roundIndex
+    setPersistedEndOfRoundSummary(endOfRoundSummary)
+    if (isNewRoundSummary) {
+      setIsEndOfRoundModalDismissed(false)
+    }
+  }, [endOfRoundSummary, persistedEndOfRoundSummary?.roundIndex])
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -1545,7 +1923,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setPendingPlayerActionId(playerId)
 
@@ -1566,7 +1944,7 @@ export default function App() {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to move player'
-      setLobbyError(message)
+      setGameError(message)
     } finally {
       setPendingPlayerActionId('')
     }
@@ -1577,7 +1955,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setPendingPlayerActionId(playerId)
 
@@ -1597,7 +1975,7 @@ export default function App() {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove player'
-      setLobbyError(message)
+      setGameError(message)
     } finally {
       setPendingPlayerActionId('')
     }
@@ -1608,7 +1986,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsStartingGame(true)
 
@@ -1629,7 +2007,7 @@ export default function App() {
       setLobbyInfo('Game started.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start game'
-      setLobbyError(message)
+      setGameError(message)
     } finally {
       setIsStartingGame(false)
     }
@@ -1650,8 +2028,10 @@ export default function App() {
     previousCompletedTrickCountRef.current = 0
     setOwnerSession(null)
     setPlayerSession(null)
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
+    setPersistedEndOfRoundSummary(null)
+    setIsEndOfRoundModalDismissed(false)
     clearGameIdInUrl()
   }
 
@@ -1660,7 +2040,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsStartingOver(true)
 
@@ -1682,7 +2062,7 @@ export default function App() {
       setLobbyInfo('Game reset to lobby.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start over'
-      setLobbyError(message)
+      setGameError(message)
     } finally {
       setIsStartingOver(false)
     }
@@ -1710,7 +2090,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsDealingCards(true)
 
@@ -1741,8 +2121,8 @@ export default function App() {
         )
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to deal cards'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to deal cards')
+      setGameError(message)
     } finally {
       setIsDealingCards(false)
     }
@@ -1774,7 +2154,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsSubmittingBid(true)
 
@@ -1810,8 +2190,8 @@ export default function App() {
 
       closeSubmitBidModal()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to submit bid'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to submit bid')
+      setGameError(message)
     } finally {
       setIsSubmittingBid(false)
     }
@@ -1824,7 +2204,7 @@ export default function App() {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsSortingCards(true)
 
@@ -1858,8 +2238,8 @@ export default function App() {
 
       closeSortCardsModal()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sort cards'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to sort cards')
+      setGameError(message)
     } finally {
       setIsSortingCards(false)
     }
@@ -1867,11 +2247,12 @@ export default function App() {
 
   const handlePlayCard = async (card) => {
     const activeSession = ownerSession ?? playerSession
-    if (!activeSession?.gameId || !activeSession?.playerToken) {
+    const activeGame = activeSession?.game
+    if (!activeSession?.gameId || !activeSession?.playerToken || !activeGame) {
       return
     }
 
-    setLobbyError('')
+    setGameError('')
     setLobbyInfo('')
     setIsPlayingCard(true)
 
@@ -1903,8 +2284,8 @@ export default function App() {
         )
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to play card'
-      setLobbyError(message)
+      const message = toUserFacingActionError(error, 'Unable to play card')
+      setGameError(message)
     } finally {
       setIsPlayingCard(false)
     }
@@ -1918,6 +2299,8 @@ export default function App() {
         <GameTablePage
           game={activeGame}
           isOwner={Boolean(ownerSession)}
+          errorMessage={gameError}
+          onSetGameError={setGameError}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
@@ -2015,7 +2398,7 @@ export default function App() {
             </div>
           </div>
         )}
-        {endOfRoundSummary && !isEndOfRoundModalDismissed && (
+        {persistedEndOfRoundSummary && !isEndOfRoundModalDismissed && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           >
@@ -2024,10 +2407,10 @@ export default function App() {
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">
-                {`End of Round ${endOfRoundSummary.cardCount} ${getRoundDirectionArrow(endOfRoundSummary.direction)}`}
+                {`End of Round ${persistedEndOfRoundSummary.cardCount} ${getRoundDirectionArrow(persistedEndOfRoundSummary.direction)}`}
               </h2>
               <ul className="mt-4 flex flex-col gap-2">
-                {endOfRoundSummary.players.map((player) => (
+                {persistedEndOfRoundSummary.players.map((player) => (
                   <li
                     key={player.playerId}
                     className="panel-surface-strong rounded-md border px-3 py-3"
@@ -2061,143 +2444,155 @@ export default function App() {
 
   if (activeLobbySession?.gameId && activeLobbySession?.game) {
     return (
-      <main className="theme-shell min-h-screen px-4 py-8">
-        <section className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-          <header className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {isOwnerLobby ? 'Game Owner Lobby' : 'Game Lobby'}
-            </h1>
-            <p className="text-muted">Game ID: {activeLobbySession.gameId}</p>
-            <p className="text-muted">Phase: {activeLobbySession.game.phase?.stage}</p>
-          </header>
+      <main className="theme-shell min-h-screen px-4 py-4 sm:py-6">
+        <section className="mx-auto flex w-full max-w-5xl flex-col">
+          <div className="table-surface rounded-[2rem] border px-4 py-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] sm:px-6 sm:py-6">
+            <header className="flex flex-col gap-2 border-b border-white/10 pb-5">
+              <h1 className="text-3xl font-bold tracking-tight">
+                {isOwnerLobby ? 'Game Owner Lobby' : 'Game Lobby'}
+              </h1>
+              <div className="flex flex-wrap gap-3 text-sm">
+                <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
+                  Game ID: {activeLobbySession.gameId}
+                </p>
+                <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
+                  Phase: {activeLobbySession.game.phase?.stage}
+                </p>
+              </div>
+            </header>
 
-          {lobbyError && (
-            <p className="status-error">
-              {lobbyError}
-            </p>
-          )}
-          {lobbyInfo && (
-            <p className="status-info">
-              {lobbyInfo}
-            </p>
-          )}
-
-          <section className="panel-surface rounded-lg border p-4">
-            <h2 className="text-lg font-semibold">Share Link</h2>
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                readOnly
-                value={shareLink}
-                className="input-surface w-full text-sm"
-              />
-              <button
-                type="button"
-                className="btn-primary px-4 py-2 text-sm"
-                onClick={handleCopyShareLink}
-              >
-                Copy Link
-              </button>
-            </div>
-          </section>
-
-          <section className="panel-surface rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-lg font-semibold">Players</h2>
-              {isOwnerLobby && (
-                <label className="flex items-center gap-2 text-sm text-muted">
-                  <span>Dealer</span>
-                  <select
-                    value={selectedDealerPlayerId}
-                    onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
-                    disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-                    className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
-                    aria-label="Select dealer"
-                  >
-                    {orderedPlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            <div className="mt-6 flex flex-col gap-6">
+              {gameError && (
+                <p className="status-error">
+                  {gameError}
+                </p>
               )}
-            </div>
-            <ul className="mt-3 flex flex-col gap-2">
-              {orderedPlayers.map((player) => {
-                const isPending = pendingPlayerActionId === player.id
-                return (
-                  <li
-                    key={player.id}
-                    className={`panel-surface-strong rounded-md border px-3 py-3 ${
-                      isOwnerLobby
-                        ? 'grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'
-                        : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{player.name}</span>
-                      <span className="rounded border px-2 py-0.5 text-xs uppercase tracking-wide text-muted" style={{ borderColor: 'var(--border-color)' }}>
-                        {player.type}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {isOwnerLobby && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                            onClick={() => handleMovePlayer(player.id, 'left')}
-                            disabled={isPending || isStartingGame}
-                            aria-label={`Move ${player.name} up`}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                            onClick={() => handleMovePlayer(player.id, 'right')}
-                            disabled={isPending || isStartingGame}
-                            aria-label={`Move ${player.name} down`}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-danger px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                            onClick={() => handleRemovePlayer(player.id)}
-                            disabled={
-                              player.type === 'ai' ||
-                              player.id === ownerSession?.ownerPlayerId ||
-                              isPending ||
-                              isStartingGame
-                            }
-                            aria-label={`Remove ${player.name}`}
-                          >
-                            ×
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
+              {lobbyInfo && (
+                <p className="status-info">
+                  {lobbyInfo}
+                </p>
+              )}
 
-          <div className="flex justify-end">
-            {isOwnerLobby ? (
-              <button
-                type="button"
-                className="btn-primary px-4 py-2 disabled:opacity-50"
-                onClick={handleStartGame}
-                disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-              >
-                {isStartingGame ? 'Starting...' : 'Start Game'}
-              </button>
-            ) : (
-              <p className="text-sm text-muted">Waiting for game to start...</p>
-            )}
+              <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
+                <h2 className="text-lg font-semibold">Share Link</h2>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareLink}
+                    className="input-surface w-full text-sm"
+                  />
+                  <button
+                    type="button"
+                    className="btn-primary px-4 py-2 text-sm"
+                    onClick={handleCopyShareLink}
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              </section>
+
+              <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="text-lg font-semibold">Players</h2>
+                  {isOwnerLobby && (
+                    <label className="flex items-center gap-2 text-sm text-muted">
+                      <span>Dealer</span>
+                      <select
+                        value={selectedDealerPlayerId}
+                        onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
+                        disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                        className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
+                        aria-label="Select dealer"
+                      >
+                        {orderedPlayers.map((player) => (
+                          <option key={player.id} value={player.id}>
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {orderedPlayers.map((player) => {
+                    const isPending = pendingPlayerActionId === player.id
+                    return (
+                      <li
+                        key={player.id}
+                        className={`panel-surface-strong rounded-xl border bg-[rgba(52,52,52,0.85)] px-3 py-3 ${
+                          isOwnerLobby
+                            ? 'grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'
+                            : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{player.name}</span>
+                          <span className="rounded border px-2 py-0.5 text-xs uppercase tracking-wide text-muted" style={{ borderColor: 'var(--border-color)' }}>
+                            {player.type}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {isOwnerLobby && (
+                            <>
+                              <button
+                                type="button"
+                                className="btn-secondary border-white/15 bg-white/8 px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                onClick={() => handleMovePlayer(player.id, 'left')}
+                                disabled={isPending || isStartingGame}
+                                aria-label={`Move ${player.name} up`}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-secondary border-white/15 bg-white/8 px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                onClick={() => handleMovePlayer(player.id, 'right')}
+                                disabled={isPending || isStartingGame}
+                                aria-label={`Move ${player.name} down`}
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-danger bg-[rgba(199,67,67,0.12)] px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                onClick={() => handleRemovePlayer(player.id)}
+                                disabled={
+                                  player.type === 'ai' ||
+                                  player.id === ownerSession?.ownerPlayerId ||
+                                  isPending ||
+                                  isStartingGame
+                                }
+                                aria-label={`Remove ${player.name}`}
+                              >
+                                ×
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+
+              <div className="flex justify-end">
+                {isOwnerLobby ? (
+                  <button
+                    type="button"
+                    className="btn-primary px-4 py-2 disabled:opacity-50"
+                    onClick={handleStartGame}
+                    disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                  >
+                    {isStartingGame ? 'Starting...' : 'Start Game'}
+                  </button>
+                ) : (
+                  <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm text-muted">
+                    Waiting for game to start...
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -2205,9 +2600,10 @@ export default function App() {
   }
 
   return (
-    <main className="theme-shell min-h-screen">
-      <section className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-6 px-6 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Setback</h1>
+    <main className="theme-shell h-[100dvh] overflow-hidden px-4 py-4">
+      <section className="mx-auto flex h-full max-w-xl flex-col items-center justify-center px-2 py-4 text-center sm:py-6">
+        <div className="table-surface flex max-h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border px-6 py-8 sm:py-10 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+        <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">Setback</h1>
         {requestError && (
           <p className="status-error w-full max-w-md">
             {requestError}
@@ -2241,6 +2637,7 @@ export default function App() {
           >
             Continue Game
           </button>
+        </div>
         </div>
       </section>
 

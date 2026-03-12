@@ -74,6 +74,14 @@ export const invokeLambda = async (action, payload) => {
 
   if (!response.ok) {
     const message = typeof data?.error === 'string' ? data.error : 'Request failed'
+    console.error('Lambda request failed', {
+      action,
+      payload,
+      status: response.status,
+      statusText: response.statusText,
+      error: message,
+      response: data,
+    })
     throw new Error(message)
   }
 
