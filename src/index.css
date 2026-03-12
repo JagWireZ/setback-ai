@@ -236,7 +236,7 @@
   .reaction-float {
     position: absolute;
     transform: translateX(-50%);
-    animation: reaction-float-up 4.2s linear forwards;
+    animation: reaction-float-up 5.1s linear forwards;
     will-change: transform, opacity;
   }
 
@@ -255,7 +255,7 @@
     box-shadow: 0 16px 28px rgba(0, 0, 0, 0.26);
     backdrop-filter: blur(8px);
     white-space: nowrap;
-    animation: reaction-sway 4.2s ease-in-out forwards;
+    animation: reaction-sway 5.1s ease-in-out forwards;
     will-change: transform;
   }
 }

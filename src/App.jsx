@@ -812,9 +812,9 @@ function GameTablePage({
         const hash = hashString(reaction.id)
         const left = 38 + (hash % 25)
         const driftDirection = hash % 2 === 0 ? 1 : -1
-        const driftA = driftDirection * (12 + ((hash >> 3) % 8))
-        const driftB = driftDirection * -1 * (8 + ((hash >> 6) % 10))
-        const driftC = driftDirection * (16 + ((hash >> 9) % 12))
+        const driftA = driftDirection * (18 + ((hash >> 3) % 10))
+        const driftB = driftDirection * -1 * (14 + ((hash >> 6) % 12))
+        const driftC = driftDirection * (24 + ((hash >> 9) % 14))
         const delay = (index % 3) * 0.08
 
         return {
@@ -1076,100 +1076,107 @@ function GameTablePage({
   }
 
   const renderActionBarContent = (isMobileBar) => (
-    <div className="relative flex flex-wrap items-center justify-center gap-3 px-3 py-3">
-      <div className="flex items-center gap-3">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-3 py-3">
+      <div className="flex items-center justify-start gap-3">
         <button
           type="button"
-          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+          className="min-h-12 border-0 bg-transparent px-1 py-1 text-[1.55rem] leading-none text-white transition hover:scale-110"
           onClick={() => setIsMenuModalOpen(true)}
           aria-label="Open game menu"
         >
           ☰
         </button>
-        {isMobileBar ? (
-          <button
-            type="button"
-            className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
-            onClick={() => setIsScoreModalOpen(true)}
-          >
-            Score
-          </button>
-        ) : null}
       </div>
-      {canSortCards ? (
-        <button
-          type="button"
-          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] disabled:opacity-50"
-          onClick={onSortCards}
-          disabled={isSortingCards}
-        >
-          {isSortingCards ? 'Sorting...' : 'Sort'}
-        </button>
-      ) : null}
-      {availableActions.length > 0 ? (
-        <div className="flex flex-wrap justify-center gap-2">
-          {availableActions.map((action) => {
-            const isDisabled =
-              !isActionEnabled(action) ||
-              isDealingCards ||
-              isSubmittingBid ||
-              isPlayingCard ||
-              isSortingCards ||
-              isStartingOver
-            const shouldFlashActionButton =
-              ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
-              (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
-            const isPrimaryAction =
-              !isDisabled &&
-              (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
+      <div className="min-w-0 overflow-x-auto">
+        <div className="flex w-max min-w-full items-center justify-center gap-3 px-1">
+          {isMobileBar ? (
+            <button
+              type="button"
+              className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+              onClick={() => setIsScoreModalOpen(true)}
+            >
+              Score
+            </button>
+          ) : null}
+          {canSortCards ? (
+            <button
+              type="button"
+              className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] disabled:opacity-50"
+              onClick={onSortCards}
+              disabled={isSortingCards}
+            >
+              {isSortingCards ? 'Sorting...' : 'Sort'}
+            </button>
+          ) : null}
+          {availableActions.length > 0 ? (
+            <div className="flex items-center justify-center gap-2">
+              {availableActions.map((action) => {
+                const isDisabled =
+                  !isActionEnabled(action) ||
+                  isDealingCards ||
+                  isSubmittingBid ||
+                  isPlayingCard ||
+                  isSortingCards ||
+                  isStartingOver
+                const shouldFlashActionButton =
+                  ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
+                  (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
+                const isPrimaryAction =
+                  !isDisabled &&
+                  (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
 
-            return (
-              <button
-                key={action}
-                type="button"
-                className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
-                  shouldFlashActionButton
-                    ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
-                    : isPrimaryAction
-                      ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
-                      : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
-                }`}
-                disabled={isDisabled}
-                onClick={
-                  action === 'Deal Cards'
-                    ? onDealCards
-                    : action === 'Submit Bid'
-                      ? onSubmitBid
-                      : action === 'Play Card'
-                        ? () => {
-                            if (selectedCard) {
-                              onPlayCard(selectedCard)
-                            }
-                          }
-                        : action === 'Start Over'
-                          ? onStartOver
-                          : action === 'New Game'
-                            ? onOpenNewGame
-                            : action === 'Join Game'
-                              ? onOpenJoinGame
-                          : undefined
-                }
-              >
-                {action === 'Deal Cards' && isDealingCards
-                  ? 'Dealing...'
-                  : action === 'Start Over' && isStartingOver
-                    ? 'Starting...'
-                    : action === 'Submit Bid' && isSubmittingBid
-                      ? 'Submitting...'
-                      : action === 'Play Card' && isPlayingCard
-                        ? 'Playing...'
-                      : action}
-              </button>
-            )
-          })}
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
+                      shouldFlashActionButton
+                        ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
+                        : isPrimaryAction
+                          ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
+                          : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
+                    }`}
+                    disabled={isDisabled}
+                    onClick={
+                      action === 'Deal Cards'
+                        ? onDealCards
+                        : action === 'Submit Bid'
+                          ? onSubmitBid
+                          : action === 'Play Card'
+                            ? () => {
+                                if (selectedCard) {
+                                  onPlayCard(selectedCard)
+                                }
+                              }
+                            : action === 'Start Over'
+                              ? onStartOver
+                              : action === 'New Game'
+                                ? onOpenNewGame
+                                : action === 'Join Game'
+                                  ? onOpenJoinGame
+                                  : undefined
+                    }
+                  >
+                    {action === 'Deal Cards' && isDealingCards
+                      ? 'Dealing...'
+                      : action === 'Start Over' && isStartingOver
+                        ? 'Starting...'
+                        : action === 'Submit Bid' && isSubmittingBid
+                          ? 'Submitting...'
+                          : action === 'Play Card' && isPlayingCard
+                            ? 'Playing...'
+                            : action}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
         </div>
-      ) : null}
-      <div className="relative" ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}>
+      </div>
+      <div
+        className="relative flex items-center justify-end"
+        ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}
+      >
         {isReactionModalOpen && isMobileBar === isMobileViewport ? (
           <div className="absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl bg-[#3a3a3a] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
             <div className="grid grid-cols-4 gap-2">
@@ -1209,7 +1216,7 @@ function GameTablePage({
   )
 
   return (
-    <>
+    <div className="contents">
       <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
         {reactionLayouts.map(({ reaction, style }) => (
           <div
@@ -1244,13 +1251,16 @@ function GameTablePage({
               />
             </div>
             {trumpCard ? (
-              <div className="flex shrink-0 items-center gap-2 self-start">
+              <div className="mt-2 flex shrink-0 items-center gap-2 self-start md:mt-0">
                 <p className="text-sm text-dim">Trump</p>
-                <div className="relative h-[84px] w-[78px] shrink-0">
-                  <div className="absolute left-0 top-0 h-[84px] w-[60px]">
+                <div className="relative h-[76px] w-[70px] shrink-0 md:h-[84px] md:w-[78px]">
+                  <div className="absolute left-0 top-0 h-[76px] w-[54px] md:h-[84px] md:w-[60px]">
                     <CardBack />
                   </div>
-                  <div className="absolute top-0 h-[84px] w-[60px]" style={{ left: '0.75rem' }}>
+                  <div
+                    className="absolute top-0 h-[76px] w-[54px] md:h-[84px] md:w-[60px]"
+                    style={{ left: '0.75rem' }}
+                  >
                     <CardAsset card={trumpCard} showCornerSuit={false} />
                   </div>
                 </div>
@@ -1730,7 +1740,7 @@ function GameTablePage({
         </div>
       ) : null}
     </main>
-    </>
+    </div>
   )
 }
 
