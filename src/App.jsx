@@ -1178,7 +1178,7 @@ function GameTablePage({
         ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}
       >
         {isReactionModalOpen && isMobileBar === isMobileViewport ? (
-          <div className="absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl bg-[#3a3a3a] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+          <div className="absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl bg-[#3a3a3a] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
             <div className="grid grid-cols-4 gap-2">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
