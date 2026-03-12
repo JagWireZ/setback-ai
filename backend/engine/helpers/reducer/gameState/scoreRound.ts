@@ -1,14 +1,5 @@
 import type { Card, Game, Score, Suit } from "@shared/types/game";
-
-const STANDARD_SUITS: Exclude<Suit, "Joker">[] = ["Clubs", "Diamonds", "Hearts", "Spades"];
-
-const normalizeSuit = (card: Card, trumpSuit: Suit): Suit =>
-  card.suit === "Joker" ? trumpSuit : card.suit;
-
-const hasAllSuitsWithTrumpJokerRule = (cards: Card[], trumpSuit: Suit): boolean => {
-  const normalizedSuits = new Set(cards.map((card) => normalizeSuit(card, trumpSuit)));
-  return STANDARD_SUITS.every((suit) => normalizedSuits.has(suit));
-};
+import { hasRainbow } from "./rainbow";
 
 const buildPlayedCardsByPlayer = (game: Game): Map<string, Card[]> => {
   if (game.phase.stage !== "Scoring") {
@@ -111,7 +102,7 @@ export const scoreRound = (game: Game): Score[] => {
     let rainbow = false;
     if (round.cardCount === 4) {
       const playedCards = playedCardsByPlayer.get(playerId) ?? [];
-      if (hasAllSuitsWithTrumpJokerRule(playedCards, trumpCard.suit)) {
+      if (hasRainbow(playedCards, trumpCard.suit, round.cardCount)) {
         rainbow = true;
         delta += 25;
       }
@@ -128,7 +119,8 @@ export const scoreRound = (game: Game): Score[] => {
       bid: bid.amount,
       books: tricksWon,
     };
-    const rounds = [...existingRounds, roundResult];
+    const rounds = [...existingRounds];
+    rounds[scoringPhase.roundIndex] = roundResult;
     const total = rounds.reduce((sum, value) => sum + value.total, 0);
     const possible = rounds.reduce((sum, value) => sum + value.possible, 0);
 

@@ -13,10 +13,6 @@ export const startOver = (
     throw new Error("Game ID mismatch");
   }
 
-  if (existingGame.phase.stage !== "GameOver") {
-    throw new Error("Game can only be restarted from GameOver phase");
-  }
-
   return withNextVersion(existingGame, {
     phase: { stage: "Lobby" },
     scores: existingGame.players.map((player) => buildScore(player.id)),

@@ -4,6 +4,7 @@ import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { shuffleCards } from "../helpers/shuffleCards";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
+import { applyRainbowPreviewToScores } from "../helpers/reducer/gameState/rainbow";
 
 const getNextPlayerIndex = (playerOrder: string[], playerId: string): number => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -110,8 +111,16 @@ export const dealCards = (
     ...existingGame,
     phase: dealtPhase,
   });
+  const nextScores = applyRainbowPreviewToScores(
+    existingGame.scores,
+    handsByPlayerId,
+    trump.suit,
+    existingGame.phase.roundIndex,
+    round.cardCount,
+  );
 
   return withNextVersion(existingGame, {
     phase: nextPhase,
+    scores: nextScores,
   });
 };

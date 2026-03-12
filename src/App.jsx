@@ -223,6 +223,7 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
               : score?.rounds?.[currentRoundIndex]?.bid ?? '-'
         const playerBooks =
           booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
+        const playerRainbow = score?.rounds?.[currentRoundIndex]?.rainbow === true
 
         return (
           <li key={player.id} className="rounded border panel-surface-strong px-3 py-2 text-sm">
@@ -236,7 +237,10 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-lg font-semibold text-white">{score?.total ?? 0}</p>
+                <p className="mt-1 text-lg font-semibold text-white">
+                  {score?.total ?? 0}
+                  {playerRainbow ? <span className="ml-2" aria-label="Rainbow round">🌈</span> : null}
+                </p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs text-muted">
                 <p>
@@ -515,8 +519,25 @@ const TRICK_COMPLETE_DELAY_MS = 5000
 
 const getRoundDirectionArrow = (direction) => (direction === 'up' ? '⬆' : '⬇')
 
-const getCompletedRoundCount = (game) =>
-  Array.isArray(game?.scores) ? Math.max(0, ...game.scores.map((score) => score?.rounds?.length ?? 0)) : 0
+const getCompletedRoundCount = (game) => {
+  const maxRecordedRounds = Array.isArray(game?.scores)
+    ? Math.max(0, ...game.scores.map((score) => score?.rounds?.length ?? 0))
+    : 0
+
+  if (!game?.phase || !('roundIndex' in game.phase)) {
+    return maxRecordedRounds
+  }
+
+  if (game.phase.stage === 'EndOfRound') {
+    return Math.min(maxRecordedRounds, game.phase.roundIndex + 1)
+  }
+
+  if (game.phase.stage === 'Dealing' || game.phase.stage === 'Bidding' || game.phase.stage === 'Playing' || game.phase.stage === 'Scoring') {
+    return Math.min(maxRecordedRounds, game.phase.roundIndex)
+  }
+
+  return maxRecordedRounds
+}
 
 const buildRoundSummary = (game, roundIndex) => {
   if (!game || roundIndex < 0) {
@@ -532,18 +553,21 @@ const buildRoundSummary = (game, roundIndex) => {
     roundIndex,
     cardCount: roundConfig.cardCount,
     direction: roundConfig.direction,
-    players: (game.playerOrder ?? []).map((playerId) => {
-      const player = game.players?.find((entry) => entry.id === playerId)
-      const roundResult = game.scores?.find((score) => score.playerId === playerId)?.rounds?.[roundIndex]
+    players: (game.playerOrder ?? [])
+      .map((playerId) => {
+        const player = game.players?.find((entry) => entry.id === playerId)
+        const roundResult = game.scores?.find((score) => score.playerId === playerId)?.rounds?.[roundIndex]
 
-      return {
-        playerId,
-        name: player?.name ?? 'Unknown',
-        bid: roundResult?.bid ?? 0,
-        books: roundResult?.books ?? 0,
-        score: roundResult?.total ?? 0,
-      }
-    }),
+        return {
+          playerId,
+          name: player?.name ?? 'Unknown',
+          bid: roundResult?.bid ?? 0,
+          books: roundResult?.books ?? 0,
+          score: roundResult?.total ?? 0,
+          rainbow: roundResult?.rainbow === true,
+        }
+      })
+      .sort((left, right) => right.score - left.score),
   }
 }
 
@@ -677,6 +701,27 @@ function GameTablePage({
 
     return ordered.length > 0 ? ordered : game.players ?? []
   }, [game.playerOrder, game.players])
+  const biddingPlayers = useMemo(() => {
+    if (orderedPlayers.length === 0) {
+      return []
+    }
+
+    if (game.phase?.stage !== 'Bidding') {
+      return orderedPlayers
+    }
+
+    const dealerPlayerId = game.phase.dealerPlayerId
+    const dealerIndex = orderedPlayers.findIndex((player) => player.id === dealerPlayerId)
+    if (dealerIndex < 0) {
+      return orderedPlayers
+    }
+
+    const firstBidderIndex = (dealerIndex + 1) % orderedPlayers.length
+    return [
+      ...orderedPlayers.slice(firstBidderIndex),
+      ...orderedPlayers.slice(0, firstBidderIndex),
+    ]
+  }, [game.phase, orderedPlayers])
   const bidsByPlayerId = useMemo(() => new Map(bids.map((bid) => [bid.playerId, bid])), [bids])
   const booksByPlayerId = useMemo(() => {
     const books = new Map()
@@ -695,9 +740,11 @@ function GameTablePage({
   const [selectedTrickCardIndex, setSelectedTrickCardIndex] = useState(null)
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
+  const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
+  const selectedTrickCardTimeoutRef = useRef(null)
   const mobileActionBarRef = useRef(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
@@ -792,6 +839,28 @@ function GameTablePage({
   }, [displayedTrickPlays, selectedTrickCardIndex, winningDisplayedTrickCardIndex])
 
   useEffect(() => {
+    if (bookWinnerMessage || selectedTrickCardIndex === null) {
+      if (selectedTrickCardTimeoutRef.current) {
+        clearTimeout(selectedTrickCardTimeoutRef.current)
+        selectedTrickCardTimeoutRef.current = null
+      }
+      return
+    }
+
+    selectedTrickCardTimeoutRef.current = setTimeout(() => {
+      setSelectedTrickCardIndex(null)
+      selectedTrickCardTimeoutRef.current = null
+    }, 2000)
+
+    return () => {
+      if (selectedTrickCardTimeoutRef.current) {
+        clearTimeout(selectedTrickCardTimeoutRef.current)
+        selectedTrickCardTimeoutRef.current = null
+      }
+    }
+  }, [bookWinnerMessage, selectedTrickCardIndex])
+
+  useEffect(() => {
     const latestTrick = completedTricks[completedTricks.length - 1]
 
     if (completedTricks.length > previousCompletedTrickCountRef.current && latestTrick?.winnerPlayerId) {
@@ -818,6 +887,9 @@ function GameTablePage({
     return () => {
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
+      }
+      if (selectedTrickCardTimeoutRef.current) {
+        clearTimeout(selectedTrickCardTimeoutRef.current)
       }
     }
   }, [])
@@ -922,9 +994,9 @@ function GameTablePage({
           {isSortingCards ? 'Sorting...' : 'Sort'}
         </button>
       ) : null}
-      <div className="flex flex-wrap justify-center gap-2">
-        {availableActions.length > 0 ? (
-          availableActions.map((action) => {
+      {availableActions.length > 0 ? (
+        <div className="flex flex-wrap justify-center gap-2">
+          {availableActions.map((action) => {
             const isDisabled =
               !isActionEnabled(action) ||
               isDealingCards ||
@@ -982,17 +1054,9 @@ function GameTablePage({
                       : action}
               </button>
             )
-          })
-        ) : (
-          <button
-            type="button"
-            className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
-            disabled
-          >
-            No actions available
-          </button>
-        )}
-      </div>
+          })}
+        </div>
+      ) : null}
     </div>
   )
 
@@ -1062,7 +1126,20 @@ function GameTablePage({
             </div>
           </article>
 
-          <article className="flex min-h-0 flex-col p-1">
+          <article
+            className="flex min-h-0 flex-col p-1"
+            onClick={(event) => {
+              if (selectedTrickCardIndex === null || bookWinnerMessage) {
+                return
+              }
+
+              if (event.target.closest('button')) {
+                return
+              }
+
+              setSelectedTrickCardIndex(null)
+            }}
+          >
             <div className="mb-3 flex min-h-7 items-center justify-center">
               {isViewerTurn ? (
                 <p className="status-turn px-6 py-2 text-xl font-semibold">
@@ -1077,18 +1154,20 @@ function GameTablePage({
               ) : null}
             </div>
             {game.phase?.stage === 'Bidding' ? (
-              <section className="mb-3 rounded-2xl border border-[rgba(34,130,88,0.34)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.08)),rgba(22,101,52,0.16)] px-3 py-3 sm:px-4">
+              <section className="mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border border-[rgba(34,130,88,0.34)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.08)),rgba(22,101,52,0.16)] px-3 py-3 sm:px-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d9f7e5]">Bids</h2>
                   <p className="text-xs text-[#9ed3b4]">
-                    {bids.length}/{orderedPlayers.length} in
+                    {bids.length}/{biddingPlayers.length} in
                   </p>
                 </div>
-                <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {orderedPlayers.map((player) => {
+                <ul className="score-scroll mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto pr-1">
+                  {biddingPlayers.map((player) => {
                     const bidEntry = bidsByPlayerId.get(player.id)
                     const isCurrentBidder = currentTurnPlayerId === player.id
                     const hasBid = Boolean(bidEntry)
+                    const playerScore = game.scores?.find((entry) => entry.playerId === player.id)
+                    const playerRainbow = playerScore?.rounds?.[currentRoundIndex]?.rainbow === true
 
                     return (
                       <li
@@ -1099,19 +1178,15 @@ function GameTablePage({
                             : 'border-white/10 bg-[rgba(255,255,255,0.05)]'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-white">{player.name}</p>
-                          {isCurrentBidder ? (
-                            <span className="rounded-full border border-[rgba(34,130,88,0.56)] bg-[rgba(34,130,88,0.2)] px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-[#d9f7e5]">
-                              Up
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="mt-2 flex items-end justify-between gap-2">
-                          <p className={`text-lg font-semibold ${hasBid ? 'text-[#d9f7e5]' : 'text-dim'}`}>
+                        <div className="grid grid-cols-[minmax(0,1fr)_3rem_4.75rem] items-center gap-3">
+                          <p className="min-w-0 truncate text-sm font-medium text-white">
+                            {player.name}
+                            {playerRainbow ? ' 🌈' : ''}
+                          </p>
+                          <p className={`text-right text-base font-semibold ${hasBid ? 'text-[#d9f7e5]' : 'text-dim'}`}>
                             {getBidDisplay(bidEntry)}
                           </p>
-                          <p className="text-[0.68rem] uppercase tracking-[0.14em] text-dim">
+                          <p className="text-right text-[0.68rem] uppercase tracking-[0.14em] text-dim">
                             {hasBid ? 'Locked' : isCurrentBidder ? 'Bidding' : 'Waiting'}
                           </p>
                         </div>
@@ -1126,47 +1201,49 @@ function GameTablePage({
                 <p className="text-center text-lg text-[#d8e6ff]">{bookWinnerMessage}</p>
               </div>
             ) : null}
-            <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
-              {displayedTrickPlays.length > 0 ? (
-                displayedTrickPlays.map((play, index) => (
-                  <li
-                    key={`${play.playerId}-${index}`}
-                    className="flex w-fit shrink-0 flex-col items-center text-sm"
-                    style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: selectedTrickCardIndex === index ? 100 : index + 1 }}
-                  >
-                    <div className="mb-3 flex h-5 items-end justify-center">
-                      {selectedTrickCardIndex === index ? (
-                        <p className="text-center text-lg text-white">{getPlayerName(game, play.playerId)}</p>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
-                        selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
-                      }`}
-                      onClick={() => {
-                        if (bookWinnerMessage) {
-                          return
-                        }
-                        setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
-                      }}
-                      aria-label={getPlayerName(game, play.playerId)}
+            {game.phase?.stage === 'Bidding' ? null : (
+              <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
+                {displayedTrickPlays.length > 0 ? (
+                  displayedTrickPlays.map((play, index) => (
+                    <li
+                      key={`${play.playerId}-${index}`}
+                      className="flex w-fit shrink-0 flex-col items-center text-sm"
+                      style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: selectedTrickCardIndex === index ? 100 : index + 1 }}
                     >
-                      <div className="aspect-[2.5/3.5] w-24 sm:w-28">
-                        <CardAsset
-                          card={play.card}
-                          jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
-                        />
+                      <div className="mb-3 flex h-5 items-end justify-center">
+                        {selectedTrickCardIndex === index ? (
+                          <p className="text-center text-lg text-white">{getPlayerName(game, play.playerId)}</p>
+                        ) : null}
                       </div>
-                    </button>
+                      <button
+                        type="button"
+                        className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
+                          selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
+                        }`}
+                        onClick={() => {
+                          if (bookWinnerMessage) {
+                            return
+                          }
+                          setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
+                        }}
+                        aria-label={getPlayerName(game, play.playerId)}
+                      >
+                        <div className="aspect-[2.5/3.5] w-24 sm:w-28">
+                          <CardAsset
+                            card={play.card}
+                            jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
+                          />
+                        </div>
+                      </button>
+                    </li>
+                  ))
+                ) : (
+                  <li className="self-center text-sm text-dim">
+                    No cards played in this trick yet.
                   </li>
-                ))
-              ) : (
-                <li className="self-center text-sm text-dim">
-                  {game.phase?.stage === 'Bidding' ? 'Bidding in progress.' : 'No cards played in this trick yet.'}
-                </li>
-              )}
-            </ul>
+                )}
+              </ul>
+            )}
           </article>
         </div>
 
@@ -1184,7 +1261,7 @@ function GameTablePage({
               : 'border-white/10'
           }`}
         >
-          <div className="flex min-h-[11rem] items-center justify-center pt-5 pb-2">
+          <div className="flex min-h-[8rem] items-center justify-center pt-6 pb-2">
             {(viewerHand?.cards ?? []).length > 0 ? (
               viewerHand.cards.map((card, index) => {
                 const invalidPlayMessage = canSelectCards ? getInvalidPlayMessage(game, viewerHand, card) : ''
@@ -1214,7 +1291,7 @@ function GameTablePage({
                     }`}
                     style={{
                       marginLeft: index === 0 ? '0' : handLayout.overlapOffset,
-                      zIndex: selectedCardIndex === index ? 100 : index + 1,
+                      zIndex: index + 1,
                     }}
                     aria-label={getCardLabel(card)}
                   >
@@ -1285,13 +1362,20 @@ function GameTablePage({
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
             />
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex items-center justify-between gap-3">
               <button
                 type="button"
                 className="text-sm font-medium text-[#9ed3b4] transition hover:text-[#d9f7e5]"
                 onClick={() => setIsHistoryModalOpen(true)}
               >
                 See History
+              </button>
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2"
+                onClick={() => setIsScoreModalOpen(false)}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -1334,10 +1418,60 @@ function GameTablePage({
               >
                 Join Game
               </button>
+              {isOwner ? (
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-3 text-left"
+                  onClick={() => {
+                    setIsMenuModalOpen(false)
+                    setIsResetConfirmModalOpen(true)
+                  }}
+                >
+                  Reset Game
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
       )}
+      {isResetConfirmModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => setIsResetConfirmModalOpen(false)}
+        >
+          <div
+            className="dialog-surface w-full max-w-md p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white">Reset Game?</h2>
+            <p className="mt-3 text-sm text-muted">
+              This will erase the current game progress, send everyone back to the lobby, and restart from round 1.
+            </p>
+            <p className="mt-2 text-sm text-[#f1c5c5]">
+              This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2"
+                onClick={() => setIsResetConfirmModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger bg-[rgba(199,67,67,0.12)] px-4 py-2"
+                onClick={() => {
+                  setIsResetConfirmModalOpen(false)
+                  onStartOver?.()
+                }}
+              >
+                Reset Game
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
@@ -1381,6 +1515,9 @@ export default function App() {
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
+  const latestShownRoundIndexRef = useRef(-1)
+  const hydratedRoundSummaryGameIdRef = useRef('')
+  const gameErrorTimeoutRef = useRef(null)
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSortingCards || isStartingOver
 
@@ -1829,22 +1966,67 @@ export default function App() {
     activeGame?.phase && 'roundIndex' in activeGame.phase ? activeGame.phase.roundIndex : 0
   const currentRoundCardCount = activeGame?.options?.rounds?.[activeRoundIndex]?.cardCount ?? 0
   const isTripRound = [1, 2, 3].includes(currentRoundCardCount)
-  const endOfRoundSummary =
-    activeGame?.phase?.stage === 'EndOfRound'
-      ? buildRoundSummary(activeGame, activeGame.phase.roundIndex)
-      : null
+  const completedRoundCount = getCompletedRoundCount(activeGame)
 
   useEffect(() => {
-    if (!endOfRoundSummary) {
+    if (!activeGame) {
       return
     }
 
-    const isNewRoundSummary = persistedEndOfRoundSummary?.roundIndex !== endOfRoundSummary.roundIndex
-    setPersistedEndOfRoundSummary(endOfRoundSummary)
-    if (isNewRoundSummary) {
-      setIsEndOfRoundModalDismissed(false)
+    if (hydratedRoundSummaryGameIdRef.current === activeGame.id) {
+      return
     }
-  }, [endOfRoundSummary, persistedEndOfRoundSummary?.roundIndex])
+
+    hydratedRoundSummaryGameIdRef.current = activeGame.id
+    latestShownRoundIndexRef.current = completedRoundCount > 0 ? completedRoundCount - 1 : -1
+    setPersistedEndOfRoundSummary(
+      completedRoundCount > 0 ? buildRoundSummary(activeGame, completedRoundCount - 1) : null,
+    )
+    setIsEndOfRoundModalDismissed(true)
+  }, [activeGame, completedRoundCount])
+
+  useEffect(() => {
+    if (gameErrorTimeoutRef.current) {
+      clearTimeout(gameErrorTimeoutRef.current)
+      gameErrorTimeoutRef.current = null
+    }
+
+    if (!gameError || activeGame?.phase?.stage !== 'Playing') {
+      return
+    }
+
+    gameErrorTimeoutRef.current = setTimeout(() => {
+      setGameError('')
+      gameErrorTimeoutRef.current = null
+    }, 2000)
+
+    return () => {
+      if (gameErrorTimeoutRef.current) {
+        clearTimeout(gameErrorTimeoutRef.current)
+        gameErrorTimeoutRef.current = null
+      }
+    }
+  }, [activeGame?.phase?.stage, gameError])
+
+  useEffect(() => {
+    if (!activeGame || completedRoundCount <= 0) {
+      return
+    }
+
+    const latestCompletedRoundIndex = completedRoundCount - 1
+    if (latestCompletedRoundIndex <= latestShownRoundIndexRef.current) {
+      return
+    }
+
+    const summary = buildRoundSummary(activeGame, latestCompletedRoundIndex)
+    if (!summary) {
+      return
+    }
+
+    latestShownRoundIndexRef.current = latestCompletedRoundIndex
+    setPersistedEndOfRoundSummary(summary)
+    setIsEndOfRoundModalDismissed(false)
+  }, [activeGame, completedRoundCount])
 
   const orderedPlayers = useMemo(() => {
     const game = activeLobbySession?.game
@@ -2026,6 +2208,12 @@ export default function App() {
 
     aiPauseUntilRef.current = 0
     previousCompletedTrickCountRef.current = 0
+    latestShownRoundIndexRef.current = -1
+    hydratedRoundSummaryGameIdRef.current = ''
+    if (gameErrorTimeoutRef.current) {
+      clearTimeout(gameErrorTimeoutRef.current)
+      gameErrorTimeoutRef.current = null
+    }
     setOwnerSession(null)
     setPlayerSession(null)
     setGameError('')
@@ -2410,21 +2598,30 @@ export default function App() {
                 {`End of Round ${persistedEndOfRoundSummary.cardCount} ${getRoundDirectionArrow(persistedEndOfRoundSummary.direction)}`}
               </h2>
               <ul className="mt-4 flex flex-col gap-2">
-                {persistedEndOfRoundSummary.players.map((player) => (
-                  <li
-                    key={player.playerId}
-                    className="panel-surface-strong rounded-md border px-3 py-3"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="font-medium text-white">{player.name}</p>
-                      <div className="flex items-center gap-4 text-sm text-muted">
-                        <span>{`Bid ${player.bid}`}</span>
-                        <span>{`Books ${player.books}`}</span>
-                        <span className="font-medium text-white">{`Score ${player.score}`}</span>
+                {persistedEndOfRoundSummary.players.map((player) => {
+                  const winningScore = persistedEndOfRoundSummary.players[0]?.score ?? null
+                  const isWinner = winningScore !== null && player.score === winningScore
+
+                  return (
+                    <li
+                      key={player.playerId}
+                      className={`rounded-md border px-3 py-3 ${
+                        isWinner
+                          ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
+                          : 'panel-surface-strong'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-white">{player.name}</p>
+                        <div className="flex items-center gap-4 text-sm text-muted">
+                          <span>{`Bid ${player.bid}`}</span>
+                          <span>{`Books ${player.books}`}</span>
+                          <span className="font-medium text-white">{`Score ${player.score}`}{player.rainbow ? ' 🌈' : ''}</span>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
               <div className="mt-4 flex justify-end">
                 <button
