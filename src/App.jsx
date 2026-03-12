@@ -1772,10 +1772,16 @@ function GameTablePage({
                   {`👤 ${shortenedMenuPlayerName}`}
                 </button>
               </div>
-              <span className="shrink-0 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted">
-                {game.id}
-              </span>
+              <button
+                type="button"
+                className="shrink-0 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
+                onClick={onCopyShareLink}
+                title="Copy game link"
+              >
+                {isShareLinkCopied ? '🔗 Copied!' : `🔗 ${game.id}`}
+              </button>
             </div>
+            <div className="mt-4 border-t border-white/10" />
             {isEditingPlayerName ? (
               <form
                 className="mt-4 flex flex-col gap-3"
@@ -1870,27 +1876,6 @@ function GameTablePage({
                 </button>
               ) : null}
             </div>
-            <section className="mt-5 border-t border-white/10 pt-5">
-              <h3 className="flex items-center gap-2 text-lg font-semibold">
-                <span className="text-sm">🔗</span>
-                <span>Share Link</span>
-              </h3>
-              <div className="mt-3 flex flex-col items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={shareLink}
-                  className="input-surface w-[90%] text-sm"
-                />
-                <button
-                  type="button"
-                  className="btn-primary w-[90%] px-4 py-2 text-sm"
-                  onClick={onCopyShareLink}
-                >
-                  {isShareLinkCopied ? 'Copied!' : 'Copy Link'}
-                </button>
-              </div>
-            </section>
           </div>
         </div>
       )}
