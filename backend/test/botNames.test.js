@@ -15,13 +15,12 @@ test("createGame assigns bot names from the curated pool", () => {
   });
 
   const aiPlayers = result.game.players.filter((player) => player.type === "ai");
+  const aiNames = aiPlayers.map((player) => player.name);
 
   assert.equal(aiPlayers.length, 4);
-  assert.deepEqual(
-    aiPlayers.map((player) => player.name),
-    ["Sharp Shuffle", "Deadly Weapon", "Ace Machine", "Trick Snatcher"],
-  );
   assert.ok(aiPlayers.every((player) => BOT_NAMES.includes(player.name)));
+  assert.equal(new Set(aiNames).size, aiNames.length);
+  assert.ok(aiNames.every((name) => name !== "Casey"));
 });
 
 test("removePlayer replaces a human with an available curated bot name", () => {
@@ -64,8 +63,10 @@ test("removePlayer replaces a human with an available curated bot name", () => {
 
   assert.equal(replacement.type, "ai");
   assert.equal(replacement.connected, true);
-  assert.equal(replacement.name, "Deadly Weapon");
   assert.ok(BOT_NAMES.includes(replacement.name));
+  assert.notEqual(replacement.name, "Sharp Shuffle");
+  assert.notEqual(replacement.name, "Casey");
+  assert.notEqual(replacement.name, "Robin");
   assert.notEqual(
     updated.playerTokens.find((playerToken) => playerToken.playerId === "p3").token,
     removedPlayerToken,

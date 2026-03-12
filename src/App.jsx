@@ -748,6 +748,7 @@ function GameTablePage({
   onSortCards,
   onStartOver,
   onSendReaction,
+  onGoHome,
   onOpenNewGame,
   onOpenJoinGame,
   onOpenSwitchGame,
@@ -1327,11 +1328,18 @@ function GameTablePage({
         <article className="shrink-0 px-1 py-3 -translate-y-[15%]">
           <div className="flex items-center justify-between gap-4 text-sm text-muted">
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <img
-                src="/logo-512x512.png"
-                alt="Setback"
-                className="h-20 w-20 shrink-0 rounded-md"
-              />
+              <button
+                type="button"
+                className="w-fit rounded-md transition hover:scale-[1.02]"
+                onClick={onGoHome}
+                aria-label="Go home"
+              >
+                <img
+                  src="/logo-512x512.png"
+                  alt="Setback"
+                  className="h-20 w-20 shrink-0 rounded-md"
+                />
+              </button>
             </div>
             {trumpCard ? (
               <div className="mt-2 flex shrink-0 items-center gap-2 self-start md:mt-0">
@@ -3118,6 +3126,54 @@ export default function App() {
   }
 
   const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
+  const rejoinModal = isRejoinModalOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      onClick={closeRejoinModal}
+    >
+      <div
+        className="dialog-surface w-full max-w-md p-6 text-left"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 className="text-xl font-semibold">Rejoin Game</h2>
+        <form className="mt-4 flex flex-col gap-4" onSubmit={handleRejoinGame}>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm text-muted">Stored Game</span>
+            <select
+              value={selectedRejoinGameId}
+              onChange={(event) => setSelectedRejoinGameId(event.target.value)}
+              className="input-surface"
+              disabled={isRejoiningGame || rejoinableGames.length === 0}
+            >
+              {rejoinableGames.map((game) => (
+                <option key={game.gameId} value={game.gameId}>
+                  {game.gameId} ({game.phase})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="mt-2 flex justify-end gap-3">
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2"
+              onClick={closeRejoinModal}
+              disabled={isRejoiningGame}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isRejoiningGame || rejoinableGames.length === 0}
+              className="btn-primary px-4 py-2 disabled:opacity-50"
+            >
+              {isRejoiningGame ? 'Rejoining...' : 'Continue'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  ) : null
 
   if (activeGame && activeGame.phase?.stage !== 'Lobby') {
     return (
@@ -3140,6 +3196,7 @@ export default function App() {
           onSortCards={openSortCardsModal}
           onStartOver={handleStartOver}
           onSendReaction={handleSendReaction}
+          onGoHome={resetActiveSessionState}
           onOpenNewGame={handleOpenNewGame}
           onOpenJoinGame={handleOpenJoinGame}
           onOpenSwitchGame={handleOpenSwitchGame}
@@ -3286,6 +3343,7 @@ export default function App() {
             </div>
           </div>
         )}
+        {rejoinModal}
       </>
     )
   }
@@ -3446,6 +3504,7 @@ export default function App() {
             </div>
           </div>
         </section>
+        {rejoinModal}
       </main>
     )
   }
@@ -3636,55 +3695,7 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {isRejoinModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          onClick={closeRejoinModal}
-        >
-          <div
-            className="dialog-surface w-full max-w-md p-6 text-left"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 className="text-xl font-semibold">Rejoin Game</h2>
-            <form className="mt-4 flex flex-col gap-4" onSubmit={handleRejoinGame}>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm text-muted">Stored Game</span>
-                <select
-                  value={selectedRejoinGameId}
-                  onChange={(event) => setSelectedRejoinGameId(event.target.value)}
-                  className="input-surface"
-                  disabled={isRejoiningGame || rejoinableGames.length === 0}
-                >
-                  {rejoinableGames.map((game) => (
-                    <option key={game.gameId} value={game.gameId}>
-                      {game.gameId} ({game.phase})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="mt-2 flex justify-end gap-3">
-                <button
-                  type="button"
-                  className="btn-secondary px-4 py-2"
-                  onClick={closeRejoinModal}
-                  disabled={isRejoiningGame}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isRejoiningGame || rejoinableGames.length === 0}
-                  className="btn-primary px-4 py-2 disabled:opacity-50"
-                >
-                  {isRejoiningGame ? 'Rejoining...' : 'Continue'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {rejoinModal}
     </main>
   )
 }

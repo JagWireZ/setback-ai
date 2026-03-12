@@ -36,7 +36,7 @@ export const BOT_NAMES: readonly string[] = [
   "Fate Breaker",
   "Rule Bender",
   "Heartbreaker",
-  "The Unlucky Charm",
+  "Unlucky Charm",
   "Bad Omen",
   "Trouble Maker",
   "Brain Burner",
@@ -54,65 +54,57 @@ export const BOT_NAMES: readonly string[] = [
   "Captain Cardboard",
   "Mister Misdeal",
   "Queen of Chaos",
-  "The Shufflin\u2019 Muffin",
+  "Shufflin\u2019 Muffin",
   "Lucky Duckling",
-  "The Mild Threat",
+  "Mild Threat",
   "Sir Trips-A-Lot",
-  "The Almost Champion",
+  "Almost Champion",
   "Bluffalo Bill",
-  "The Card Cactus",
+  "Card Cactus",
   "The Foldinator",
   "Sneaky Beaky",
   "Big Deal Banana",
-  "The Fumble Wizard",
+  "Fumble Wizard",
   "Count Clueless",
-  "The Panic Button",
+  "Panic Button",
   "Mister Maybe",
   "Jokester Supreme",
-  "The Wiggly Wizard",
+  "Wiggly Wizard",
   "Sneak-Attack Snack",
-  "The Goof Gambler",
+  "Goof Gambler",
   "Pocket-Sized Menace",
-  "The Tiny Titan",
-  "The Card Bard",
-  "The Mild Menace",
-  "The Sassy Shuffler",
-  "The Chaotic Neutral",
+  "Tiny Titan",
+  "Card Bard",
+  "Mild Menace",
+  "Sassy Shuffler",
+  "Chaotic Neutral",
   "Marshmallow Fury",
   "Bubblegum Bandit",
   "Cinnamon Spin",
-  "The Cozy Crusher",
+  "Cozy Crusher",
   "Peanut Butter Panic",
-  "The Gentle Jerk",
+  "Humble Jerk",
   "Cupcake Carnage",
-  "The Snuggle Striker",
+  "Snuggle Striker",
   "Fluffy Havoc",
-  "The Velvet Villain",
-  "The Unstable Genius",
+  "Velvet Villain",
+  "Unstable Genius",
   "Chaos Cupholder",
-  "The Accidental Winner",
-  "The Cardboard Overlord",
-  "The Friendly Disaster",
-  "The Wobble King",
-  "The Slightly Dangerous",
-  "The Mostly Harmless",
-  "The Wild Guess",
+  "Accidental Winner",
+  "Cardboard Overlord",
+  "Friendly Disaster",
+  "Wobble King",
+  "Slightly Dangerous",
+  "Mostly Harmless",
+  "Wild Guess",
   "The Sandbagger",
 ] ;
 
-export const getBotName = (
-  existingNames: string[],
-  preferredIndex = 0,
-): string => {
+export const getBotName = (existingNames: string[]): string => {
   const usedNames = new Set(existingNames);
-  const startIndex = ((preferredIndex % BOT_NAMES.length) + BOT_NAMES.length) % BOT_NAMES.length;
+  const availableNames = BOT_NAMES.filter((name) => !usedNames.has(name));
+  const candidatePool = availableNames.length > 0 ? availableNames : BOT_NAMES;
+  const randomIndex = Math.floor(Math.random() * candidatePool.length);
 
-  for (let offset = 0; offset < BOT_NAMES.length; offset += 1) {
-    const candidateName = BOT_NAMES[(startIndex + offset) % BOT_NAMES.length];
-    if (!usedNames.has(candidateName)) {
-      return candidateName;
-    }
-  }
-
-  return BOT_NAMES[startIndex];
+  return candidatePool[randomIndex];
 };

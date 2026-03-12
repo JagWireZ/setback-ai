@@ -21,7 +21,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
 
   for (let playerIndex = 1; playerIndex < 5; playerIndex += 1) {
     allPlayers.push({
-      ...buildPlayer(getBotName(allPlayers.map((player) => player.name), playerIndex)),
+      ...buildPlayer(getBotName(allPlayers.map((player) => player.name))),
       type: "ai" as const,
     });
   }

@@ -34,12 +34,10 @@ export const removePlayer = (
     return existingGame;
   }
 
-  const playerIndex = existingGame.players.findIndex((player) => player.id === targetPlayer.id);
   const aiName = getBotName(
     existingGame.players
       .filter((player) => player.id !== targetPlayer.id)
       .map((player) => player.name),
-    playerIndex,
   );
   const replacementPlayerToken = buildPlayerToken(targetPlayer.id);
 
