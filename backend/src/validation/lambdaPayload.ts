@@ -267,6 +267,28 @@ export function assertRemovePlayerPayload(
   }
 }
 
+export function assertRenamePlayerPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"renamePlayer"> {
+  if (event.action !== "renamePlayer") {
+    throw new Error("Invalid action for renamePlayer payload validation");
+  }
+
+  const { gameId, playerToken, playerName } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("renamePlayer requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("renamePlayer requires payload.playerToken");
+  }
+
+  if (typeof playerName !== "string" || playerName.trim().length === 0) {
+    throw new Error("renamePlayer requires payload.playerName");
+  }
+}
+
 export function assertGetGameStatePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"getGameState"> {

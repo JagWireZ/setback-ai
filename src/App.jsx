@@ -7,6 +7,7 @@ import {
   joinGame,
   movePlayer,
   playCard,
+  renamePlayer,
   removePlayer,
   sortCards,
   startGame,
@@ -662,7 +663,10 @@ function GameTablePage({
   game,
   isOwner,
   errorMessage,
+  shareLink,
+  onCopyShareLink,
   onSetGameError,
+  onRenamePlayer,
   onDealCards,
   onSubmitBid,
   onPlayCard,
@@ -670,11 +674,15 @@ function GameTablePage({
   onStartOver,
   onOpenNewGame,
   onOpenJoinGame,
+  onOpenSwitchGame,
   isDealingCards,
   isStartingOver,
   isSubmittingBid,
   isPlayingCard,
+  isRenamingPlayer,
   isSortingCards,
+  isLoadingRejoinGames,
+  hasRejoinableGames,
 }) {
   const viewerHand = getViewerHand(game)
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -741,6 +749,8 @@ function GameTablePage({
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
+  const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
+  const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
@@ -777,6 +787,7 @@ function GameTablePage({
       : null
   const handCardCount = viewerHand?.cards?.length ?? 0
   const isMobileViewport = viewportWidth < 640
+  const currentPlayerName = getPlayerName(game, viewerPlayerId)
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
       return {
@@ -859,6 +870,18 @@ function GameTablePage({
       }
     }
   }, [bookWinnerMessage, selectedTrickCardIndex])
+
+  useEffect(() => {
+    if (!isMenuModalOpen) {
+      setIsEditingPlayerName(false)
+      setEditedPlayerName(currentPlayerName)
+      return
+    }
+
+    if (!isEditingPlayerName) {
+      setEditedPlayerName(currentPlayerName)
+    }
+  }, [currentPlayerName, isEditingPlayerName, isMenuModalOpen])
 
   useEffect(() => {
     const latestTrick = completedTricks[completedTricks.length - 1]
@@ -1396,11 +1419,73 @@ function GameTablePage({
             className="dialog-surface w-full max-w-sm p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="text-xl font-semibold">Menu</h2>
-            <div className="mt-4 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  className="min-w-0 truncate text-left text-xl font-semibold text-white transition hover:text-[#d9f7e5]"
+                  onClick={() => {
+                    setIsEditingPlayerName(true)
+                    setEditedPlayerName(currentPlayerName)
+                  }}
+                >
+                  {`👤 ${currentPlayerName}`}
+                </button>
+              </div>
+            </div>
+            {isEditingPlayerName ? (
+              <form
+                className="mt-4 flex flex-col gap-3"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  const nextName = editedPlayerName.trim()
+                  if (!nextName || nextName === currentPlayerName) {
+                    setIsEditingPlayerName(false)
+                    setEditedPlayerName(currentPlayerName)
+                    return
+                  }
+
+                  const didRename = await onRenamePlayer?.(nextName)
+                  if (didRename) {
+                    setIsEditingPlayerName(false)
+                  }
+                }}
+              >
+                <input
+                  type="text"
+                  value={editedPlayerName}
+                  onChange={(event) => setEditedPlayerName(event.target.value)}
+                  className="input-surface"
+                  placeholder="Player name"
+                  maxLength={32}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2"
+                    onClick={() => {
+                      setIsEditingPlayerName(false)
+                      setEditedPlayerName(currentPlayerName)
+                    }}
+                    disabled={isRenamingPlayer}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary px-4 py-2 disabled:opacity-50"
+                    disabled={isRenamingPlayer || !editedPlayerName.trim()}
+                  >
+                    {isRenamingPlayer ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+            <div className="mt-4 flex flex-col items-center gap-3">
               <button
                 type="button"
-                className="btn-secondary px-4 py-3 text-left"
+                className="btn-secondary w-[90%] px-4 py-3 text-left"
                 onClick={() => {
                   setIsMenuModalOpen(false)
                   onOpenNewGame?.()
@@ -1410,7 +1495,7 @@ function GameTablePage({
               </button>
               <button
                 type="button"
-                className="btn-secondary px-4 py-3 text-left"
+                className="btn-secondary w-[90%] px-4 py-3 text-left"
                 onClick={() => {
                   setIsMenuModalOpen(false)
                   onOpenJoinGame?.()
@@ -1418,10 +1503,21 @@ function GameTablePage({
               >
                 Join Game
               </button>
+              <button
+                type="button"
+                className="btn-secondary w-[90%] px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  setIsMenuModalOpen(false)
+                  onOpenSwitchGame?.()
+                }}
+                disabled={isLoadingRejoinGames || !hasRejoinableGames}
+              >
+                Switch Game
+              </button>
               {isOwner ? (
                 <button
                   type="button"
-                  className="btn-secondary px-4 py-3 text-left"
+                  className="btn-secondary w-[90%] px-4 py-3 text-left"
                   onClick={() => {
                     setIsMenuModalOpen(false)
                     setIsResetConfirmModalOpen(true)
@@ -1431,6 +1527,27 @@ function GameTablePage({
                 </button>
               ) : null}
             </div>
+            <section className="mt-5 border-t border-white/10 pt-5">
+              <h3 className="flex items-center gap-2 text-lg font-semibold">
+                <span className="text-sm">🔗</span>
+                <span>Share Link</span>
+              </h3>
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={shareLink}
+                  className="input-surface w-[90%] text-sm"
+                />
+                <button
+                  type="button"
+                  className="btn-primary w-[90%] px-4 py-2 text-sm"
+                  onClick={onCopyShareLink}
+                >
+                  Copy Link
+                </button>
+              </div>
+            </section>
           </div>
         </div>
       )}
@@ -1506,6 +1623,7 @@ export default function App() {
   const [selectedBid, setSelectedBid] = useState('0')
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
+  const [isRenamingPlayer, setIsRenamingPlayer] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
@@ -2272,6 +2390,14 @@ export default function App() {
     setIsJoinModalOpen(true)
   }
 
+  const handleOpenSwitchGame = () => {
+    setRequestError('')
+    setSessionInfo(null)
+    setIsCreateModalOpen(false)
+    setIsJoinModalOpen(false)
+    setIsRejoinModalOpen(true)
+  }
+
   const handleDealCards = async () => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken) {
@@ -2433,6 +2559,54 @@ export default function App() {
     }
   }
 
+  const handleRenamePlayer = async (playerName) => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return false
+    }
+
+    setGameError('')
+    setLobbyInfo('')
+    setIsRenamingPlayer(true)
+
+    try {
+      const result = await renamePlayer({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+        playerName,
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update player name'
+      setGameError(message)
+      return false
+    } finally {
+      setIsRenamingPlayer(false)
+    }
+  }
+
   const handlePlayCard = async (card) => {
     const activeSession = ownerSession ?? playerSession
     const activeGame = activeSession?.game
@@ -2488,7 +2662,10 @@ export default function App() {
           game={activeGame}
           isOwner={Boolean(ownerSession)}
           errorMessage={gameError}
+          shareLink={shareLink}
+          onCopyShareLink={handleCopyShareLink}
           onSetGameError={setGameError}
+          onRenamePlayer={handleRenamePlayer}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
@@ -2496,11 +2673,15 @@ export default function App() {
           onStartOver={handleStartOver}
           onOpenNewGame={handleOpenNewGame}
           onOpenJoinGame={handleOpenJoinGame}
+          onOpenSwitchGame={handleOpenSwitchGame}
           isDealingCards={isDealingCards}
           isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
           isPlayingCard={isPlayingCard}
+          isRenamingPlayer={isRenamingPlayer}
           isSortingCards={isSortingCards}
+          isLoadingRejoinGames={isLoadingRejoinGames}
+          hasRejoinableGames={rejoinableGames.length > 0}
         />
 
         {isBidModalOpen && (

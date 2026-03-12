@@ -12,6 +12,7 @@ export type LambdaAction =
   | 'sortCards'
   | 'movePlayer'
   | 'removePlayer'
+  | 'renamePlayer'
   | 'removeGame'
   | 'getGameState'
 
@@ -61,6 +62,10 @@ type ActionPayloadMap = {
   removePlayer: {
     gameId: string
     playerId: string
+  }
+  renamePlayer: {
+    gameId: string
+    playerName: string
   }
   removeGame: {
     gameId: string

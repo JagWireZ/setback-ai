@@ -128,6 +128,13 @@ export const removePlayer = ({ gameId, playerToken, playerId }) =>
     playerId,
   })
 
+export const renamePlayer = ({ gameId, playerToken, playerName }) =>
+  invokeLambda('renamePlayer', {
+    gameId,
+    playerToken,
+    playerName,
+  })
+
 export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
   invokeLambda('startGame', {
     gameId,
