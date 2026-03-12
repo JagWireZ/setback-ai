@@ -1985,6 +1985,38 @@ export default function App() {
     }
   }, [])
 
+  const handleRemovedFromGame = (gameId) => {
+    if (gameId) {
+      clearStoredGameSession(gameId)
+    }
+
+    if (aiPauseTimeoutRef.current) {
+      clearTimeout(aiPauseTimeoutRef.current)
+      aiPauseTimeoutRef.current = null
+    }
+
+    if (gameErrorTimeoutRef.current) {
+      clearTimeout(gameErrorTimeoutRef.current)
+      gameErrorTimeoutRef.current = null
+    }
+
+    aiPauseUntilRef.current = 0
+    previousCompletedTrickCountRef.current = 0
+    latestShownRoundIndexRef.current = -1
+    hydratedRoundSummaryGameIdRef.current = ''
+    setOwnerSession(null)
+    setPlayerSession(null)
+    setGameError('')
+    setLobbyInfo('')
+    setPersistedEndOfRoundSummary(null)
+    setIsEndOfRoundModalDismissed(false)
+    setIsBidModalOpen(false)
+    setIsSortModalOpen(false)
+    setSessionInfo(null)
+    setRequestError(`You have been removed from game ${gameId}.`)
+    clearGameIdInUrl()
+  }
+
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
     if (!gameIdFromUrl) {
@@ -2042,7 +2074,11 @@ export default function App() {
 
       clearStoredGameSession(gameIdFromUrl)
       if (!isCancelled) {
-        setIsJoinModalOpen(true)
+        if (storedSession?.role === 'player') {
+          handleRemovedFromGame(gameIdFromUrl)
+        } else {
+          setIsJoinModalOpen(true)
+        }
       }
     }
 
@@ -2384,6 +2420,11 @@ export default function App() {
         }
       })
     } catch (error) {
+      if (isInvalidPlayerTokenError(error)) {
+        handleRemovedFromGame(playerSession.gameId)
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to refresh game state')
       setGameError(message)
     }
@@ -3412,15 +3453,19 @@ export default function App() {
   return (
     <main className="theme-shell h-[100dvh] overflow-hidden px-4 py-4">
       <section className="mx-auto flex h-full max-w-xl flex-col items-center justify-center px-2 py-4 text-center sm:py-6">
-        <div className="table-surface flex max-h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border px-6 py-8 sm:py-10 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
-        <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">Setback</h1>
+        <div className="table-surface flex max-h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border px-6 pb-8 pt-5 sm:pb-10 sm:pt-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
+        <img
+          src="/logo-512x512.png"
+          alt="Setback"
+          className="mb-4 h-24 w-24 rounded-xl sm:h-28 sm:w-28"
+        />
         {requestError && (
-          <p className="status-error w-full max-w-md">
+          <p className="status-error mb-4 w-full max-w-md">
             {requestError}
           </p>
         )}
         {sessionInfo && (
-          <p className="status-info w-full max-w-md">
+          <p className="status-info mb-4 w-full max-w-md">
             {sessionInfo.action === 'createGame' ? 'Game created' : 'Joined game'}: {sessionInfo.gameId}
           </p>
         )}

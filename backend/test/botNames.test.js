@@ -25,6 +25,7 @@ test("createGame assigns bot names from the curated pool", () => {
 });
 
 test("removePlayer replaces a human with an available curated bot name", () => {
+  const removedPlayerToken = "token-3";
   const updated = removePlayer(
     {
       id: "game-1",
@@ -43,7 +44,7 @@ test("removePlayer replaces a human with an available curated bot name", () => {
       playerTokens: [
         { playerId: "p1", token: "owner-token" },
         { playerId: "p2", token: "token-2" },
-        { playerId: "p3", token: "token-3" },
+        { playerId: "p3", token: removedPlayerToken },
       ],
       playerOrder: ["p1", "p2", "p3"],
       scores: [],
@@ -65,4 +66,8 @@ test("removePlayer replaces a human with an available curated bot name", () => {
   assert.equal(replacement.connected, true);
   assert.equal(replacement.name, "Deadly Weapon");
   assert.ok(BOT_NAMES.includes(replacement.name));
+  assert.notEqual(
+    updated.playerTokens.find((playerToken) => playerToken.playerId === "p3").token,
+    removedPlayerToken,
+  );
 });

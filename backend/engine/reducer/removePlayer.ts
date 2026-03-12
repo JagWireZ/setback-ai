@@ -1,5 +1,6 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
+import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
 import { getBotName } from "../helpers/reducer/player/getBotName";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
@@ -40,6 +41,7 @@ export const removePlayer = (
       .map((player) => player.name),
     playerIndex,
   );
+  const replacementPlayerToken = buildPlayerToken(targetPlayer.id);
 
   return withNextVersion(existingGame, {
     players: existingGame.players.map((player) =>
@@ -51,6 +53,9 @@ export const removePlayer = (
             connected: true,
           }
         : player,
+    ),
+    playerTokens: existingGame.playerTokens.map((playerToken) =>
+      playerToken.playerId === targetPlayer.id ? replacementPlayerToken : playerToken,
     ),
   });
 };
