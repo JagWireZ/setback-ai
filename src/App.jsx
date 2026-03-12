@@ -988,12 +988,6 @@ function GameTablePage({
   }, [game?.version])
 
   useEffect(() => {
-    if ((currentTrick?.plays ?? []).length > 0) {
-      setBookWinnerMessage('')
-    }
-  }, [currentTrick?.plays])
-
-  useEffect(() => {
     return () => {
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
