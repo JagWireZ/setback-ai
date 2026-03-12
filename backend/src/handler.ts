@@ -2,6 +2,7 @@ import { LambdaFunctionURLEvent, LambdaFunctionURLResult } from "aws-lambda";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
 import { runAiTurnsForGame } from "../engine/ai/runAiTurnsForGame";
+import { normalizeGameId } from "../engine/helpers/reducer/gameId/normalizeGameId";
 import { toResult } from "../engine/helpers/reducer/gameState/toResult";
 import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import {
@@ -56,9 +57,20 @@ const parseLambdaEvent = (action: unknown, payload: unknown): LambdaEventPayload
     throw new Error("Missing request action");
   }
 
+  const normalizedPayload =
+    payload && typeof payload === "object" && "gameId" in (payload as Record<string, unknown>)
+      ? {
+          ...(payload as Record<string, unknown>),
+          gameId:
+            typeof (payload as Record<string, unknown>).gameId === "string"
+              ? normalizeGameId((payload as Record<string, unknown>).gameId as string)
+              : (payload as Record<string, unknown>).gameId,
+        }
+      : payload;
+
   return {
     action: action as LambdaEventPayload["action"],
-    payload: payload as LambdaEventPayload["payload"],
+    payload: normalizedPayload as LambdaEventPayload["payload"],
   } as LambdaEventPayload;
 };
 

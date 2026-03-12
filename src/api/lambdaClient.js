@@ -12,6 +12,9 @@ const requiredEnv = (name) => {
   return value.trim()
 }
 
+const normalizeGameId = (value) =>
+  typeof value === 'string' ? value.trim().toLowerCase() : value
+
 const resolveRegion = (urlString) => {
   const configuredRegion = import.meta.env.VITE_AWS_REGION
   if (configuredRegion && configuredRegion.trim()) {
@@ -96,26 +99,26 @@ export const createGame = ({ playerName, maxCards }) =>
 
 export const joinGame = ({ gameId, playerName }) =>
   invokeLambda('joinGame', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerName,
   })
 
 export const checkState = ({ gameId, playerToken }) =>
   invokeLambda('checkState', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
   })
 
 export const getGameState = ({ gameId, playerToken, version }) =>
   invokeLambda('getGameState', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     version,
   })
 
 export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
   invokeLambda('movePlayer', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     playerId,
     direction,
@@ -123,47 +126,47 @@ export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
 
 export const removePlayer = ({ gameId, playerToken, playerId }) =>
   invokeLambda('removePlayer', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     playerId,
   })
 
 export const renamePlayer = ({ gameId, playerToken, playerName }) =>
   invokeLambda('renamePlayer', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     playerName,
   })
 
 export const sendReaction = ({ gameId, playerToken, emoji }) =>
   invokeLambda('sendReaction', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     emoji,
   })
 
 export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
   invokeLambda('startGame', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     dealerPlayerId,
   })
 
 export const startOver = ({ gameId, playerToken }) =>
   invokeLambda('startOver', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
   })
 
 export const dealCards = ({ gameId, playerToken }) =>
   invokeLambda('dealCards', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
   })
 
 export const submitBid = ({ gameId, playerToken, bid, trip }) =>
   invokeLambda('submitBid', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     bid,
     ...(typeof trip === 'boolean' ? { trip } : {}),
@@ -171,14 +174,14 @@ export const submitBid = ({ gameId, playerToken, bid, trip }) =>
 
 export const playCard = ({ gameId, playerToken, card }) =>
   invokeLambda('playCard', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     card,
   })
 
 export const sortCards = ({ gameId, playerToken, mode }) =>
   invokeLambda('sortCards', {
-    gameId,
+    gameId: normalizeGameId(gameId),
     playerToken,
     mode,
   })

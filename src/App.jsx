@@ -1088,7 +1088,7 @@ function GameTablePage({
         </button>
       </div>
       <div className="min-w-0 overflow-x-auto">
-        <div className="flex w-max min-w-full items-center justify-center gap-3 px-1">
+        <div className="flex w-max min-w-full items-center justify-center gap-3">
           {isMobileBar ? (
             <button
               type="button"
@@ -1582,6 +1582,9 @@ function GameTablePage({
                   {`👤 ${currentPlayerName}`}
                 </button>
               </div>
+              <span className="shrink-0 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted">
+                {game.id}
+              </span>
             </div>
             {isEditingPlayerName ? (
               <form
@@ -3048,7 +3051,10 @@ export default function App() {
               </h1>
               <div className="flex flex-wrap gap-3 text-sm">
                 <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
-                  Game ID: {activeLobbySession.gameId}
+                  Game ID:{' '}
+                  <span className="font-medium text-[#9ed3b4] [text-shadow:0_0_12px_rgba(158,211,180,0.35)]">
+                    {activeLobbySession.gameId}
+                  </span>
                 </p>
                 <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
                   Phase: {activeLobbySession.game.phase?.stage}
