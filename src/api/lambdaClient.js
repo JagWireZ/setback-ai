@@ -135,6 +135,13 @@ export const renamePlayer = ({ gameId, playerToken, playerName }) =>
     playerName,
   })
 
+export const sendReaction = ({ gameId, playerToken, emoji }) =>
+  invokeLambda('sendReaction', {
+    gameId,
+    playerToken,
+    emoji,
+  })
+
 export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
   invokeLambda('startGame', {
     gameId,

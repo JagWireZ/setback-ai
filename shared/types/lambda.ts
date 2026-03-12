@@ -1,4 +1,4 @@
-import type { Card, CardCount, SortMode } from './game'
+import type { Card, CardCount, ReactionEmoji, SortMode } from './game'
 
 export type LambdaAction =
   | 'createGame'
@@ -13,6 +13,7 @@ export type LambdaAction =
   | 'movePlayer'
   | 'removePlayer'
   | 'renamePlayer'
+  | 'sendReaction'
   | 'removeGame'
   | 'getGameState'
 
@@ -66,6 +67,10 @@ type ActionPayloadMap = {
   renamePlayer: {
     gameId: string
     playerName: string
+  }
+  sendReaction: {
+    gameId: string
+    emoji: ReactionEmoji
   }
   removeGame: {
     gameId: string

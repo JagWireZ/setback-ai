@@ -9,6 +9,7 @@ import {
   playCard,
   renamePlayer,
   removePlayer,
+  sendReaction,
   sortCards,
   startGame,
   startOver,
@@ -97,6 +98,18 @@ const SUIT_SYMBOLS = {
   Clubs: '♣️',
   Spades: '♠️',
   Joker: '⭐',
+}
+
+const REACTION_EMOJIS = ['😀', '😂', '😮', '😢', '😡', '👏', '🔥', '🎉']
+
+const hashString = (value) => {
+  let hash = 0
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+
+  return hash
 }
 
 const SUIT_COLORS = {
@@ -672,6 +685,7 @@ function GameTablePage({
   onPlayCard,
   onSortCards,
   onStartOver,
+  onSendReaction,
   onOpenNewGame,
   onOpenJoinGame,
   onOpenSwitchGame,
@@ -679,6 +693,7 @@ function GameTablePage({
   isStartingOver,
   isSubmittingBid,
   isPlayingCard,
+  isSendingReaction,
   isRenamingPlayer,
   isSortingCards,
   isLoadingRejoinGames,
@@ -749,6 +764,7 @@ function GameTablePage({
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
+  const [isReactionModalOpen, setIsReactionModalOpen] = useState(false)
   const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
@@ -756,6 +772,7 @@ function GameTablePage({
   const bookWinnerTimeoutRef = useRef(null)
   const selectedTrickCardTimeoutRef = useRef(null)
   const mobileActionBarRef = useRef(null)
+  const reactionPickerRef = useRef(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -788,6 +805,57 @@ function GameTablePage({
   const handCardCount = viewerHand?.cards?.length ?? 0
   const isMobileViewport = viewportWidth < 640
   const currentPlayerName = getPlayerName(game, viewerPlayerId)
+  const activeReactions = game?.reactions ?? []
+  const reactionLayouts = useMemo(
+    () =>
+      activeReactions.map((reaction, index) => {
+        const hash = hashString(reaction.id)
+        const left = 38 + (hash % 25)
+        const driftDirection = hash % 2 === 0 ? 1 : -1
+        const driftA = driftDirection * (12 + ((hash >> 3) % 8))
+        const driftB = driftDirection * -1 * (8 + ((hash >> 6) % 10))
+        const driftC = driftDirection * (16 + ((hash >> 9) % 12))
+        const delay = (index % 3) * 0.08
+
+        return {
+          reaction,
+          style: {
+            left: `${left}%`,
+            bottom: `${mobileActionBarHeight + 24 + (hash % 3) * 6}px`,
+            animationDelay: `${delay}s`,
+            '--reaction-sway-a': `${driftA}px`,
+            '--reaction-sway-b': `${driftB}px`,
+            '--reaction-sway-c': `${driftC}px`,
+          },
+        }
+      }),
+    [activeReactions, mobileActionBarHeight],
+  )
+
+  useEffect(() => {
+    console.log('[reactions] viewport', {
+      isMobileViewport,
+      viewportWidth,
+      mobileActionBarHeight,
+      activeReactionCount: activeReactions.length,
+    })
+  }, [activeReactions.length, isMobileViewport, mobileActionBarHeight, viewportWidth])
+
+  useEffect(() => {
+    if (activeReactions.length === 0) {
+      return
+    }
+
+    console.log(
+      '[reactions] render payload',
+      reactionLayouts.map(({ reaction, style }) => ({
+        id: reaction.id,
+        playerId: reaction.playerId,
+        emoji: reaction.emoji,
+        style,
+      })),
+    )
+  }, [activeReactions.length, reactionLayouts])
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
       return {
@@ -882,6 +950,25 @@ function GameTablePage({
       setEditedPlayerName(currentPlayerName)
     }
   }, [currentPlayerName, isEditingPlayerName, isMenuModalOpen])
+
+  useEffect(() => {
+    if (!isReactionModalOpen || typeof window === 'undefined') {
+      return undefined
+    }
+
+    const handlePointerDown = (event) => {
+      if (reactionPickerRef.current?.contains(event.target)) {
+        return
+      }
+
+      setIsReactionModalOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [isReactionModalOpen])
 
   useEffect(() => {
     const latestTrick = completedTricks[completedTricks.length - 1]
@@ -988,8 +1075,8 @@ function GameTablePage({
     return false
   }
 
-  const actionBarContent = (
-    <div className="flex flex-wrap items-center justify-center gap-3 px-3 py-3">
+  const renderActionBarContent = (isMobileBar) => (
+    <div className="relative flex flex-wrap items-center justify-center gap-3 px-3 py-3">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -999,13 +1086,15 @@ function GameTablePage({
         >
           ☰
         </button>
-        <button
-          type="button"
-          className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] md:hidden"
-          onClick={() => setIsScoreModalOpen(true)}
-        >
-          Score
-        </button>
+        {isMobileBar ? (
+          <button
+            type="button"
+            className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+            onClick={() => setIsScoreModalOpen(true)}
+          >
+            Score
+          </button>
+        ) : null}
       </div>
       {canSortCards ? (
         <button
@@ -1080,15 +1169,66 @@ function GameTablePage({
           })}
         </div>
       ) : null}
+      <div className="relative" ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}>
+        {isReactionModalOpen && isMobileBar === isMobileViewport ? (
+          <div className="absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl bg-[#3a3a3a] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)] sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+            <div className="grid grid-cols-4 gap-2">
+              {REACTION_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="flex h-11 items-center justify-center rounded-xl bg-transparent text-2xl transition hover:scale-110 disabled:opacity-50"
+                  onClick={async () => {
+                    try {
+                      await onSendReaction?.(emoji)
+                      setIsReactionModalOpen(false)
+                    } catch {
+                      // Keep the picker open so the user can retry.
+                    }
+                  }}
+                  disabled={isSendingReaction}
+                  aria-label={`Send ${emoji} reaction`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          className="min-h-12 border-0 bg-transparent px-1 py-1 text-3xl leading-none text-white transition hover:scale-110 disabled:opacity-50"
+          onClick={() => setIsReactionModalOpen((current) => !current)}
+          disabled={isSendingReaction || typeof onSendReaction !== 'function'}
+          aria-label="Open reactions"
+        >
+          😀
+        </button>
+      </div>
     </div>
   )
 
   return (
-    <main
-      className="theme-shell h-[100dvh] overflow-hidden md:h-screen md:px-3 md:py-3"
-      style={{ '--mobile-action-bar-height': `${mobileActionBarHeight}px` }}
-    >
-      <section className="mx-auto flex h-[calc(100dvh-var(--mobile-action-bar-height,0px))] w-full max-w-none flex-col md:h-full md:max-w-6xl">
+    <>
+      <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
+        {reactionLayouts.map(({ reaction, style }) => (
+          <div
+            key={reaction.id}
+            className="reaction-float"
+            style={style}
+          >
+            <div className="reaction-badge">
+              <span className="truncate">{getPlayerName(game, reaction.playerId)}</span>
+              <span className="text-xl leading-none">{reaction.emoji}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <main
+        className="theme-shell h-[100dvh] overflow-hidden md:h-screen md:px-3 md:py-3"
+        style={{ '--mobile-action-bar-height': `${mobileActionBarHeight}px` }}
+      >
+      <section className="relative mx-auto flex h-[calc(100dvh-var(--mobile-action-bar-height,0px))] w-full max-w-none flex-col md:h-full md:max-w-6xl">
         <div
           className="table-surface flex h-full min-h-0 w-full flex-col rounded-none border-0 md:rounded-3xl md:border md:border-b-0"
           style={{ borderColor: 'var(--border-color)' }}
@@ -1344,7 +1484,7 @@ function GameTablePage({
             )}
           </div>
           <div className="hidden md:block">
-            {actionBarContent}
+            {renderActionBarContent(false)}
           </div>
         </article>
         </div>
@@ -1357,7 +1497,7 @@ function GameTablePage({
           backgroundColor: 'rgba(20, 20, 20, 0.25)',
         }}
       >
-        {actionBarContent}
+        {renderActionBarContent(true)}
       </div>
       {isScoreModalOpen && (
         <div
@@ -1590,6 +1730,7 @@ function GameTablePage({
         </div>
       ) : null}
     </main>
+    </>
   )
 }
 
@@ -1623,6 +1764,7 @@ export default function App() {
   const [selectedBid, setSelectedBid] = useState('0')
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
+  const [isSendingReaction, setIsSendingReaction] = useState(false)
   const [isRenamingPlayer, setIsRenamingPlayer] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
@@ -1637,7 +1779,7 @@ export default function App() {
   const hydratedRoundSummaryGameIdRef = useRef('')
   const gameErrorTimeoutRef = useRef(null)
   const isMutationInFlight =
-    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSortingCards || isStartingOver
+    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isStartingOver
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -2559,6 +2701,69 @@ export default function App() {
     }
   }
 
+  const handleSendReaction = async (emoji) => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    setGameError('')
+    setIsSendingReaction(true)
+
+    console.log('[reactions] send start', {
+      emoji,
+      gameId: activeSession.gameId,
+      hasOwnerSession: Boolean(ownerSession),
+      hasPlayerSession: Boolean(playerSession),
+    })
+
+    try {
+      const result = await sendReaction({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+        emoji,
+      })
+
+      if (ownerSession) {
+        setOwnerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+              }
+            : prev,
+        )
+      } else {
+        setPlayerSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                game: result?.game ?? prev.game,
+                version: result?.version ?? prev.version,
+              }
+            : prev,
+        )
+      }
+
+      console.log('[reactions] send success', {
+        emoji,
+        returnedReactionCount: result?.game?.reactions?.length ?? 0,
+        reactions: result?.game?.reactions ?? [],
+      })
+    } catch (error) {
+      const message = toUserFacingActionError(error, 'Unable to send reaction')
+      console.log('[reactions] send error', {
+        emoji,
+        message,
+        error,
+      })
+      setGameError(message)
+      throw error
+    } finally {
+      setIsSendingReaction(false)
+    }
+  }
+
   const handleRenamePlayer = async (playerName) => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken) {
@@ -2671,6 +2876,7 @@ export default function App() {
           onPlayCard={handlePlayCard}
           onSortCards={openSortCardsModal}
           onStartOver={handleStartOver}
+          onSendReaction={handleSendReaction}
           onOpenNewGame={handleOpenNewGame}
           onOpenJoinGame={handleOpenJoinGame}
           onOpenSwitchGame={handleOpenSwitchGame}
@@ -2678,6 +2884,7 @@ export default function App() {
           isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
           isPlayingCard={isPlayingCard}
+          isSendingReaction={isSendingReaction}
           isRenamingPlayer={isRenamingPlayer}
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}

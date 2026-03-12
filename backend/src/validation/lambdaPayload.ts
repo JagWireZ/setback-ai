@@ -1,6 +1,8 @@
 import type { CardCount } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 
+const REACTION_EMOJIS = new Set(["😀", "😂", "😮", "😢", "😡", "👏", "🔥", "🎉"]);
+
 export function assertCreateGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"createGame"> {
@@ -286,6 +288,28 @@ export function assertRenamePlayerPayload(
 
   if (typeof playerName !== "string" || playerName.trim().length === 0) {
     throw new Error("renamePlayer requires payload.playerName");
+  }
+}
+
+export function assertSendReactionPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"sendReaction"> {
+  if (event.action !== "sendReaction") {
+    throw new Error("Invalid action for sendReaction payload validation");
+  }
+
+  const { gameId, playerToken, emoji } = event.payload;
+
+  if (typeof gameId !== "string" || gameId.trim().length === 0) {
+    throw new Error("sendReaction requires payload.gameId");
+  }
+
+  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
+    throw new Error("sendReaction requires payload.playerToken");
+  }
+
+  if (typeof emoji !== "string" || !REACTION_EMOJIS.has(emoji)) {
+    throw new Error("sendReaction requires payload.emoji");
   }
 }
 

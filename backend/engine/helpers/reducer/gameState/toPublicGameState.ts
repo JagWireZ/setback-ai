@@ -1,4 +1,5 @@
 import type { Game } from "@shared/types/game";
+import { pruneActiveReactions } from "./reactions";
 
 export const toPublicGameState = (
   game: Game,
@@ -25,5 +26,6 @@ export const toPublicGameState = (
   return {
     ...publicGame,
     phase: publicPhase,
+    reactions: pruneActiveReactions(game.reactions),
   };
 };

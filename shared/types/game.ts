@@ -132,6 +132,15 @@ export type PlayerToken = {
   token: string
 }
 
+export type ReactionEmoji = '😀' | '😂' | '😮' | '😢' | '😡' | '👏' | '🔥' | '🎉'
+
+export type Reaction = {
+  id: string
+  playerId: string
+  emoji: ReactionEmoji
+  createdAt: number
+}
+
 export type Options = {
   maxCards: CardCount
   blindBid: boolean
@@ -160,5 +169,6 @@ export type Game = {
   playerTokens: PlayerToken[]
   playerOrder: string[]
   scores: Score[]
+  reactions: Reaction[]
   phase: Phase
 }

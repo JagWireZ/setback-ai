@@ -40,6 +40,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
     playerTokens,
     playerOrder: allPlayers.map((player) => player.id),
     scores: allPlayers.map((player) => buildScore(player.id)),
+    reactions: [],
   };
 
   return {
