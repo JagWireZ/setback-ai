@@ -53,3 +53,36 @@ test("renamePlayer rejects blank names", () => {
     /player name is required/i,
   );
 });
+
+test("renamePlayer allows the owner to rename another player", () => {
+  const game = createGame();
+  game.ownerToken = "token-1";
+
+  const updated = renamePlayer(game, {
+    action: "renamePlayer",
+    payload: {
+      gameId: "game-1",
+      playerToken: "token-1",
+      playerId: "p2",
+      playerName: "Taylor",
+    },
+  });
+
+  assert.equal(updated.players.find((player) => player.id === "p2").name, "Taylor");
+});
+
+test("renamePlayer rejects non-owner attempts to rename another player", () => {
+  assert.throws(
+    () =>
+      renamePlayer(createGame(), {
+        action: "renamePlayer",
+        payload: {
+          gameId: "game-1",
+          playerToken: "token-2",
+          playerId: "p1",
+          playerName: "Taylor",
+        },
+      }),
+    /owner token required/i,
+  );
+});

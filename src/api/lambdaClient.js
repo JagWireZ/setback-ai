@@ -131,11 +131,12 @@ export const removePlayer = ({ gameId, playerToken, playerId }) =>
     playerId,
   })
 
-export const renamePlayer = ({ gameId, playerToken, playerName }) =>
+export const renamePlayer = ({ gameId, playerToken, playerName, playerId }) =>
   invokeLambda('renamePlayer', {
     gameId: normalizeGameId(gameId),
     playerToken,
     playerName,
+    ...(playerId ? { playerId } : {}),
   })
 
 export const sendReaction = ({ gameId, playerToken, emoji }) =>

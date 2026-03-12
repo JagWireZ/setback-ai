@@ -92,6 +92,41 @@ const toUserFacingActionError = (error, fallbackMessage) => {
   return message
 }
 
+const MAX_PLAYER_NAME_LENGTH = 30
+const PLAYER_NAME_ALLOWED_PATTERN = /^[\p{L}\p{N} _().'-]+$/u
+const PLAYER_NAME_SANITIZE_PATTERN = /[^\p{L}\p{N} _().'-]+/gu
+const PLAYER_NAME_VALIDATION_MESSAGE =
+  "Player Name can use letters, numbers, spaces, hyphens, underscores, parentheses, apostrophes, and periods only."
+
+const sanitizePlayerNameInput = (value) =>
+  value.replace(PLAYER_NAME_SANITIZE_PATTERN, '').slice(0, MAX_PLAYER_NAME_LENGTH)
+
+const validatePlayerName = (value) => {
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return 'Player Name is required.'
+  }
+
+  if (trimmedValue.length > MAX_PLAYER_NAME_LENGTH) {
+    return `Player Name must be ${MAX_PLAYER_NAME_LENGTH} characters or fewer.`
+  }
+
+  if (!PLAYER_NAME_ALLOWED_PATTERN.test(trimmedValue)) {
+    return PLAYER_NAME_VALIDATION_MESSAGE
+  }
+
+  return ''
+}
+
+const truncateLabel = (value, maxLength) => {
+  if (typeof value !== 'string') {
+    return ''
+  }
+
+  return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
+}
+
 const SUIT_SYMBOLS = {
   Hearts: '♥️',
   Diamonds: '♦️',
@@ -216,13 +251,21 @@ function CardBack({ className = '' }) {
   )
 }
 
-function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
+function ScoreSummary({
+  game,
+  bids,
+  booksByPlayerId,
+  currentRoundIndex,
+  isOwner = false,
+  onSelectPlayer,
+}) {
   const playersById = new Map((game.players ?? []).map((player) => [player.id, player]))
   const orderedPlayers =
     (game.playerOrder ?? [])
       .map((playerId) => playersById.get(playerId))
       .filter(Boolean)
   const currentDealerPlayerId = game?.phase && 'dealerPlayerId' in game.phase ? game.phase.dealerPlayerId : ''
+  const getPlayerRoleIcon = (player) => (player.type === 'ai' ? '🤖' : '👤')
 
   return (
     <ul className="mt-3 flex flex-col gap-2">
@@ -238,22 +281,37 @@ function ScoreSummary({ game, bids, booksByPlayerId, currentRoundIndex }) {
         const playerBooks =
           booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
         const playerRainbow = score?.rounds?.[currentRoundIndex]?.rainbow === true
+        const playerDisplayName = truncateLabel(player.name, 22)
 
         return (
           <li key={player.id} className="rounded border panel-surface-strong px-3 py-2 text-sm">
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{player.name}</p>
-                  {player.id === currentDealerPlayerId ? (
-                    <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
-                      Dealer
-                    </span>
-                  ) : null}
+                  {isOwner && typeof onSelectPlayer === 'function' ? (
+                    <button
+                      type="button"
+                      className="block w-full min-w-0 cursor-pointer truncate text-left font-medium text-white transition hover:text-[#d9f7e5]"
+                      title={player.name}
+                      onClick={() => onSelectPlayer(player)}
+                      aria-label={`Manage ${player.name}`}
+                    >
+                      {`${getPlayerRoleIcon(player)} ${playerDisplayName}`}
+                    </button>
+                  ) : (
+                    <p className="truncate font-medium" title={player.name}>
+                      {`${getPlayerRoleIcon(player)} ${playerDisplayName}`}
+                    </p>
+                  )}
                 </div>
                 <p className="mt-1 text-lg font-semibold text-white">
                   {score?.total ?? 0}
                   {playerRainbow ? <span className="ml-2" aria-label="Rainbow round">🌈</span> : null}
+                  {player.id === currentDealerPlayerId ? (
+                    <span className="ml-4 rounded-full border border-white/15 bg-white/8 px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                      Dealer
+                    </span>
+                  ) : null}
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1 text-xs text-muted">
@@ -675,11 +733,15 @@ const getViewerHand = (game) => {
 function GameTablePage({
   game,
   isOwner,
+  ownerPlayerId = '',
+  pendingPlayerActionId = '',
   errorMessage,
   shareLink,
+  isShareLinkCopied,
   onCopyShareLink,
   onSetGameError,
   onRenamePlayer,
+  onRemovePlayer,
   onDealCards,
   onSubmitBid,
   onPlayCard,
@@ -766,6 +828,8 @@ function GameTablePage({
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
   const [isReactionModalOpen, setIsReactionModalOpen] = useState(false)
   const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
+  const [selectedScorePlayerId, setSelectedScorePlayerId] = useState('')
+  const [scorePlayerNameDraft, setScorePlayerNameDraft] = useState('')
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const previousCompletedTrickCountRef = useRef(0)
@@ -805,6 +869,10 @@ function GameTablePage({
   const handCardCount = viewerHand?.cards?.length ?? 0
   const isMobileViewport = viewportWidth < 640
   const currentPlayerName = getPlayerName(game, viewerPlayerId)
+  const selectedScorePlayer =
+    orderedPlayers.find((player) => player.id === selectedScorePlayerId) ??
+    game.players?.find((player) => player.id === selectedScorePlayerId) ??
+    null
   const activeReactions = game?.reactions ?? []
   const reactionLayouts = useMemo(
     () =>
@@ -950,6 +1018,27 @@ function GameTablePage({
       setEditedPlayerName(currentPlayerName)
     }
   }, [currentPlayerName, isEditingPlayerName, isMenuModalOpen])
+
+  const shortenedMenuPlayerName = truncateLabel(currentPlayerName, 18)
+
+  useEffect(() => {
+    if (!selectedScorePlayerId) {
+      return
+    }
+
+    if (!selectedScorePlayer) {
+      setSelectedScorePlayerId('')
+      setScorePlayerNameDraft('')
+      return
+    }
+
+    setScorePlayerNameDraft(selectedScorePlayer.name)
+  }, [selectedScorePlayer?.name, selectedScorePlayerId])
+
+  const closeScorePlayerModal = () => {
+    setSelectedScorePlayerId('')
+    setScorePlayerNameDraft('')
+  }
 
   useEffect(() => {
     if (!isReactionModalOpen || typeof window === 'undefined') {
@@ -1281,6 +1370,8 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              isOwner={isOwner}
+              onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
             />
             <div className="mt-4 flex justify-end pr-3">
               <button
@@ -1528,6 +1619,8 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              isOwner={isOwner}
+              onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
             />
             <div className="mt-4 flex items-center justify-between gap-3">
               <button
@@ -1554,6 +1647,100 @@ function GameTablePage({
           onClose={() => setIsHistoryModalOpen(false)}
         />
       ) : null}
+      {selectedScorePlayer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeScorePlayerModal}
+        >
+          <div
+            className="dialog-surface w-full max-w-md p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">Manage Player</h2>
+              <button
+                type="button"
+                className="btn-secondary px-3 py-2 text-sm"
+                onClick={closeScorePlayerModal}
+              >
+                Close
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-muted">{selectedScorePlayer.name}</p>
+            <form
+              className="mt-4 flex flex-col gap-4"
+              onSubmit={async (event) => {
+                event.preventDefault()
+                if (!selectedScorePlayer) {
+                  return
+                }
+
+                const validationError = validatePlayerName(scorePlayerNameDraft)
+                if (validationError) {
+                  onSetGameError(validationError)
+                  return
+                }
+
+                const didRename = await onRenamePlayer?.(
+                  scorePlayerNameDraft.trim(),
+                  selectedScorePlayer.id,
+                )
+                if (didRename) {
+                  closeScorePlayerModal()
+                }
+              }}
+            >
+              <label className="flex flex-col gap-2">
+                <span className="text-sm text-muted">Player Name</span>
+                <input
+                  type="text"
+                  value={scorePlayerNameDraft}
+                  onChange={(event) => {
+                    setScorePlayerNameDraft(sanitizePlayerNameInput(event.target.value))
+                    onSetGameError('')
+                  }}
+                  className="input-surface"
+                  placeholder="Player name"
+                  maxLength={MAX_PLAYER_NAME_LENGTH}
+                  autoFocus
+                />
+              </label>
+              <div className="flex justify-between gap-3">
+                <button
+                  type="button"
+                  className="btn-danger bg-[rgba(199,67,67,0.12)] px-4 py-2 disabled:opacity-50"
+                  onClick={async () => {
+                    if (!selectedScorePlayer) {
+                      return
+                    }
+
+                    onSetGameError('')
+                    const didRemove = await onRemovePlayer?.(selectedScorePlayer.id)
+                    if (didRemove) {
+                      closeScorePlayerModal()
+                    }
+                  }}
+                  disabled={
+                    isRenamingPlayer ||
+                    pendingPlayerActionId === selectedScorePlayer.id ||
+                    selectedScorePlayer.type === 'ai' ||
+                    selectedScorePlayer.id === ownerPlayerId
+                  }
+                >
+                  {pendingPlayerActionId === selectedScorePlayer.id ? 'Removing...' : 'Remove Player'}
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary px-4 py-2 disabled:opacity-50"
+                  disabled={isRenamingPlayer || !scorePlayerNameDraft.trim()}
+                >
+                  {isRenamingPlayer ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
       {isMenuModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
@@ -1567,13 +1754,14 @@ function GameTablePage({
               <div className="min-w-0">
                 <button
                   type="button"
-                  className="min-w-0 truncate text-left text-xl font-semibold text-white transition hover:text-[#d9f7e5]"
+                  className="block max-w-[12rem] min-w-0 truncate text-left text-xl font-semibold text-white transition hover:text-[#d9f7e5] sm:max-w-[14rem]"
                   onClick={() => {
                     setIsEditingPlayerName(true)
                     setEditedPlayerName(currentPlayerName)
                   }}
+                  title={currentPlayerName}
                 >
-                  {`👤 ${currentPlayerName}`}
+                  {`👤 ${shortenedMenuPlayerName}`}
                 </button>
               </div>
               <span className="shrink-0 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted">
@@ -1691,7 +1879,7 @@ function GameTablePage({
                   className="btn-primary w-[90%] px-4 py-2 text-sm"
                   onClick={onCopyShareLink}
                 >
-                  Copy Link
+                  {isShareLinkCopied ? 'Copied!' : 'Copy Link'}
                 </button>
               </div>
             </section>
@@ -1779,14 +1967,23 @@ export default function App() {
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
+  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
   const latestShownRoundIndexRef = useRef(-1)
   const hydratedRoundSummaryGameIdRef = useRef('')
   const gameErrorTimeoutRef = useRef(null)
+  const shareLinkCopiedTimeoutRef = useRef(null)
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isStartingOver
+
+  useEffect(() => () => {
+    if (shareLinkCopiedTimeoutRef.current) {
+      clearTimeout(shareLinkCopiedTimeoutRef.current)
+      shareLinkCopiedTimeoutRef.current = null
+    }
+  }, [])
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -1953,9 +2150,11 @@ export default function App() {
   const handleCreateGame = async (event) => {
     event.preventDefault()
     const errors = {}
+    const trimmedPlayerName = playerName.trim()
+    const playerNameError = validatePlayerName(playerName)
 
-    if (!playerName.trim()) {
-      errors.playerName = 'Player Name is required.'
+    if (playerNameError) {
+      errors.playerName = playerNameError
     }
 
     if (!maxCards) {
@@ -1973,7 +2172,7 @@ export default function App() {
 
     try {
       const result = await createGame({
-        playerName: playerName.trim(),
+        playerName: trimmedPlayerName,
         maxCards: Number(maxCards),
       })
       setSessionInfo({
@@ -2008,13 +2207,15 @@ export default function App() {
   const handleJoinGame = async (event) => {
     event.preventDefault()
     const errors = {}
+    const trimmedPlayerName = joinPlayerName.trim()
+    const playerNameError = validatePlayerName(joinPlayerName)
 
     if (!joinGameId.trim()) {
       errors.gameId = 'Game ID is required.'
     }
 
-    if (!joinPlayerName.trim()) {
-      errors.playerName = 'Player Name is required.'
+    if (playerNameError) {
+      errors.playerName = playerNameError
     }
 
     if (Object.keys(errors).length > 0) {
@@ -2029,7 +2230,7 @@ export default function App() {
     try {
       const result = await joinGame({
         gameId: joinGameId.trim(),
-        playerName: joinPlayerName.trim(),
+        playerName: trimmedPlayerName,
       })
       setSessionInfo({
         action: 'joinGame',
@@ -2361,7 +2562,14 @@ export default function App() {
 
     try {
       await navigator.clipboard.writeText(shareLink)
-      setLobbyInfo('Share link copied.')
+      setIsShareLinkCopied(true)
+      if (shareLinkCopiedTimeoutRef.current) {
+        clearTimeout(shareLinkCopiedTimeoutRef.current)
+      }
+      shareLinkCopiedTimeoutRef.current = setTimeout(() => {
+        setIsShareLinkCopied(false)
+        shareLinkCopiedTimeoutRef.current = null
+      }, 2000)
     } catch {
       setLobbyInfo('Unable to copy automatically. Copy the link manually.')
     }
@@ -2401,7 +2609,7 @@ export default function App() {
 
   const handleRemovePlayer = async (playerId) => {
     if (!ownerSession?.gameId || !ownerSession?.playerToken) {
-      return
+      return false
     }
 
     setGameError('')
@@ -2422,9 +2630,11 @@ export default function App() {
             }
           : prev,
       )
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove player'
       setGameError(message)
+      return false
     } finally {
       setPendingPlayerActionId('')
     }
@@ -2771,7 +2981,7 @@ export default function App() {
     }
   }
 
-  const handleRenamePlayer = async (playerName) => {
+  const handleRenamePlayer = async (playerName, playerId) => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return false
@@ -2786,6 +2996,7 @@ export default function App() {
         gameId: activeSession.gameId,
         playerToken: activeSession.playerToken,
         playerName,
+        playerId,
       })
 
       if (ownerSession) {
@@ -2873,11 +3084,15 @@ export default function App() {
         <GameTablePage
           game={activeGame}
           isOwner={Boolean(ownerSession)}
+          ownerPlayerId={ownerSession?.ownerPlayerId ?? ''}
+          pendingPlayerActionId={pendingPlayerActionId}
           errorMessage={gameError}
           shareLink={shareLink}
+          isShareLinkCopied={isShareLinkCopied}
           onCopyShareLink={handleCopyShareLink}
           onSetGameError={setGameError}
           onRenamePlayer={handleRenamePlayer}
+          onRemovePlayer={handleRemovePlayer}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
@@ -3082,7 +3297,7 @@ export default function App() {
                     className="btn-primary px-4 py-2 text-sm"
                     onClick={handleCopyShareLink}
                   >
-                    Copy Link
+                    {isShareLinkCopied ? 'Copied!' : 'Copy Link'}
                   </button>
                 </div>
               </section>
@@ -3253,11 +3468,12 @@ export default function App() {
                   type="text"
                   value={playerName}
                   onChange={(event) => {
-                    setPlayerName(event.target.value)
+                    setPlayerName(sanitizePlayerNameInput(event.target.value))
                     setCreateErrors((prev) => ({ ...prev, playerName: undefined }))
                   }}
                   className="input-surface"
                   placeholder="Enter your name"
+                  maxLength={MAX_PLAYER_NAME_LENGTH}
                 />
                 {createErrors.playerName && (
                   <span className="text-sm text-red-300">{createErrors.playerName}</span>
@@ -3343,11 +3559,12 @@ export default function App() {
                   type="text"
                   value={joinPlayerName}
                   onChange={(event) => {
-                    setJoinPlayerName(event.target.value)
+                    setJoinPlayerName(sanitizePlayerNameInput(event.target.value))
                     setJoinErrors((prev) => ({ ...prev, playerName: undefined }))
                   }}
                   className="input-surface"
                   placeholder="Enter your name"
+                  maxLength={MAX_PLAYER_NAME_LENGTH}
                 />
                 {joinErrors.playerName && (
                   <span className="text-sm text-red-300">{joinErrors.playerName}</span>

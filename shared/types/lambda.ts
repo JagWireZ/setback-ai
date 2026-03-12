@@ -67,6 +67,7 @@ type ActionPayloadMap = {
   renamePlayer: {
     gameId: string
     playerName: string
+    playerId?: string
   }
   sendReaction: {
     gameId: string

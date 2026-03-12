@@ -1,5 +1,6 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
+import { getBotName } from "../helpers/reducer/player/getBotName";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 
@@ -33,7 +34,12 @@ export const removePlayer = (
   }
 
   const playerIndex = existingGame.players.findIndex((player) => player.id === targetPlayer.id);
-  const aiName = `AI ${playerIndex + 1}`;
+  const aiName = getBotName(
+    existingGame.players
+      .filter((player) => player.id !== targetPlayer.id)
+      .map((player) => player.name),
+    playerIndex,
+  );
 
   return withNextVersion(existingGame, {
     players: existingGame.players.map((player) =>
