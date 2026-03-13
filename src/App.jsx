@@ -843,7 +843,6 @@ function GameTablePage({
   const reactionPickerRef = useRef(null)
   const hasAutoOpenedGameOverScoreRef = useRef(false)
   const gameOverScoreTimeoutRef = useRef(null)
-  const previousPhaseStageRef = useRef(game?.phase?.stage)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -909,63 +908,6 @@ function GameTablePage({
     [activeReactions, mobileActionBarHeight],
   )
 
-  useEffect(() => {
-    console.log('[reactions] viewport', {
-      isMobileViewport,
-      viewportWidth,
-      mobileActionBarHeight,
-      activeReactionCount: activeReactions.length,
-    })
-  }, [activeReactions.length, isMobileViewport, mobileActionBarHeight, viewportWidth])
-
-  useEffect(() => {
-    if (activeReactions.length === 0) {
-      return
-    }
-
-    console.log(
-      '[reactions] render payload',
-      reactionLayouts.map(({ reaction, style }) => ({
-        id: reaction.id,
-        playerId: reaction.playerId,
-        emoji: reaction.emoji,
-        style,
-      })),
-    )
-  }, [activeReactions.length, reactionLayouts])
-
-  useEffect(() => {
-    const currentPhaseStage = game?.phase?.stage
-    if (!currentPhaseStage || previousPhaseStageRef.current === currentPhaseStage) {
-      return
-    }
-
-    const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : null
-    const currentTrickIndex = game?.phase && 'cards' in game.phase ? game.phase.cards.trickIndex : null
-    const trumpSuit = game?.phase && 'cards' in game.phase ? game.phase.cards.trump?.suit ?? null : null
-    const currentTrickPlayCount = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick?.plays?.length ?? 0 : null
-    const completedTrickCount = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks?.length ?? 0 : null
-    const bidCount = game?.phase?.stage === 'Bidding' ? game.phase.bids?.length ?? 0 : null
-
-    console.log('[phase] stage changed', {
-      gameId: game?.id,
-      version: game?.version ?? null,
-      previousStage: previousPhaseStageRef.current ?? null,
-      stage: currentPhaseStage,
-      roundIndex: currentRoundIndex,
-      turnPlayerId: currentTurnPlayerId ?? null,
-      dealerPlayerId: game?.phase?.dealerPlayerId ?? null,
-      viewerPlayerId: viewerPlayerId ?? null,
-      currentTrickIndex,
-      currentTrickPlayCount,
-      completedTrickCount,
-      bidCount,
-      trumpSuit,
-      winnerPlayerId: latestCompletedTrick?.winnerPlayerId ?? null,
-    })
-
-    previousPhaseStageRef.current = currentPhaseStage
-  }, [currentTurnPlayerId, game, latestCompletedTrick?.winnerPlayerId, viewerPlayerId])
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
       return {
@@ -3094,13 +3036,6 @@ export default function App() {
     setGameError('')
     setIsSendingReaction(true)
 
-    console.log('[reactions] send start', {
-      emoji,
-      gameId: activeSession.gameId,
-      hasOwnerSession: Boolean(ownerSession),
-      hasPlayerSession: Boolean(playerSession),
-    })
-
     try {
       const result = await sendReaction({
         gameId: activeSession.gameId,
@@ -3138,19 +3073,8 @@ export default function App() {
         setReactionCooldownUntil(0)
         reactionCooldownTimeoutRef.current = null
       }, REACTION_COOLDOWN_MS)
-
-      console.log('[reactions] send success', {
-        emoji,
-        returnedReactionCount: result?.game?.reactions?.length ?? 0,
-        reactions: result?.game?.reactions ?? [],
-      })
     } catch (error) {
       const message = toUserFacingActionError(error, 'Unable to send reaction')
-      console.log('[reactions] send error', {
-        emoji,
-        message,
-        error,
-      })
       setGameError(message)
       throw error
     } finally {
