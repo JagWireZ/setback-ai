@@ -201,6 +201,70 @@
     color: var(--text-dim);
   }
 
+  .sort-toggle-icon {
+    position: relative;
+    display: inline-block;
+    width: 1rem;
+    height: 0.8rem;
+    opacity: 0.92;
+  }
+
+  .sort-toggle-icon::before,
+  .sort-toggle-icon::after,
+  .sort-toggle-icon span,
+  .sort-toggle-icon span::before,
+  .sort-toggle-icon i,
+  .sort-toggle-icon i::before {
+    content: "";
+    position: absolute;
+  }
+
+  .sort-toggle-icon::before,
+  .sort-toggle-icon::after {
+    height: 2px;
+    background-color: currentColor;
+  }
+
+  .sort-toggle-icon::before {
+    top: 0.12rem;
+    left: 0.12rem;
+    width: 0.62rem;
+  }
+
+  .sort-toggle-icon::after {
+    bottom: 0.12rem;
+    right: 0.12rem;
+    width: 0.62rem;
+  }
+
+  .sort-toggle-icon span {
+    inset: 0;
+  }
+
+  .sort-toggle-icon span::before {
+    top: 0.02rem;
+    right: 0.08rem;
+    width: 0.28rem;
+    height: 0.28rem;
+    border-top: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  .sort-toggle-icon i {
+    inset: 0;
+  }
+
+  .sort-toggle-icon i::before {
+    bottom: 0.02rem;
+    left: 0.08rem;
+    width: 0.28rem;
+    height: 0.28rem;
+    border-top: 2px solid currentColor;
+    border-right: 2px solid currentColor;
+    transform: rotate(-135deg);
+  }
+
   .score-scroll {
     scrollbar-width: auto;
     scrollbar-color: rgba(255, 255, 255, 0.22) transparent;

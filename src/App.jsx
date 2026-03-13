@@ -747,6 +747,7 @@ function GameTablePage({
   onSubmitBid,
   onPlayCard,
   onSortCards,
+  sortMode = 'bySuit',
   onStartOver,
   onSendReaction,
   onGoHome,
@@ -1172,12 +1173,12 @@ function GameTablePage({
           ☰
         </button>
       </div>
-      <div className="min-w-0 overflow-x-auto">
-        <div className="flex w-max min-w-full items-center justify-center gap-3">
+      <div className="min-w-0">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 sm:w-max sm:min-w-full sm:flex-nowrap sm:gap-3">
           {isMobileBar ? (
             <button
               type="button"
-              className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7]"
+              className="btn-secondary min-h-11 whitespace-nowrap border-[#2f6fdb] bg-[#2f6fdb] px-3 py-2.5 text-xs text-white hover:bg-[#1f58b7] sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
               onClick={() => setIsScoreModalOpen(true)}
             >
               Score
@@ -1186,75 +1187,85 @@ function GameTablePage({
           {canSortCards ? (
             <button
               type="button"
-              className="btn-secondary min-h-12 border-[#2f6fdb] bg-[#2f6fdb] px-4 py-3 text-sm text-white hover:bg-[#1f58b7] disabled:opacity-50"
+              className="btn-secondary min-h-11 whitespace-nowrap border-[#2f6fdb] bg-[#2f6fdb] px-3 py-2.5 text-xs text-white hover:bg-[#1f58b7] disabled:opacity-50 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
               onClick={onSortCards}
               disabled={isSortingCards}
             >
-              {isSortingCards ? 'Sorting...' : 'Sort'}
+              {isSortingCards ? (
+                'Sorting...'
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <span className="sort-toggle-icon" aria-hidden="true">
+                    <span />
+                    <i />
+                  </span>
+                  <span>{sortMode === 'bySuit' ? 'By Rank' : 'By Suit'}</span>
+                </span>
+              )}
             </button>
           ) : null}
           {availableActions.length > 0 ? (
-            <div className="flex items-center justify-center gap-2">
-              {availableActions.map((action) => {
-                const isDisabled =
-                  !isActionEnabled(action) ||
-                  isDealingCards ||
-                  isSubmittingBid ||
-                  isPlayingCard ||
-                  isSortingCards ||
-                  isStartingOver
-                const shouldFlashActionButton =
-                  ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
-                  (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
-                const isPrimaryAction =
-                  !isDisabled &&
-                  (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
+            availableActions.map((action) => {
+              const isDisabled =
+                !isActionEnabled(action) ||
+                isDealingCards ||
+                isSubmittingBid ||
+                isPlayingCard ||
+                isSortingCards ||
+                isStartingOver
+              const shouldFlashActionButton =
+                ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
+                (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
+              const isPrimaryAction =
+                !isDisabled &&
+                (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
 
-                return (
-                  <button
-                    key={action}
-                    type="button"
-                    className={`min-h-12 rounded-md border px-4 py-3 text-sm text-white disabled:opacity-50 ${
-                      shouldFlashActionButton
-                        ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
-                        : isPrimaryAction
-                          ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
-                          : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
-                    }`}
-                    disabled={isDisabled}
-                    onClick={
-                      action === 'Deal Cards'
-                        ? onDealCards
-                        : action === 'Submit Bid'
-                          ? onSubmitBid
-                          : action === 'Play Card'
-                            ? () => {
-                                if (selectedCard) {
-                                  onPlayCard(selectedCard)
-                                }
+              return (
+                <button
+                  key={action}
+                  type="button"
+                  className={`min-h-11 whitespace-nowrap rounded-md border px-3 py-2.5 text-xs text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm ${
+                    shouldFlashActionButton
+                      ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
+                      : isPrimaryAction
+                        ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
+                        : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
+                  }`}
+                  disabled={isDisabled}
+                  onClick={
+                    action === 'Deal Cards'
+                      ? onDealCards
+                      : action === 'Submit Bid'
+                        ? onSubmitBid
+                        : action === 'Play Card'
+                          ? () => {
+                              if (selectedCard) {
+                                onPlayCard(selectedCard)
                               }
-                            : action === 'Start Over'
-                              ? onStartOver
-                              : action === 'New Game'
-                                ? onOpenNewGame
-                                : action === 'Join Game'
-                                  ? onOpenJoinGame
-                                  : undefined
-                    }
-                  >
-                    {action === 'Deal Cards' && isDealingCards
-                      ? 'Dealing...'
-                      : action === 'Start Over' && isStartingOver
-                        ? 'Starting...'
-                        : action === 'Submit Bid' && isSubmittingBid
-                          ? 'Submitting...'
-                          : action === 'Play Card' && isPlayingCard
-                            ? 'Playing...'
+                            }
+                          : action === 'Start Over'
+                            ? onStartOver
+                            : action === 'New Game'
+                              ? onOpenNewGame
+                              : action === 'Join Game'
+                                ? onOpenJoinGame
+                                : undefined
+                  }
+                >
+                  {action === 'Deal Cards' && isDealingCards
+                    ? 'Dealing...'
+                    : action === 'Start Over' && isStartingOver
+                      ? 'Starting...'
+                      : action === 'Submit Bid' && isSubmittingBid
+                        ? 'Submitting...'
+                        : action === 'Play Card' && isPlayingCard
+                          ? 'Playing...'
+                          : action === 'Submit Bid'
+                            ? 'Bid'
                             : action}
-                  </button>
-                )
-              })}
-            </div>
+                </button>
+              )
+            })
           ) : null}
         </div>
       </div>
@@ -1947,7 +1958,7 @@ export default function App() {
   const [isStartingGame, setIsStartingGame] = useState(false)
   const [isDealingCards, setIsDealingCards] = useState(false)
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
-  const [isSortModalOpen, setIsSortModalOpen] = useState(false)
+  const [sortMode, setSortMode] = useState('bySuit')
   const [selectedBid, setSelectedBid] = useState('0')
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
@@ -2844,14 +2855,6 @@ export default function App() {
     setSelectedBid('0')
   }
 
-  const openSortCardsModal = () => {
-    setIsSortModalOpen(true)
-  }
-
-  const closeSortCardsModal = () => {
-    setIsSortModalOpen(false)
-  }
-
   const handleSubmitBid = async (event) => {
     event.preventDefault()
 
@@ -2942,13 +2945,17 @@ export default function App() {
         )
       }
 
-      closeSortCardsModal()
+      setSortMode(mode)
     } catch (error) {
       const message = toUserFacingActionError(error, 'Unable to sort cards')
       setGameError(message)
     } finally {
       setIsSortingCards(false)
     }
+  }
+
+  const toggleSortCards = () => {
+    void handleSortCards(sortMode === 'bySuit' ? 'byRank' : 'bySuit')
   }
 
   const handleSendReaction = async (emoji) => {
@@ -3353,7 +3360,8 @@ export default function App() {
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
-          onSortCards={openSortCardsModal}
+          onSortCards={toggleSortCards}
+          sortMode={sortMode}
           onStartOver={handleStartOver}
           onSendReaction={handleSendReaction}
           onGoHome={resetActiveSessionState}
@@ -3380,7 +3388,7 @@ export default function App() {
               className="dialog-surface w-full max-w-md p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
-              <h2 className="text-xl font-semibold">Submit Bid</h2>
+              <h2 className="text-xl font-semibold">Bid</h2>
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmitBid}>
                 <label className="flex flex-col gap-2">
                   <span className="text-sm text-muted">Bid Amount</span>
@@ -3420,37 +3428,6 @@ export default function App() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
-        {isSortModalOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-            onClick={closeSortCardsModal}
-          >
-            <div
-              className="dialog-surface w-full max-w-sm p-6 text-left"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <h2 className="text-xl font-semibold">Sort Cards</h2>
-              <div className="mt-4 flex flex-col gap-3">
-                <button
-                  type="button"
-                  className="btn-secondary px-4 py-3 text-left disabled:opacity-50"
-                  onClick={() => handleSortCards('bySuit')}
-                  disabled={isSortingCards}
-                >
-                  Sort by Suit
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary px-4 py-3 text-left disabled:opacity-50"
-                  onClick={() => handleSortCards('byRank')}
-                  disabled={isSortingCards}
-                >
-                  Sort by Rank
-                </button>
-              </div>
             </div>
           </div>
         )}
