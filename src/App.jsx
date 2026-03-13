@@ -752,7 +752,6 @@ function GameTablePage({
   onOpenHelp,
   onOpenNewGame,
   onOpenJoinGame,
-  onOpenSwitchGame,
   isDealingCards,
   isStartingOver,
   isSubmittingBid,
@@ -761,7 +760,6 @@ function GameTablePage({
   isRenamingPlayer,
   isSortingCards,
   isLoadingRejoinGames,
-  hasRejoinableGames,
 }) {
   const viewerHand = getViewerHand(game)
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -1853,17 +1851,6 @@ function GameTablePage({
               >
                 Join Game
               </button>
-              <button
-                type="button"
-                className="btn-secondary w-[90%] px-4 py-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => {
-                  setIsMenuModalOpen(false)
-                  onOpenSwitchGame?.()
-                }}
-                disabled={isLoadingRejoinGames || !hasRejoinableGames}
-              >
-                Switch Game
-              </button>
               {isOwner ? (
                 <button
                   type="button"
@@ -1936,7 +1923,6 @@ function GameTablePage({
 export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
-  const [isRejoinModalOpen, setIsRejoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [maxCards, setMaxCards] = useState('10')
   const [joinGameId, setJoinGameId] = useState('')
@@ -2180,13 +2166,10 @@ export default function App() {
 
   const closeJoinModal = () => {
     setIsJoinModalOpen(false)
+    setSelectedRejoinGameId('')
     setJoinGameId('')
     setJoinPlayerName('')
     setJoinErrors({})
-  }
-
-  const closeRejoinModal = () => {
-    setIsRejoinModalOpen(false)
   }
 
   const handleCreateGame = async (event) => {
@@ -2248,6 +2231,12 @@ export default function App() {
 
   const handleJoinGame = async (event) => {
     event.preventDefault()
+
+    if (selectedRejoinGameId) {
+      await handleRejoinGame(event)
+      return
+    }
+
     const errors = {}
     const trimmedPlayerName = joinPlayerName.trim()
     const playerNameError = validatePlayerName(joinPlayerName)
@@ -2354,7 +2343,7 @@ export default function App() {
       setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(selectedGame.gameId)
-      closeRejoinModal()
+      closeJoinModal()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to rejoin game'
       setRequestError(message)
@@ -2720,11 +2709,6 @@ export default function App() {
   }
 
   const resetActiveSessionState = () => {
-    const activeGameId = ownerSession?.gameId ?? playerSession?.gameId
-    if (activeGameId) {
-      clearStoredGameSession(activeGameId)
-    }
-
     if (aiPauseTimeoutRef.current) {
       clearTimeout(aiPauseTimeoutRef.current)
       aiPauseTimeoutRef.current = null
@@ -2742,6 +2726,7 @@ export default function App() {
     setPlayerSession(null)
     setGameError('')
     setLobbyInfo('')
+    setSessionInfo(null)
     setPersistedEndOfRoundSummary(null)
     setIsEndOfRoundModalDismissed(false)
     clearGameIdInUrl()
@@ -2794,14 +2779,6 @@ export default function App() {
     setSessionInfo(null)
     setIsCreateModalOpen(false)
     setIsJoinModalOpen(true)
-  }
-
-  const handleOpenSwitchGame = () => {
-    setRequestError('')
-    setSessionInfo(null)
-    setIsCreateModalOpen(false)
-    setIsJoinModalOpen(false)
-    setIsRejoinModalOpen(true)
   }
 
   const handleDealCards = async () => {
@@ -3124,54 +3101,6 @@ export default function App() {
   }
 
   const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
-  const rejoinModal = isRejoinModalOpen ? (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-      onClick={closeRejoinModal}
-    >
-      <div
-        className="dialog-surface w-full max-w-md p-6 text-left"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 className="text-xl font-semibold">Rejoin Game</h2>
-        <form className="mt-4 flex flex-col gap-4" onSubmit={handleRejoinGame}>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm text-muted">Stored Game</span>
-            <select
-              value={selectedRejoinGameId}
-              onChange={(event) => setSelectedRejoinGameId(event.target.value)}
-              className="input-surface"
-              disabled={isRejoiningGame || rejoinableGames.length === 0}
-            >
-              {rejoinableGames.map((game) => (
-                <option key={game.gameId} value={game.gameId}>
-                  {game.gameId} ({game.phase})
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="mt-2 flex justify-end gap-3">
-            <button
-              type="button"
-              className="btn-secondary px-4 py-2"
-              onClick={closeRejoinModal}
-              disabled={isRejoiningGame}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isRejoiningGame || rejoinableGames.length === 0}
-              className="btn-primary px-4 py-2 disabled:opacity-50"
-            >
-              {isRejoiningGame ? 'Rejoining...' : 'Continue'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  ) : null
   const helpModal = isHelpModalOpen ? (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
@@ -3412,7 +3341,6 @@ export default function App() {
           onOpenHelp={() => setIsHelpModalOpen(true)}
           onOpenNewGame={handleOpenNewGame}
           onOpenJoinGame={handleOpenJoinGame}
-          onOpenSwitchGame={handleOpenSwitchGame}
           isDealingCards={isDealingCards}
           isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
@@ -3421,7 +3349,6 @@ export default function App() {
           isRenamingPlayer={isRenamingPlayer}
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}
-          hasRejoinableGames={rejoinableGames.length > 0}
         />
 
         {isBidModalOpen && (
@@ -3556,7 +3483,6 @@ export default function App() {
             </div>
           </div>
         )}
-        {rejoinModal}
         {helpModal}
       </>
     )
@@ -3725,7 +3651,6 @@ export default function App() {
             </div>
           </div>
         </section>
-        {rejoinModal}
         {helpModal}
       </main>
     )
@@ -3764,14 +3689,6 @@ export default function App() {
             onClick={() => setIsJoinModalOpen(true)}
           >
             Join Game
-          </button>
-          <button
-            type="button"
-            className="btn-secondary px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => setIsRejoinModalOpen(true)}
-            disabled={isLoadingRejoinGames || rejoinableGames.length === 0}
-          >
-            Continue Game
           </button>
           <button
             type="button"
@@ -3869,6 +3786,36 @@ export default function App() {
           >
             <h2 className="text-xl font-semibold">Join Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleJoinGame}>
+              {rejoinableGames.length > 0 ? (
+                <>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm text-muted">Saved Sessions</span>
+                    <select
+                      value={selectedRejoinGameId}
+                      onChange={(event) => {
+                        const nextGameId = event.target.value
+                        setSelectedRejoinGameId(nextGameId)
+                        if (nextGameId) {
+                          setJoinGameId(nextGameId)
+                          setJoinErrors((prev) => ({ ...prev, gameId: undefined, playerName: undefined }))
+                        }
+                      }}
+                      className="input-surface"
+                      disabled={isLoadingRejoinGames || isRejoiningGame}
+                    >
+                      <option value="">Select a saved session</option>
+                      {rejoinableGames.map((game) => (
+                        <option key={game.gameId} value={game.gameId}>
+                          {game.gameId} ({game.phase})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="border-t border-white/10" />
+                </>
+              ) : null}
+
               <label className="flex flex-col gap-2">
                 <span className="text-sm text-muted">Game ID</span>
                 <input
@@ -3880,6 +3827,7 @@ export default function App() {
                   }}
                   className="input-surface"
                   placeholder="Enter game ID"
+                  disabled={Boolean(selectedRejoinGameId)}
                 />
                 {joinErrors.gameId && (
                   <span className="text-sm text-red-300">{joinErrors.gameId}</span>
@@ -3898,6 +3846,7 @@ export default function App() {
                   className="input-surface"
                   placeholder="Enter your name"
                   maxLength={MAX_PLAYER_NAME_LENGTH}
+                  disabled={Boolean(selectedRejoinGameId)}
                 />
                 {joinErrors.playerName && (
                   <span className="text-sm text-red-300">{joinErrors.playerName}</span>
@@ -3914,17 +3863,22 @@ export default function App() {
                 </button>
                   <button
                     type="submit"
-                    disabled={isJoiningGame}
+                    disabled={isJoiningGame || isRejoiningGame}
                   className="btn-primary px-4 py-2"
                   >
-                  {isJoiningGame ? 'Joining...' : 'Join Game'}
+                  {selectedRejoinGameId
+                    ? isRejoiningGame
+                      ? 'Rejoining...'
+                      : 'Join Game'
+                    : isJoiningGame
+                      ? 'Joining...'
+                      : 'Join Game'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      {rejoinModal}
       {helpModal}
     </main>
   )
