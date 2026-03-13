@@ -3252,6 +3252,28 @@ export default function App() {
                   the seat of any AI players in the game. Players remain in the Lobby until the game owner starts the game.
                 </p>
               </section>
+              <section className="mt-4">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">During the Game</h4>
+                <p className="mt-2">
+                  During the game, the main table shows the current round, score, tricks, trump, and your hand. Action buttons appear
+                  based on the current phase, such as dealing, bidding, playing a card, sorting your hand, or starting over when the
+                  game is finished.
+                </p>
+                <p className="mt-2">
+                  The score area keeps track of bids, books, total score, and dealer position so players can quickly see how the round
+                  is unfolding.
+                </p>
+              </section>
+              <section className="mt-4">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">Game Menu</h4>
+                <p className="mt-2">
+                  The game menu can be opened during play to access common actions. From there, players can review their name, copy the
+                  game link from the game ID button, start a new game, join another game, switch to a stored game, or open this Help panel.
+                </p>
+                <p className="mt-2">
+                  The game owner also has access to owner-only actions like resetting the current game when appropriate.
+                </p>
+              </section>
             </>
           ) : (
             <>
