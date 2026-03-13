@@ -835,11 +835,15 @@ function GameTablePage({
   const [scorePlayerNameDraft, setScorePlayerNameDraft] = useState('')
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
+  const [revealedCompletedTrick, setRevealedCompletedTrick] = useState(null)
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
   const selectedTrickCardTimeoutRef = useRef(null)
   const mobileActionBarRef = useRef(null)
   const reactionPickerRef = useRef(null)
+  const hasAutoOpenedGameOverScoreRef = useRef(false)
+  const gameOverScoreTimeoutRef = useRef(null)
+  const previousPhaseStageRef = useRef(game?.phase?.stage)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -859,11 +863,13 @@ function GameTablePage({
         : game.phase?.stage === 'Dealing'
           ? 'Deal'
           : ''
-  const displayedTrick = bookWinnerMessage && latestCompletedTrick ? latestCompletedTrick : currentTrick
+  const isGameOver = game.phase?.stage === 'GameOver'
+  const isTrickWinnerRevealVisible = Boolean(bookWinnerMessage)
+  const displayedTrick = revealedCompletedTrick ?? currentTrick
   const displayedTrickPlays = displayedTrick?.plays ?? []
   const winningDisplayedTrickCardIndex =
-    bookWinnerMessage && latestCompletedTrick?.winnerPlayerId
-      ? latestCompletedTrick.plays.findIndex((play) => play.playerId === latestCompletedTrick.winnerPlayerId)
+    revealedCompletedTrick?.winnerPlayerId
+      ? revealedCompletedTrick.plays.findIndex((play) => play.playerId === revealedCompletedTrick.winnerPlayerId)
       : null
   const selectedCard =
     selectedCardIndex !== null && viewerHand?.cards?.[selectedCardIndex]
@@ -927,6 +933,39 @@ function GameTablePage({
       })),
     )
   }, [activeReactions.length, reactionLayouts])
+
+  useEffect(() => {
+    const currentPhaseStage = game?.phase?.stage
+    if (!currentPhaseStage || previousPhaseStageRef.current === currentPhaseStage) {
+      return
+    }
+
+    const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : null
+    const currentTrickIndex = game?.phase && 'cards' in game.phase ? game.phase.cards.trickIndex : null
+    const trumpSuit = game?.phase && 'cards' in game.phase ? game.phase.cards.trump?.suit ?? null : null
+    const currentTrickPlayCount = game?.phase && 'cards' in game.phase ? game.phase.cards.currentTrick?.plays?.length ?? 0 : null
+    const completedTrickCount = game?.phase && 'cards' in game.phase ? game.phase.cards.completedTricks?.length ?? 0 : null
+    const bidCount = game?.phase?.stage === 'Bidding' ? game.phase.bids?.length ?? 0 : null
+
+    console.log('[phase] stage changed', {
+      gameId: game?.id,
+      version: game?.version ?? null,
+      previousStage: previousPhaseStageRef.current ?? null,
+      stage: currentPhaseStage,
+      roundIndex: currentRoundIndex,
+      turnPlayerId: currentTurnPlayerId ?? null,
+      dealerPlayerId: game?.phase?.dealerPlayerId ?? null,
+      viewerPlayerId: viewerPlayerId ?? null,
+      currentTrickIndex,
+      currentTrickPlayCount,
+      completedTrickCount,
+      bidCount,
+      trumpSuit,
+      winnerPlayerId: latestCompletedTrick?.winnerPlayerId ?? null,
+    })
+
+    previousPhaseStageRef.current = currentPhaseStage
+  }, [currentTurnPlayerId, game, latestCompletedTrick?.winnerPlayerId, viewerPlayerId])
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
       return {
@@ -1063,26 +1102,62 @@ function GameTablePage({
   }, [isReactionModalOpen])
 
   useEffect(() => {
-    const latestTrick = completedTricks[completedTricks.length - 1]
+    previousCompletedTrickCountRef.current = completedTricks.length
+    setBookWinnerMessage('')
+    setRevealedCompletedTrick(null)
+    hasAutoOpenedGameOverScoreRef.current = false
 
-    if (completedTricks.length > previousCompletedTrickCountRef.current && latestTrick?.winnerPlayerId) {
+    if (bookWinnerTimeoutRef.current) {
+      clearTimeout(bookWinnerTimeoutRef.current)
+      bookWinnerTimeoutRef.current = null
+    }
+  }, [game?.id])
+
+  useEffect(() => {
+    if (isGameOver && !bookWinnerMessage && !hasAutoOpenedGameOverScoreRef.current) {
+      setIsScoreModalOpen(true)
+      hasAutoOpenedGameOverScoreRef.current = true
+    }
+
+    if (!isGameOver) {
+      hasAutoOpenedGameOverScoreRef.current = false
+    }
+  }, [bookWinnerMessage, isGameOver])
+
+  useEffect(() => {
+    const latestTrick = completedTricks[completedTricks.length - 1]
+    const previousCompletedTrickCount = previousCompletedTrickCountRef.current
+
+    if (completedTricks.length < previousCompletedTrickCount) {
+      setBookWinnerMessage('')
+      setRevealedCompletedTrick(null)
+      if (bookWinnerTimeoutRef.current) {
+        clearTimeout(bookWinnerTimeoutRef.current)
+        bookWinnerTimeoutRef.current = null
+      }
+    } else if (completedTricks.length > previousCompletedTrickCount && latestTrick?.winnerPlayerId) {
+      setRevealedCompletedTrick(latestTrick)
       setBookWinnerMessage(`${getPlayerName(game, latestTrick.winnerPlayerId)} won the book!`)
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
       }
       bookWinnerTimeoutRef.current = setTimeout(() => {
         setBookWinnerMessage('')
+        setRevealedCompletedTrick(null)
         bookWinnerTimeoutRef.current = null
       }, TRICK_COMPLETE_DELAY_MS)
     }
 
     previousCompletedTrickCountRef.current = completedTricks.length
-  }, [game?.version])
+  }, [completedTricks, game, game?.version])
 
   useEffect(() => {
     return () => {
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
+      }
+      if (gameOverScoreTimeoutRef.current) {
+        clearTimeout(gameOverScoreTimeoutRef.current)
       }
       if (selectedTrickCardTimeoutRef.current) {
         clearTimeout(selectedTrickCardTimeoutRef.current)
@@ -1376,7 +1451,9 @@ function GameTablePage({
           <article className="score-scroll hidden min-h-0 max-h-full self-start overflow-auto rounded-2xl border border-white/10 bg-[rgba(35,35,35,0.25)] pb-4 pl-4 pr-1 pt-4 md:block">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Score</h2>
-              {currentRoundConfig ? (
+              {isGameOver ? (
+                <p className="text-lg font-medium text-muted">Game Over</p>
+              ) : currentRoundConfig ? (
                 <p className="text-lg font-medium text-muted">
                   <span>{`Round ${currentRoundConfig.cardCount} `}</span>
                   <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
@@ -1419,7 +1496,7 @@ function GameTablePage({
             }}
           >
             <div className="mb-3 flex min-h-7 items-center justify-center">
-              {isViewerTurn ? (
+              {isGameOver || isTrickWinnerRevealVisible ? null : isViewerTurn ? (
                 <p className="status-turn px-6 py-2 text-xl font-semibold">
                   {viewerTurnMessage}
                 </p>
@@ -1517,7 +1594,7 @@ function GameTablePage({
                   ))
                 ) : (
                   <li className="self-center text-sm text-dim">
-                    No cards played in this trick yet.
+                    {isGameOver ? '' : 'No cards played in this trick yet.'}
                   </li>
                 )}
               </ul>
@@ -1595,7 +1672,7 @@ function GameTablePage({
                 )
               })
             ) : (
-              <p className="text-sm text-dim">No cards in hand yet.</p>
+              <p className="text-sm text-dim">{isGameOver ? '' : 'No cards in hand yet.'}</p>
             )}
           </div>
           <div className="hidden md:block">
@@ -1616,7 +1693,7 @@ function GameTablePage({
       </div>
       {isScoreModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 md:hidden"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
           onClick={() => setIsScoreModalOpen(false)}
         >
           <div
@@ -1625,7 +1702,9 @@ function GameTablePage({
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-white">Score</h2>
-              {currentRoundConfig ? (
+              {isGameOver ? (
+                <p className="text-lg font-medium text-muted">Game Over</p>
+              ) : currentRoundConfig ? (
                 <p className="text-lg font-medium text-muted">
                   <span>{`Round ${currentRoundConfig.cardCount} `}</span>
                   <span className="text-lg">{currentRoundConfig.direction === 'up' ? '⬆' : '⬇'}</span>
@@ -1982,6 +2061,8 @@ export default function App() {
   const gameErrorTimeoutRef = useRef(null)
   const shareLinkCopiedTimeoutRef = useRef(null)
   const reactionCooldownTimeoutRef = useRef(null)
+  const endOfRoundSummaryTimeoutRef = useRef(null)
+  const gameOverScoreTimeoutRef = useRef(null)
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
@@ -1994,6 +2075,14 @@ export default function App() {
     if (reactionCooldownTimeoutRef.current) {
       clearTimeout(reactionCooldownTimeoutRef.current)
       reactionCooldownTimeoutRef.current = null
+    }
+    if (endOfRoundSummaryTimeoutRef.current) {
+      clearTimeout(endOfRoundSummaryTimeoutRef.current)
+      endOfRoundSummaryTimeoutRef.current = null
+    }
+    if (gameOverScoreTimeoutRef.current) {
+      clearTimeout(gameOverScoreTimeoutRef.current)
+      gameOverScoreTimeoutRef.current = null
     }
   }, [])
 
@@ -2010,6 +2099,14 @@ export default function App() {
     if (gameErrorTimeoutRef.current) {
       clearTimeout(gameErrorTimeoutRef.current)
       gameErrorTimeoutRef.current = null
+    }
+    if (endOfRoundSummaryTimeoutRef.current) {
+      clearTimeout(endOfRoundSummaryTimeoutRef.current)
+      endOfRoundSummaryTimeoutRef.current = null
+    }
+    if (gameOverScoreTimeoutRef.current) {
+      clearTimeout(gameOverScoreTimeoutRef.current)
+      gameOverScoreTimeoutRef.current = null
     }
 
     aiPauseUntilRef.current = 0
@@ -2549,7 +2646,29 @@ export default function App() {
 
     latestShownRoundIndexRef.current = latestCompletedRoundIndex
     setPersistedEndOfRoundSummary(summary)
-    setIsEndOfRoundModalDismissed(false)
+
+    if (endOfRoundSummaryTimeoutRef.current) {
+      clearTimeout(endOfRoundSummaryTimeoutRef.current)
+      endOfRoundSummaryTimeoutRef.current = null
+    }
+
+    if (activeGame.phase?.stage === 'GameOver') {
+      setIsEndOfRoundModalDismissed(true)
+      return
+    }
+
+    setIsEndOfRoundModalDismissed(true)
+    endOfRoundSummaryTimeoutRef.current = setTimeout(() => {
+      setIsEndOfRoundModalDismissed(false)
+      endOfRoundSummaryTimeoutRef.current = null
+    }, TRICK_COMPLETE_DELAY_MS)
+
+    return () => {
+      if (endOfRoundSummaryTimeoutRef.current) {
+        clearTimeout(endOfRoundSummaryTimeoutRef.current)
+        endOfRoundSummaryTimeoutRef.current = null
+      }
+    }
   }, [activeGame, completedRoundCount])
 
   const orderedPlayers = useMemo(() => {
@@ -2741,6 +2860,14 @@ export default function App() {
     if (gameErrorTimeoutRef.current) {
       clearTimeout(gameErrorTimeoutRef.current)
       gameErrorTimeoutRef.current = null
+    }
+    if (endOfRoundSummaryTimeoutRef.current) {
+      clearTimeout(endOfRoundSummaryTimeoutRef.current)
+      endOfRoundSummaryTimeoutRef.current = null
+    }
+    if (gameOverScoreTimeoutRef.current) {
+      clearTimeout(gameOverScoreTimeoutRef.current)
+      gameOverScoreTimeoutRef.current = null
     }
     setOwnerSession(null)
     setPlayerSession(null)
