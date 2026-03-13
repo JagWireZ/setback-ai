@@ -1,6 +1,9 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { pruneActiveReactions } from "../helpers/reducer/gameState/reactions";
+import {
+  REACTION_COOLDOWN_MS,
+  pruneActiveReactions,
+} from "../helpers/reducer/gameState/reactions";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 
@@ -21,6 +24,15 @@ export const sendReaction = (
   }
 
   const now = Date.now();
+  const activeReactions = pruneActiveReactions(existingGame.reactions ?? [], now);
+  const lastPlayerReaction = [...activeReactions]
+    .reverse()
+    .find((reaction) => reaction.playerId === playerToken.playerId);
+
+  if (lastPlayerReaction && now - lastPlayerReaction.createdAt < REACTION_COOLDOWN_MS) {
+    return existingGame;
+  }
+
   const nextReaction = {
     id: `${playerToken.playerId}-${now}`,
     playerId: playerToken.playerId,
@@ -29,6 +41,6 @@ export const sendReaction = (
   };
 
   return withNextVersion(existingGame, {
-    reactions: pruneActiveReactions([...(existingGame.reactions ?? []), nextReaction], now),
+    reactions: pruneActiveReactions([...activeReactions, nextReaction], now),
   });
 };

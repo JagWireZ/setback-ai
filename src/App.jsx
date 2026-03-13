@@ -136,6 +136,7 @@ const SUIT_SYMBOLS = {
 }
 
 const REACTION_EMOJIS = ['😀', '😂', '😮', '😢', '😡', '👏', '🔥', '🎉']
+const REACTION_COOLDOWN_MS = 5000
 
 const hashString = (value) => {
   let hash = 0
@@ -757,6 +758,7 @@ function GameTablePage({
   isSubmittingBid,
   isPlayingCard,
   isSendingReaction,
+  isReactionOnCooldown,
   isRenamingPlayer,
   isSortingCards,
   isLoadingRejoinGames,
@@ -1276,7 +1278,7 @@ function GameTablePage({
                       // Keep the picker open so the user can retry.
                     }
                   }}
-                  disabled={isSendingReaction}
+                  disabled={isSendingReaction || isReactionOnCooldown}
                   aria-label={`Send ${emoji} reaction`}
                 >
                   {emoji}
@@ -1289,7 +1291,7 @@ function GameTablePage({
           type="button"
           className="min-h-12 border-0 bg-transparent px-1 py-1 text-3xl leading-none text-white transition hover:scale-110 disabled:opacity-50"
           onClick={() => setIsReactionModalOpen((current) => !current)}
-          disabled={isSendingReaction || typeof onSendReaction !== 'function'}
+          disabled={isSendingReaction || isReactionOnCooldown || typeof onSendReaction !== 'function'}
           aria-label="Open reactions"
         >
           😀
@@ -1960,6 +1962,7 @@ export default function App() {
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const [helpSection, setHelpSection] = useState('using-app')
+  const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
@@ -1967,13 +1970,19 @@ export default function App() {
   const hydratedRoundSummaryGameIdRef = useRef('')
   const gameErrorTimeoutRef = useRef(null)
   const shareLinkCopiedTimeoutRef = useRef(null)
+  const reactionCooldownTimeoutRef = useRef(null)
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isStartingOver
+  const isReactionOnCooldown = reactionCooldownUntil > Date.now()
 
   useEffect(() => () => {
     if (shareLinkCopiedTimeoutRef.current) {
       clearTimeout(shareLinkCopiedTimeoutRef.current)
       shareLinkCopiedTimeoutRef.current = null
+    }
+    if (reactionCooldownTimeoutRef.current) {
+      clearTimeout(reactionCooldownTimeoutRef.current)
+      reactionCooldownTimeoutRef.current = null
     }
   }, [])
 
@@ -2944,7 +2953,7 @@ export default function App() {
 
   const handleSendReaction = async (emoji) => {
     const activeSession = ownerSession ?? playerSession
-    if (!activeSession?.gameId || !activeSession?.playerToken) {
+    if (!activeSession?.gameId || !activeSession?.playerToken || isReactionOnCooldown) {
       return
     }
 
@@ -2985,6 +2994,16 @@ export default function App() {
             : prev,
         )
       }
+
+      const nextCooldownUntil = Date.now() + REACTION_COOLDOWN_MS
+      setReactionCooldownUntil(nextCooldownUntil)
+      if (reactionCooldownTimeoutRef.current) {
+        clearTimeout(reactionCooldownTimeoutRef.current)
+      }
+      reactionCooldownTimeoutRef.current = setTimeout(() => {
+        setReactionCooldownUntil(0)
+        reactionCooldownTimeoutRef.current = null
+      }, REACTION_COOLDOWN_MS)
 
       console.log('[reactions] send success', {
         emoji,
@@ -3346,6 +3365,7 @@ export default function App() {
           isSubmittingBid={isSubmittingBid}
           isPlayingCard={isPlayingCard}
           isSendingReaction={isSendingReaction}
+          isReactionOnCooldown={isReactionOnCooldown}
           isRenamingPlayer={isRenamingPlayer}
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}

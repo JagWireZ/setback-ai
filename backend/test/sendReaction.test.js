@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { sendReaction } = require("../dist/backend/engine/reducer/sendReaction.js");
+const { REACTION_COOLDOWN_MS } = require("../dist/backend/engine/helpers/reducer/gameState/reactions.js");
 
 const createGame = () => ({
   id: "game-1",
@@ -55,4 +56,36 @@ test("sendReaction rejects an invalid player token", () => {
       }),
     /invalid player token/i,
   );
+});
+
+test("sendReaction ignores extra reactions from the same player inside 5 seconds", () => {
+  const originalNow = Date.now;
+
+  try {
+    Date.now = () => 1_000;
+    const initial = sendReaction(createGame(), {
+      action: "sendReaction",
+      payload: {
+        gameId: "game-1",
+        playerToken: "token-2",
+        emoji: "🔥",
+      },
+    });
+
+    Date.now = () => 1_000 + REACTION_COOLDOWN_MS - 1;
+    const ignored = sendReaction(initial, {
+      action: "sendReaction",
+      payload: {
+        gameId: "game-1",
+        playerToken: "token-2",
+        emoji: "👏",
+      },
+    });
+
+    assert.equal(ignored, initial);
+    assert.equal(ignored.reactions.length, 1);
+    assert.equal(ignored.reactions[0].emoji, "🔥");
+  } finally {
+    Date.now = originalNow;
+  }
 });

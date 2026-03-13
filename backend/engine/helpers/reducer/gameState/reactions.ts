@@ -1,5 +1,6 @@
 import type { Reaction } from "@shared/types/game";
 
+export const REACTION_COOLDOWN_MS = 5000;
 export const REACTION_TTL_MS = 5000;
 const MAX_REACTIONS = 20;
 
