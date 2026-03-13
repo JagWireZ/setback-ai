@@ -1958,7 +1958,7 @@ export default function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
-  const [maxCards, setMaxCards] = useState('10')
+  const [selectedMaxCards, setSelectedMaxCards] = useState('10')
   const [joinGameId, setJoinGameId] = useState('')
   const [selectedRejoinGameId, setSelectedRejoinGameId] = useState('')
   const [joinPlayerName, setJoinPlayerName] = useState('')
@@ -2104,6 +2104,7 @@ export default function App() {
           ownerPlayerId: restoredSession.ownerPlayerId,
         })
         setSelectedDealerPlayerId(restoredSession.ownerPlayerId)
+        setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setPlayerSession(null)
         setIsJoinModalOpen(false)
         saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'owner')
@@ -2219,7 +2220,6 @@ export default function App() {
   const closeCreateModal = () => {
     setIsCreateModalOpen(false)
     setPlayerName('')
-    setMaxCards('10')
     setCreateErrors({})
   }
 
@@ -2241,10 +2241,6 @@ export default function App() {
       errors.playerName = playerNameError
     }
 
-    if (!maxCards) {
-      errors.maxCards = 'Max Cards is required.'
-    }
-
     if (Object.keys(errors).length > 0) {
       setCreateErrors(errors)
       return
@@ -2257,7 +2253,6 @@ export default function App() {
     try {
       const result = await createGame({
         playerName: trimmedPlayerName,
-        maxCards: Number(maxCards),
       })
       setSessionInfo({
         action: 'createGame',
@@ -2274,6 +2269,7 @@ export default function App() {
       setSelectedDealerPlayerId(
         result?.game?.players?.find((player) => player.type === 'human')?.id ?? '',
       )
+      setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setPlayerSession(null)
       setGameError('')
       setLobbyInfo('')
@@ -2770,6 +2766,7 @@ export default function App() {
       const result = await startGame({
         gameId: ownerSession.gameId,
         playerToken: ownerSession.playerToken,
+        maxCards: Number(selectedMaxCards),
         dealerPlayerId: selectedDealerPlayerId || undefined,
       })
       setOwnerSession((prev) =>
@@ -2845,6 +2842,7 @@ export default function App() {
           : prev,
       )
       setSelectedDealerPlayerId(ownerSession.ownerPlayerId ?? '')
+      setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setLobbyInfo('Game reset to lobby.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start over'
@@ -3229,9 +3227,8 @@ export default function App() {
                 <div className="mt-4">
                   <h5 className="text-sm font-semibold text-white">New Game</h5>
                   <p className="mt-2">
-                    When creating a new game, a user is prompted to enter their name and the max card count, which is how many cards
-                    players will have in their hand during the start of the first and last round. After creating the new game, the
-                    user becomes the game owner and is placed in the Lobby.
+                    When creating a new game, a user is prompted to enter their name. After the game is created, that user becomes
+                    the game owner and enters the Lobby.
                   </p>
                 </div>
                 <div className="mt-4">
@@ -3249,10 +3246,15 @@ export default function App() {
                   more players can join in. The game will always have a full amount of players by filling empty seats with AI players. When
                   someone else joins, that player will take the seat of an AI player.
                 </p>
-                <p className="mt-2">
-                  Game owners have the ability to adjust the player order, remove human players. and set who deals first. When the game owner
-                  is ready to proceed, they can click the Start Game button to begin.
-                </p>
+                <div className="mt-2">
+                  <p>Game owners can do the following before the game starts:</p>
+                  <ul className="mt-2 ml-4 list-disc space-y-1 pl-5">
+                    <li>Adjust the seating order to control turn order and dealer rotation.</li>
+                    <li>Remove human players from the game, which returns their seat to an AI player.</li>
+                    <li>Choose Max Cards, which sets the largest hand size used in the round sequence.</li>
+                    <li>Choose which player deals first when the game begins.</li>
+                  </ul>
+                </div>
                 <p className="mt-2">
                   For other players, the lobby is mainly a waiting area. They can watch other players join. As others join, they will take
                   the seat of any AI players in the game. Players remain in the Lobby until the game owner starts the game.
@@ -3593,22 +3595,43 @@ export default function App() {
                 <div className="flex items-center justify-between gap-4">
                   <h2 className="text-lg font-semibold">Players</h2>
                   {isOwnerLobby && (
-                    <label className="flex items-center gap-2 text-sm text-muted">
-                      <span>Dealer</span>
-                      <select
-                        value={selectedDealerPlayerId}
-                        onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
-                        disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-                        className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
-                        aria-label="Select dealer"
-                      >
-                        {orderedPlayers.map((player) => (
-                          <option key={player.id} value={player.id}>
-                            {player.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+                      <label className="flex items-center gap-2">
+                        <span>Max Cards</span>
+                        <select
+                          value={selectedMaxCards}
+                          onChange={(event) => setSelectedMaxCards(event.target.value)}
+                          disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                          className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
+                          aria-label="Select max cards"
+                        >
+                          {Array.from({ length: 10 }, (_, index) => {
+                            const value = String(10 - index)
+                            return (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <span>Dealer</span>
+                        <select
+                          value={selectedDealerPlayerId}
+                          onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
+                          disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                          className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
+                          aria-label="Select dealer"
+                        >
+                          {orderedPlayers.map((player) => (
+                            <option key={player.id} value={player.id}>
+                              {player.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
                   )}
                 </div>
                 <ul className="mt-3 flex flex-col gap-2">
@@ -3775,30 +3798,6 @@ export default function App() {
                 />
                 {createErrors.playerName && (
                   <span className="text-sm text-red-300">{createErrors.playerName}</span>
-                )}
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-sm text-muted">Max Cards</span>
-                <select
-                  value={maxCards}
-                  onChange={(event) => {
-                    setMaxCards(event.target.value)
-                    setCreateErrors((prev) => ({ ...prev, maxCards: undefined }))
-                  }}
-                  className="input-surface"
-                >
-                  {Array.from({ length: 10 }, (_, index) => {
-                    const value = String(10 - index)
-                    return (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    )
-                  })}
-                </select>
-                {createErrors.maxCards && (
-                  <span className="text-sm text-red-300">{createErrors.maxCards}</span>
                 )}
               </label>
 

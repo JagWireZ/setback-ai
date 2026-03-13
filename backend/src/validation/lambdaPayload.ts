@@ -10,14 +10,10 @@ export function assertCreateGamePayload(
     throw new Error("Invalid action for createGame payload validation");
   }
 
-  const { playerName, maxCards, blindBid } = event.payload;
+  const { playerName, blindBid } = event.payload;
 
   if (typeof playerName !== "string" || playerName.trim().length === 0) {
     throw new Error("createGame requires payload.playerName");
-  }
-
-  if (!isCardCount(maxCards)) {
-    throw new Error("createGame requires payload.maxCards (1-10)");
   }
 
   if (typeof blindBid !== "undefined" && typeof blindBid !== "boolean") {
@@ -105,7 +101,7 @@ export function assertStartGamePayload(
     throw new Error("Invalid action for startGame payload validation");
   }
 
-  const { gameId, playerToken, dealerPlayerId } = event.payload;
+  const { gameId, playerToken, maxCards, dealerPlayerId } = event.payload;
 
   if (typeof gameId !== "string" || gameId.trim().length === 0) {
     throw new Error("startGame requires payload.gameId");
@@ -113,6 +109,10 @@ export function assertStartGamePayload(
 
   if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
     throw new Error("startGame requires payload.playerToken");
+  }
+
+  if (!isCardCount(maxCards)) {
+    throw new Error("startGame requires payload.maxCards (1-10)");
   }
 
   if (typeof dealerPlayerId !== "undefined" && (typeof dealerPlayerId !== "string" || dealerPlayerId.trim().length === 0)) {

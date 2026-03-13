@@ -15,6 +15,10 @@ export const startOver = (
 
   return withNextVersion(existingGame, {
     phase: { stage: "Lobby" },
+    options: {
+      ...existingGame.options,
+      rounds: [],
+    },
     scores: existingGame.players.map((player) => buildScore(player.id)),
     reactions: [],
   });

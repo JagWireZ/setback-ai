@@ -66,6 +66,7 @@ test("startOver resets an in-progress game back to lobby and clears scores", () 
   });
 
   assert.equal(updated.phase.stage, "Lobby");
+  assert.deepEqual(updated.options.rounds, []);
   assert.deepEqual(
     updated.scores.map((score) => ({
       playerId: score.playerId,
@@ -89,6 +90,7 @@ test("startOver also allows resetting a game that is already in the lobby", () =
   });
 
   assert.equal(updated.phase.stage, "Lobby");
+  assert.deepEqual(updated.options.rounds, []);
   assert.deepEqual(
     updated.scores.map((score) => ({
       playerId: score.playerId,

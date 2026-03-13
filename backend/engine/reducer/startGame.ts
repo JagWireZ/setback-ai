@@ -3,6 +3,7 @@ import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
+import { generateRounds } from "../helpers/generateRounds";
 
 export const startGame = (
   game: Game | undefined,
@@ -18,6 +19,7 @@ export const startGame = (
   }
 
   const selectedDealerPlayerId = event.payload.dealerPlayerId;
+  const rounds = generateRounds(event.payload.maxCards);
   let nextPlayerOrder = existingGame.playerOrder;
 
   if (selectedDealerPlayerId) {
@@ -34,10 +36,20 @@ export const startGame = (
 
   const nextPhase = advancePhase({
     ...existingGame,
+    options: {
+      ...existingGame.options,
+      maxCards: event.payload.maxCards,
+      rounds,
+    },
     playerOrder: nextPlayerOrder,
   });
 
   return withNextVersion(existingGame, {
+    options: {
+      ...existingGame.options,
+      maxCards: event.payload.maxCards,
+      rounds,
+    },
     playerOrder: nextPlayerOrder,
     phase: nextPhase,
   });

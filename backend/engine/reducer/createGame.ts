@@ -1,7 +1,6 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game, Player } from "@shared/types/game";
 import { generateGameId } from "../helpers/generateGameId";
-import { generateRounds } from "../helpers/generateRounds";
 import { buildPlayer } from "../helpers/reducer/player/buildPlayer";
 import { getBotName } from "../helpers/reducer/player/getBotName";
 import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
@@ -34,9 +33,9 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
     phase: { stage: "Lobby" },
     ownerToken: hostPlayerToken.token,
     options: {
-      maxCards: event.payload.maxCards,
+      maxCards: 10,
       blindBid: event.payload.blindBid ?? false,
-      rounds: generateRounds(event.payload.maxCards),
+      rounds: [],
     },
     players: allPlayers,
     playerTokens,

@@ -22,7 +22,6 @@ type PublicAction = 'createGame' | 'joinGame'
 type ActionPayloadMap = {
   createGame: {
     playerName: string
-    maxCards: CardCount
     blindBid?: boolean
   }
   joinGame: {
@@ -34,6 +33,7 @@ type ActionPayloadMap = {
   }
   startGame: {
     gameId: string
+    maxCards: CardCount
     dealerPlayerId?: string
   }
   startOver: {

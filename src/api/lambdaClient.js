@@ -91,10 +91,9 @@ export const invokeLambda = async (action, payload) => {
   return data
 }
 
-export const createGame = ({ playerName, maxCards }) =>
+export const createGame = ({ playerName }) =>
   invokeLambda('createGame', {
     playerName,
-    maxCards,
   })
 
 export const joinGame = ({ gameId, playerName }) =>
@@ -146,10 +145,11 @@ export const sendReaction = ({ gameId, playerToken, emoji }) =>
     emoji,
   })
 
-export const startGame = ({ gameId, playerToken, dealerPlayerId }) =>
+export const startGame = ({ gameId, playerToken, maxCards, dealerPlayerId }) =>
   invokeLambda('startGame', {
     gameId: normalizeGameId(gameId),
     playerToken,
+    maxCards,
     dealerPlayerId,
   })
 

@@ -10,7 +10,6 @@ test("createGame assigns bot names from the curated pool", () => {
     action: "createGame",
     payload: {
       playerName: "Casey",
-      maxCards: 5,
     },
   });
 
@@ -21,6 +20,8 @@ test("createGame assigns bot names from the curated pool", () => {
   assert.ok(aiPlayers.every((player) => BOT_NAMES.includes(player.name)));
   assert.equal(new Set(aiNames).size, aiNames.length);
   assert.ok(aiNames.every((name) => name !== "Casey"));
+  assert.equal(result.game.options.maxCards, 10);
+  assert.deepEqual(result.game.options.rounds, []);
 });
 
 test("removePlayer replaces a human with an available curated bot name", () => {
