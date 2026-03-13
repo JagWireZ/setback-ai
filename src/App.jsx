@@ -368,27 +368,20 @@ function ScoreHistory({ game, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
       onClick={onClose}
     >
       <div
-        className="dialog-surface w-full max-w-4xl p-6 text-left"
+        className="dialog-surface flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden p-6 text-left"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Game History</h2>
-          <button
-            type="button"
-            className="btn-secondary px-3 py-2 text-sm"
-            onClick={onClose}
-          >
-            Close
-          </button>
         </div>
         {historyRounds.length === 0 ? (
           <p className="mt-4 text-sm text-dim">No completed rounds yet.</p>
         ) : (
-          <div className="mt-4 max-h-[70vh] overflow-auto pr-1">
+          <div className="mt-4 min-h-0 flex-1 overflow-auto pr-1">
             <div className="flex flex-col gap-4">
               {historyRounds.map((round) => {
                 const winningScore = round.players[0]?.score ?? null
@@ -435,6 +428,15 @@ function ScoreHistory({ game, onClose }) {
             </div>
           </div>
         )}
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            className="btn-secondary px-4 py-2 text-sm"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1635,11 +1637,11 @@ function GameTablePage({
       </div>
       {isScoreModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={() => setIsScoreModalOpen(false)}
         >
           <div
-            className="dialog-surface w-full max-w-md rounded-xl p-5"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-xl p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3">
@@ -1690,22 +1692,15 @@ function GameTablePage({
       ) : null}
       {selectedScorePlayer ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={closeScorePlayerModal}
         >
           <div
-            className="dialog-surface w-full max-w-md p-6 text-left"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">Manage Player</h2>
-              <button
-                type="button"
-                className="btn-secondary px-3 py-2 text-sm"
-                onClick={closeScorePlayerModal}
-              >
-                Close
-              </button>
             </div>
             <p className="mt-2 text-sm text-muted">{selectedScorePlayer.name}</p>
             <form
@@ -1770,13 +1765,22 @@ function GameTablePage({
                 >
                   {pendingPlayerActionId === selectedScorePlayer.id ? 'Removing...' : 'Remove Player'}
                 </button>
-                <button
-                  type="submit"
-                  className="btn-primary px-4 py-2 disabled:opacity-50"
-                  disabled={isRenamingPlayer || !scorePlayerNameDraft.trim()}
-                >
-                  {isRenamingPlayer ? 'Saving...' : 'Save'}
-                </button>
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2"
+                    onClick={closeScorePlayerModal}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary px-4 py-2 disabled:opacity-50"
+                    disabled={isRenamingPlayer || !scorePlayerNameDraft.trim()}
+                  >
+                    {isRenamingPlayer ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1784,11 +1788,11 @@ function GameTablePage({
       ) : null}
       {isMenuModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={() => setIsMenuModalOpen(false)}
         >
           <div
-            className="dialog-surface w-full max-w-sm p-6 text-left"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -1913,11 +1917,11 @@ function GameTablePage({
       )}
       {isResetConfirmModalOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
           onClick={() => setIsResetConfirmModalOpen(false)}
         >
           <div
-            className="dialog-surface w-full max-w-md p-6 text-left"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold text-white">Reset Game?</h2>
@@ -3178,22 +3182,15 @@ export default function App() {
   const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
   const helpModal = isHelpModalOpen ? (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
       onClick={() => setIsHelpModalOpen(false)}
     >
       <div
-        className="dialog-surface w-full max-w-2xl p-6 text-left"
+        className="dialog-surface flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden p-6 text-left"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Welcome to Setback</h2>
-          <button
-            type="button"
-            className="btn-secondary px-3 py-2 text-sm"
-            onClick={() => setIsHelpModalOpen(false)}
-          >
-            Close
-          </button>
         </div>
         <div className="mt-4 flex gap-2 border-b border-white/10 pb-4">
           <button
@@ -3219,7 +3216,7 @@ export default function App() {
             How to Play
           </button>
         </div>
-        <div className="score-scroll mt-4 max-h-[70vh] overflow-auto pr-1 text-sm text-muted">
+        <div className="score-scroll mt-4 min-h-0 flex-1 overflow-auto pr-1 text-sm text-muted">
           {helpSection === 'using-app' ? (
             <>
               <section>
@@ -3391,6 +3388,15 @@ export default function App() {
             </>
           )}
         </div>
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            className="btn-secondary px-4 py-2 text-sm"
+            onClick={() => setIsHelpModalOpen(false)}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   ) : null
@@ -3434,11 +3440,11 @@ export default function App() {
 
         {isBidModalOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
             onClick={closeSubmitBidModal}
           >
             <div
-              className="dialog-surface w-full max-w-md p-6 text-left"
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">Bid</h2>
@@ -3486,10 +3492,10 @@ export default function App() {
         )}
         {persistedEndOfRoundSummary && !isEndOfRoundModalDismissed && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           >
             <div
-              className="dialog-surface w-full max-w-lg p-6 text-left"
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto p-6 text-left"
               onClick={(event) => event.stopPropagation()}
             >
               <h2 className="text-xl font-semibold">
@@ -3774,11 +3780,11 @@ export default function App() {
 
       {isCreateModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={closeCreateModal}
         >
           <div
-            className="dialog-surface w-full max-w-md p-6 text-left"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Create Game</h2>
@@ -3824,11 +3830,11 @@ export default function App() {
 
       {isJoinModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={closeJoinModal}
         >
           <div
-            className="dialog-surface w-full max-w-md p-6 text-left"
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
             <h2 className="text-xl font-semibold">Join Game</h2>
