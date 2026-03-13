@@ -749,6 +749,7 @@ function GameTablePage({
   onStartOver,
   onSendReaction,
   onGoHome,
+  onOpenHelp,
   onOpenNewGame,
   onOpenJoinGame,
   onOpenSwitchGame,
@@ -1875,6 +1876,16 @@ function GameTablePage({
                   Reset Game
                 </button>
               ) : null}
+              <button
+                type="button"
+                className="btn-secondary w-[90%] px-4 py-3 text-left"
+                onClick={() => {
+                  setIsMenuModalOpen(false)
+                  onOpenHelp?.()
+                }}
+              >
+                Help
+              </button>
             </div>
           </div>
         </div>
@@ -1961,6 +1972,8 @@ export default function App() {
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
+  const [helpSection, setHelpSection] = useState('using-app')
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
@@ -3159,6 +3172,198 @@ export default function App() {
       </div>
     </div>
   ) : null
+  const helpModal = isHelpModalOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      onClick={() => setIsHelpModalOpen(false)}
+    >
+      <div
+        className="dialog-surface w-full max-w-2xl p-6 text-left"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold">Welcome to Setback</h2>
+          <button
+            type="button"
+            className="btn-secondary px-3 py-2 text-sm"
+            onClick={() => setIsHelpModalOpen(false)}
+          >
+            Close
+          </button>
+        </div>
+        <div className="mt-4 flex gap-2 border-b border-white/10 pb-4">
+          <button
+            type="button"
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              helpSection === 'using-app'
+                ? 'bg-white text-slate-900'
+                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
+            }`}
+            onClick={() => setHelpSection('using-app')}
+          >
+            Using the App
+          </button>
+          <button
+            type="button"
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              helpSection === 'how-to-play'
+                ? 'bg-white text-slate-900'
+                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
+            }`}
+            onClick={() => setHelpSection('how-to-play')}
+          >
+            How to Play
+          </button>
+        </div>
+        <div className="score-scroll mt-4 max-h-[70vh] overflow-auto pr-1 text-sm text-muted">
+          {helpSection === 'using-app' ? (
+            <>
+              <section>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">Getting Started</h4>
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">New Game</h5>
+                  <p className="mt-2">
+                    When creating a new game, a user is prompted to enter their name and the max card count, which is how many cards
+                    players will have in their hand during the start of the first and last round. After creating the new game, the
+                    user becomes the game owner and is placed in the Lobby.
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Join Game</h5>
+                  <p className="mt-2">
+                    Users can join an existing game by clicking Join Game and entering the game ID along with their name. Users may
+                    also use a shared link, given to them by other players. Using a shared link will populate the game ID for them.
+                  </p>
+                </div>
+              </section>
+              <section className="mt-4">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">The Lobby</h4>
+                <p className="mt-2">
+                  The lobby is where players gather before the game begins. The owner can share the game link or game ID with others so
+                  more players can join in. The game will always have a full amount of players by filling empty seats with AI players. When
+                  someone else joins, that player will take the seat of an AI player.
+                </p>
+                <p className="mt-2">
+                  Game owners have the ability to adjust the player order, remove human players. and set who deals first. When the game owner
+                  is ready to proceed, they can click the Start Game button to begin.
+                </p>
+                <p className="mt-2">
+                  For other players, the lobby is mainly a waiting area. They can watch other players join. As others join, they will take
+                  the seat of any AI players in the game. Players remain in the Lobby until the game owner starts the game.
+                </p>
+              </section>
+            </>
+          ) : (
+            <>
+              <section>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">Objective</h4>
+                <p className="mt-2">
+                  Score as many points as you can by making smart bids, winning tricks, and earning special bonuses.
+                  When all rounds are complete, the player with the highest total score wins.
+                </p>
+              </section>
+
+              <section className="mt-4">
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">Playing The Game</h4>
+                <p className="mt-2">
+                  The game is played in a sequence of rounds based on the chosen maximum hand size. Rounds count down
+                  from the max to 1, then climb back up to the max again. For example, a 10‑card game plays
+                  10, 9, 8 … 1, 2 … 10.
+                </p>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Dealing</h5>
+                  <p className="mt-2">
+                    The dealer deals one card at a time to each player until everyone has the correct number of cards
+                    for the round. After dealing, the dealer flips a card face‑up to set the trump suit for the round.
+                    If the card is a joker, it's placed under the deck and another card is turned over to set the trump
+                    suit.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Bidding</h5>
+                  <p className="mt-2">
+                    Starting with the player to the dealer&apos;s left, each player makes a bid. You may bid any number
+                    from 0 up to the number of cards in the round.
+                  </p>
+                  <p className="mt-2">
+                    In 3‑card, 2‑card, and 1‑card rounds, players may also bid <span className="text-white">Trip</span>,
+                    declaring they intend to win every trick in that round. Tripping triples the scoring for the round:
+                    winning all tricks earns a triple bonus, but failing to win them all results in a triple penalty.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Playing a Round</h5>
+                  <p className="mt-2">
+                    Each round consists of several tricks—one trick for every card in your hand. Your goal is to win enough
+                    tricks to meet your bid, but you’re also trying to prevent other players from meeting theirs. Forcing
+                    someone to miss their bid sets them back, which is where the game gets its name. The player who wins
+                    a trick leads the next one, so momentum can shift quickly. Think of a round as a series of small battles,
+                    each one giving you a chance to move closer to your bid while pushing others off course.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Playing a Trick</h5>
+                  <p className="mt-2">
+                    A trick is a single turn where each player plays one card. After all players have played, one player wins
+                    the trick based on the rules below. When a trick is won, it becomes a “book,” and the winner of that book
+                    leads the next trick.
+                  </p>
+
+                  <p className="mt-2">
+                    The first trick is led by the first player after the dealer among those who made the highest bid.
+                    The card they play sets the <span className="text-white">lead suit</span>, and all players must follow
+                    that suit if they can.
+                  </p>
+
+                  <p className="mt-2">
+                    If you cannot follow suit, you may play any card. This includes <span className="text-white">trump</span>,
+                    which acts like a powerful wild suit. Jokers count as trump. Trump cannot be led until it has been
+                    broken—meaning someone has played trump because they couldn&apos;t follow suit—unless your entire hand
+                    is trump.
+                  </p>
+
+                  <p className="mt-2">
+                    A trick is won by the highest trump played. If no trump is played, the highest card in the lead suit
+                    wins. Big Joker is highest, followed by Little Joker, then trump cards from Ace down to 2.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Scoring</h5>
+                  <p className="mt-2">
+                    If you meet your bid, you earn 10 points per trick you bid, plus 1 extra point for each trick you
+                    win beyond your bid. If you miss your bid, you lose 10 points per trick you bid.
+                  </p>
+                  <p className="mt-2">
+                    <span className="text-white">Trip</span> is only available in 3‑card, 2‑card, and 1‑card rounds.
+                    A successful Trip—winning every trick—earns 30 points per trick. Failing a Trip costs 30 points per
+                    trick instead.
+                  </p>
+                  <p className="mt-2">
+                    In 4‑card rounds, a player receives a <span className="text-white">Rainbow</span> bonus if they are
+                    dealt four cards that cover all four suits. Jokers count as the trump suit for this purpose.
+                    Achieving a Rainbow awards 25 bonus points.
+                  </p>
+                </div>
+
+                <div className="mt-4">
+                  <h5 className="text-sm font-semibold text-white">Winning The Game</h5>
+                  <p className="mt-2">
+                    After the final round, scores are totaled. The player with the highest score wins. If players are
+                    tied, they share the final standing.
+                  </p>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null
 
   if (activeGame && activeGame.phase?.stage !== 'Lobby') {
     return (
@@ -3182,6 +3387,7 @@ export default function App() {
           onStartOver={handleStartOver}
           onSendReaction={handleSendReaction}
           onGoHome={resetActiveSessionState}
+          onOpenHelp={() => setIsHelpModalOpen(true)}
           onOpenNewGame={handleOpenNewGame}
           onOpenJoinGame={handleOpenJoinGame}
           onOpenSwitchGame={handleOpenSwitchGame}
@@ -3329,6 +3535,7 @@ export default function App() {
           </div>
         )}
         {rejoinModal}
+        {helpModal}
       </>
     )
   }
@@ -3497,6 +3704,7 @@ export default function App() {
           </div>
         </section>
         {rejoinModal}
+        {helpModal}
       </main>
     )
   }
@@ -3542,6 +3750,13 @@ export default function App() {
             disabled={isLoadingRejoinGames || rejoinableGames.length === 0}
           >
             Continue Game
+          </button>
+          <button
+            type="button"
+            className="btn-secondary px-4 py-2"
+            onClick={() => setIsHelpModalOpen(true)}
+          >
+            Help
           </button>
         </div>
         </div>
@@ -3688,6 +3903,7 @@ export default function App() {
         </div>
       )}
       {rejoinModal}
+      {helpModal}
     </main>
   )
 }
