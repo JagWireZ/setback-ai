@@ -80,6 +80,11 @@ resource "aws_dynamodb_table" "setback_game" {
     name = "id"
     type = "S"
   }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
+  }
 }
 
 data "aws_iam_policy_document" "lambda_assume_role" {
