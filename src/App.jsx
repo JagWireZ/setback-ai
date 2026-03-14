@@ -495,7 +495,7 @@ const writeStoredSessions = (sessions) => {
   window.localStorage.setItem(GAME_SESSIONS_STORAGE_KEY, JSON.stringify(sessions))
 }
 
-const saveStoredGameSession = (gameId, playerToken, role) => {
+const saveStoredGameSession = (gameId, playerToken, role, playerName = '') => {
   if (!gameId || !playerToken) {
     return
   }
@@ -504,6 +504,7 @@ const saveStoredGameSession = (gameId, playerToken, role) => {
   sessions[gameId] = {
     playerToken,
     role,
+    playerName,
     updatedAt: Date.now(),
   }
   writeStoredSessions(sessions)
@@ -2215,6 +2216,7 @@ export default function App() {
           return {
             gameId,
             playerToken: storedSession.playerToken,
+            playerName: storedSession.playerName ?? '',
             phase: normalized.game.phase?.stage ?? 'Unknown',
             role: normalized.role,
             updatedAt: storedSession.updatedAt ?? 0,
@@ -2234,7 +2236,7 @@ export default function App() {
       setSelectedRejoinGameId((current) =>
         current && nextRejoinableGames.some((entry) => entry.gameId === current)
           ? current
-          : nextRejoinableGames[0]?.gameId ?? '',
+          : '',
       )
       setIsLoadingRejoinGames(false)
     }
@@ -2300,7 +2302,7 @@ export default function App() {
       setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
-      saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner')
+      saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner', trimmedPlayerName)
       closeCreateModal()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create game'
@@ -2359,7 +2361,7 @@ export default function App() {
       setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
-      saveStoredGameSession(result?.game?.id, result?.playerToken, 'player')
+      saveStoredGameSession(result?.game?.id, result?.playerToken, 'player', trimmedPlayerName)
       closeJoinModal()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to join game'
@@ -2404,7 +2406,7 @@ export default function App() {
           ownerPlayerId: restoredSession.ownerPlayerId,
         })
         setPlayerSession(null)
-        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner')
+        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner', selectedGame.playerName ?? '')
       } else {
         setPlayerSession({
           gameId: selectedGame.gameId,
@@ -2413,7 +2415,7 @@ export default function App() {
           version: restoredSession.version,
         })
         setOwnerSession(null)
-        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'player')
+        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'player', selectedGame.playerName ?? '')
       }
 
       setSessionInfo({
@@ -3845,36 +3847,6 @@ export default function App() {
           >
             <h2 className="text-xl font-semibold">Join Game</h2>
             <form className="mt-4 flex flex-col gap-4" onSubmit={handleJoinGame}>
-              {rejoinableGames.length > 0 ? (
-                <>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-sm text-muted">Saved Sessions</span>
-                    <select
-                      value={selectedRejoinGameId}
-                      onChange={(event) => {
-                        const nextGameId = event.target.value
-                        setSelectedRejoinGameId(nextGameId)
-                        if (nextGameId) {
-                          setJoinGameId(nextGameId)
-                          setJoinErrors((prev) => ({ ...prev, gameId: undefined, playerName: undefined }))
-                        }
-                      }}
-                      className="input-surface"
-                      disabled={isLoadingRejoinGames || isRejoiningGame}
-                    >
-                      <option value="">Select a saved session</option>
-                      {rejoinableGames.map((game) => (
-                        <option key={game.gameId} value={game.gameId}>
-                          {game.gameId} ({game.phase})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="border-t border-white/10" />
-                </>
-              ) : null}
-
               <label className="flex flex-col gap-2">
                 <span className="text-sm text-muted">Game ID</span>
                 <input
@@ -3884,7 +3856,7 @@ export default function App() {
                     setJoinGameId(event.target.value)
                     setJoinErrors((prev) => ({ ...prev, gameId: undefined }))
                   }}
-                  className="input-surface"
+                  className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Enter game ID"
                   disabled={Boolean(selectedRejoinGameId)}
                 />
@@ -3902,7 +3874,7 @@ export default function App() {
                     setJoinPlayerName(sanitizePlayerNameInput(event.target.value))
                     setJoinErrors((prev) => ({ ...prev, playerName: undefined }))
                   }}
-                  className="input-surface"
+                  className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="Enter your name"
                   maxLength={MAX_PLAYER_NAME_LENGTH}
                   disabled={Boolean(selectedRejoinGameId)}
@@ -3911,6 +3883,45 @@ export default function App() {
                   <span className="text-sm text-red-300">{joinErrors.playerName}</span>
                 )}
               </label>
+
+              {rejoinableGames.length > 0 ? (
+                <>
+                  <div className="relative my-1 border-t border-white/10">
+                    <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#9ed3b4]">
+                      OR
+                    </span>
+                  </div>
+
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm text-muted">Choose a Saved Session</span>
+                    <select
+                      value={selectedRejoinGameId}
+                      onChange={(event) => {
+                        const nextGameId = event.target.value
+                        const selectedGame = rejoinableGames.find((game) => game.gameId === nextGameId)
+                        setSelectedRejoinGameId(nextGameId)
+                        if (nextGameId) {
+                          setJoinGameId(nextGameId)
+                          setJoinPlayerName(selectedGame?.playerName ?? '')
+                          setJoinErrors((prev) => ({ ...prev, gameId: undefined, playerName: undefined }))
+                        } else {
+                          setJoinGameId('')
+                          setJoinPlayerName('')
+                        }
+                      }}
+                      className="input-surface"
+                      disabled={isLoadingRejoinGames || isRejoiningGame}
+                    >
+                      <option value=""></option>
+                      {rejoinableGames.map((game) => (
+                        <option key={game.gameId} value={game.gameId}>
+                          {game.gameId} ({game.phase})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              ) : null}
 
               <div className="mt-2 flex justify-end gap-3">
                   <button
