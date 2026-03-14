@@ -311,6 +311,13 @@
     background-color: rgba(22, 101, 52, 0.16);
   }
 
+  .viewer-score-surface {
+    border-color: rgba(47, 111, 219, 0.72);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.08)),
+      var(--panel-bg-strong);
+  }
+
   .error-inline {
     background:
       linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.05)),

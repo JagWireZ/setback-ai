@@ -748,6 +748,7 @@ function GameTablePage({
               currentRoundIndex={currentRoundIndex}
               isGameOver={isGameOver}
               isOwner={isOwner}
+              viewerPlayerId={viewerPlayerId}
               onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
             />
             <div className="mt-4 flex justify-end pr-3">
@@ -789,7 +790,7 @@ function GameTablePage({
               ) : null}
             </div>
             {game.phase?.stage === 'Bidding' ? (
-              <section className="callout-success mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border px-3 py-3 sm:px-4">
+              <section className="panel-surface mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border px-3 py-3 sm:px-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-accent-strong text-sm font-semibold uppercase tracking-[0.18em]">Bids</h2>
                   <p className="text-accent text-xs">
@@ -989,6 +990,7 @@ function GameTablePage({
               currentRoundConfig={currentRoundConfig}
               isGameOver={isGameOver}
               isOwner={isOwner}
+              viewerPlayerId={viewerPlayerId}
               onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
               onOpenHistory={() => setIsHistoryModalOpen(true)}
               onClose={() => setIsScoreModalOpen(false)}

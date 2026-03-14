@@ -8,6 +8,7 @@ export function ScoreSummary({
   currentRoundIndex,
   isGameOver = false,
   isOwner = false,
+  viewerPlayerId = '',
   onSelectPlayer,
 }) {
   const playersById = new Map((game.players ?? []).map((player) => [player.id, player]))
@@ -45,6 +46,7 @@ export function ScoreSummary({
         const playerRainbow = score?.rounds?.[currentRoundIndex]?.rainbow === true
         const playerDisplayName = truncateLabel(player.name, 22)
         const isWinner = isGameOver && highestTotalScore !== Number.NEGATIVE_INFINITY && (score?.total ?? 0) === highestTotalScore
+        const isViewerPlayer = Boolean(viewerPlayerId && player.id === viewerPlayerId)
 
         return (
           <li
@@ -52,7 +54,9 @@ export function ScoreSummary({
             className={`rounded border px-3 py-2 text-sm ${
               isWinner
                 ? 'winner-surface'
-                : 'panel-surface-strong'
+                : isViewerPlayer
+                  ? 'viewer-score-surface'
+                  : 'panel-surface-strong'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -74,12 +78,18 @@ export function ScoreSummary({
                     </p>
                   )}
                 </div>
-                {player.id === currentDealerPlayerId ? (
-                  <p className="mt-1">
-                    <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
-                      Dealer
-                    </span>
-                  </p>
+                {!isGameOver ? (
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <p className="text-base font-semibold text-white">
+                      {score?.total ?? 0}
+                      {playerRainbow ? <span className="ml-1" aria-label="Rainbow round">🌈</span> : null}
+                    </p>
+                    {player.id === currentDealerPlayerId ? (
+                      <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                        Dealer
+                      </span>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               {isGameOver ? (
@@ -242,6 +252,7 @@ export function ScoreSheet({
   currentRoundConfig,
   isGameOver,
   isOwner,
+  viewerPlayerId = '',
   onSelectPlayer,
   onOpenHistory,
   onClose,
@@ -259,6 +270,7 @@ export function ScoreSheet({
         currentRoundIndex={currentRoundIndex}
         isGameOver={isGameOver}
         isOwner={isOwner}
+        viewerPlayerId={viewerPlayerId}
         onSelectPlayer={onSelectPlayer}
       />
       <div className="mt-4 flex items-center justify-between gap-3">
