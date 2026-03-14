@@ -57,6 +57,11 @@ const AI_DIFFICULTY_OPTIONS = [
   { value: 'hard', label: 'Hard' },
 ]
 
+const isInvalidPlayerTokenError = (error) => {
+  const message = error instanceof Error ? error.message : ''
+  return message.toLowerCase().includes('invalid player token')
+}
+
 function GameTablePage({
   game,
   isOwner,
@@ -166,9 +171,11 @@ function GameTablePage({
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
+  const [isLeaveConfirmModalOpen, setIsLeaveConfirmModalOpen] = useState(false)
   const [isReactionModalOpen, setIsReactionModalOpen] = useState(false)
   const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
   const [selectedScorePlayerId, setSelectedScorePlayerId] = useState('')
+  const [pendingRemovePlayer, setPendingRemovePlayer] = useState(null)
   const [scorePlayerNameDraft, setScorePlayerNameDraft] = useState('')
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
@@ -183,6 +190,9 @@ function GameTablePage({
   const gameOverScoreTimeoutRef = useRef(null)
   const trickSurfaceRef = useRef(null)
   const trickCardButtonRefs = useRef([])
+  const selectedTrickLabelRef = useRef(null)
+  const previousTrickIndexRef = useRef(game?.phase?.trickIndex)
+  const shouldClearSelectedTrickCardAfterRevealRef = useRef(false)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -315,6 +325,30 @@ function GameTablePage({
   }, [displayedTrickPlays, selectedTrickCardIndex, winningDisplayedTrickCardIndex])
 
   useEffect(() => {
+    const currentTrickIndex = game?.phase?.trickIndex
+    const previousTrickIndex = previousTrickIndexRef.current
+
+    if (
+      typeof currentTrickIndex === 'number' &&
+      typeof previousTrickIndex === 'number' &&
+      currentTrickIndex > previousTrickIndex
+    ) {
+      shouldClearSelectedTrickCardAfterRevealRef.current = true
+    }
+
+    previousTrickIndexRef.current = currentTrickIndex
+  }, [game?.phase?.trickIndex])
+
+  useEffect(() => {
+    if (bookWinnerMessage || revealedCompletedTrick || !shouldClearSelectedTrickCardAfterRevealRef.current) {
+      return
+    }
+
+    setSelectedTrickCardIndex(null)
+    shouldClearSelectedTrickCardAfterRevealRef.current = false
+  }, [bookWinnerMessage, revealedCompletedTrick])
+
+  useEffect(() => {
     if (bookWinnerMessage || selectedTrickCardIndex === null) {
       if (selectedTrickCardTimeoutRef.current) {
         clearTimeout(selectedTrickCardTimeoutRef.current)
@@ -356,14 +390,45 @@ function GameTablePage({
       const horizontalPadding = 12
       const maxLabelWidth = Math.max(surfaceRect.width - horizontalPadding * 2, 0)
       const estimatedLabelWidth = Math.min(maxLabelWidth, 224)
+      const measuredLabelWidth = selectedTrickLabelRef.current?.scrollWidth ?? estimatedLabelWidth
+      const labelWidth = Math.min(maxLabelWidth, measuredLabelWidth)
       const cardCenter = cardRect.left + (cardRect.width / 2)
-      const minCenter = surfaceRect.left + horizontalPadding + (estimatedLabelWidth / 2)
-      const maxCenter = surfaceRect.right - horizontalPadding - (estimatedLabelWidth / 2)
-      const clampedCenter = Math.min(Math.max(cardCenter, minCenter), maxCenter)
+      const centeredLeft = cardCenter - (labelWidth / 2)
+      const centeredRight = cardCenter + (labelWidth / 2)
+      const minCenter = surfaceRect.left + horizontalPadding + (labelWidth / 2)
+      const maxCenter = surfaceRect.right - horizontalPadding - (labelWidth / 2)
+      const nextLabelStyle = {
+        maxWidth: `${maxLabelWidth}px`,
+      }
+      const shouldEdgeAlign = labelWidth > cardRect.width
+
+      if (shouldEdgeAlign && centeredLeft < surfaceRect.left + horizontalPadding) {
+        const leftShift = Math.max((surfaceRect.left + horizontalPadding) - cardRect.left, 0)
+        setSelectedTrickLabelStyle({
+          ...nextLabelStyle,
+          left: '0',
+          textAlign: 'left',
+          transform: `translateX(${leftShift}px)`,
+        })
+        return
+      }
+
+      if (shouldEdgeAlign && centeredRight > surfaceRect.right - horizontalPadding) {
+        const rightShift = Math.min((surfaceRect.right - horizontalPadding) - cardRect.right, 0)
+        setSelectedTrickLabelStyle({
+          ...nextLabelStyle,
+          left: '100%',
+          textAlign: 'right',
+          transform: `translateX(calc(-100% + ${rightShift}px))`,
+        })
+        return
+      }
 
       setSelectedTrickLabelStyle({
-        left: `${clampedCenter - surfaceRect.left}px`,
-        maxWidth: `${maxLabelWidth}px`,
+        ...nextLabelStyle,
+        left: '50%',
+        textAlign: 'center',
+        transform: 'translateX(-50%)',
       })
     }
 
@@ -409,6 +474,21 @@ function GameTablePage({
   const closeScorePlayerModal = () => {
     setSelectedScorePlayerId('')
     setScorePlayerNameDraft('')
+  }
+
+  const openRemovePlayerConfirm = (player) => {
+    if (!player) {
+      return
+    }
+
+    setPendingRemovePlayer({
+      id: player.id,
+      name: player.name,
+    })
+  }
+
+  const closeRemovePlayerConfirm = () => {
+    setPendingRemovePlayer(null)
   }
 
   useEffect(() => {
@@ -889,16 +969,6 @@ function GameTablePage({
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
               <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
-                {selectedTrickPlay && selectedTrickLabelStyle ? (
-                  <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-20 h-7">
-                    <p
-                      className="absolute top-0 -translate-x-1/2 truncate text-center text-lg text-white"
-                      style={selectedTrickLabelStyle}
-                    >
-                      {selectedTrickPlayerName}
-                    </p>
-                  </div>
-                ) : null}
                 <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2">
                   {displayedTrickPlays.length > 0 ? (
                     displayedTrickPlays.map((play, index) => (
@@ -923,6 +993,15 @@ function GameTablePage({
                           }}
                           aria-label={getPlayerName(game, play.playerId)}
                         >
+                          {selectedTrickCardIndex === index && selectedTrickLabelStyle ? (
+                            <p
+                              ref={selectedTrickLabelRef}
+                              className="pointer-events-none absolute bottom-full left-1/2 mb-2 truncate text-center text-lg text-white"
+                              style={selectedTrickLabelStyle}
+                            >
+                              {selectedTrickPlayerName}
+                            </p>
+                          ) : null}
                           <div className="aspect-[2.5/3.5] w-24 sm:w-28">
                             <CardAsset
                               card={play.card}
@@ -1125,10 +1204,7 @@ function GameTablePage({
                     }
 
                     onSetGameError('')
-                    const didRemove = await onRemovePlayer?.(selectedScorePlayer.id)
-                    if (didRemove) {
-                      closeScorePlayerModal()
-                    }
+                    openRemovePlayerConfirm(selectedScorePlayer)
                   }}
                   disabled={
                     isRenamingPlayer ||
@@ -1169,11 +1245,11 @@ function GameTablePage({
             className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
+            <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 w-full sm:w-auto">
                 <button
                   type="button"
-                  className="block max-w-[12rem] min-w-0 truncate text-left text-xl font-semibold text-white transition hover:[color:var(--accent-green-soft)] sm:max-w-[14rem]"
+                  className="block w-full min-w-0 truncate text-left text-xl font-semibold text-white transition hover:[color:var(--accent-green-soft)] sm:max-w-[14rem]"
                   onClick={() => {
                     setIsEditingPlayerName(true)
                     setEditedPlayerName(currentPlayerName)
@@ -1183,10 +1259,10 @@ function GameTablePage({
                   {`👤 ${shortenedMenuPlayerName}`}
                 </button>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
                 <button
                   type="button"
-                  className="badge-subtle rounded-full border px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
+                  className="badge-subtle w-full truncate rounded-full border px-3 py-1 text-sm font-medium text-muted transition hover:text-white sm:w-auto"
                   onClick={onCopyShareLink}
                   title="Copy game link"
                 >
@@ -1281,7 +1357,7 @@ function GameTablePage({
                   className="btn-danger btn-danger-soft w-[90%] px-4 py-3 text-left disabled:opacity-50"
                   onClick={() => {
                     setIsMenuModalOpen(false)
-                    onLeaveGame?.()
+                    setIsLeaveConfirmModalOpen(true)
                   }}
                   disabled={isLeavingGame}
                 >
@@ -1349,6 +1425,86 @@ function GameTablePage({
           </div>
         </div>
       ) : null}
+      {isLeaveConfirmModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+          onClick={() => setIsLeaveConfirmModalOpen(false)}
+        >
+          <div
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white">Leave Game?</h2>
+            <p className="mt-3 text-sm text-muted">
+              You will leave this game and return to the home screen.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2"
+                onClick={() => setIsLeaveConfirmModalOpen(false)}
+                disabled={isLeavingGame}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
+                onClick={() => {
+                  setIsLeaveConfirmModalOpen(false)
+                  onLeaveGame?.()
+                }}
+                disabled={isLeavingGame}
+              >
+                {isLeavingGame ? 'Leaving...' : 'Leave Game'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {pendingRemovePlayer ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+          onClick={closeRemovePlayerConfirm}
+        >
+          <div
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white">Remove Player?</h2>
+            <p className="mt-3 text-sm text-muted">
+              {`Remove ${pendingRemovePlayer.name} from this game?`}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2"
+                onClick={closeRemovePlayerConfirm}
+                disabled={pendingPlayerActionId === pendingRemovePlayer.id}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
+                onClick={async () => {
+                  const playerId = pendingRemovePlayer.id
+                  const didRemove = await onRemovePlayer?.(playerId)
+                  if (didRemove) {
+                    if (selectedScorePlayerId === playerId) {
+                      closeScorePlayerModal()
+                    }
+                    closeRemovePlayerConfirm()
+                  }
+                }}
+                disabled={pendingPlayerActionId === pendingRemovePlayer.id}
+              >
+                {pendingPlayerActionId === pendingRemovePlayer.id ? 'Removing...' : 'Remove Player'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
     </div>
   )
@@ -1393,7 +1549,8 @@ export default function App() {
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
-    const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
+  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
+  const [pendingLobbyRemovePlayer, setPendingLobbyRemovePlayer] = useState(null)
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const [helpSection, setHelpSection] = useState('how-to-play')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
@@ -1411,6 +1568,23 @@ export default function App() {
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isLeavingGame || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
+
+  const openLobbyRemovePlayerConfirm = (player) => {
+    if (!player) {
+      return
+    }
+
+    window.setTimeout(() => {
+      setPendingLobbyRemovePlayer({
+        id: player.id,
+        name: player.name,
+      })
+    }, 0)
+  }
+
+  const closeLobbyRemovePlayerConfirm = () => {
+    setPendingLobbyRemovePlayer(null)
+  }
 
   const getRestoredPlayerName = (restoredSession, fallbackName = '') => {
     if (fallbackName) {
@@ -1913,6 +2087,20 @@ export default function App() {
         playerToken: playerSession.playerToken,
         version: playerSession.version ?? playerSession.game?.version ?? 0,
       })
+      const nextVisibleGame = result?.game ?? playerSession.game
+
+      const knownViewerPlayerId =
+        getViewerHand(nextVisibleGame)?.playerId ??
+        getViewerHand(playerSession.game)?.playerId ??
+        ''
+      const stillHasPlayerSeat = knownViewerPlayerId
+        ? (nextVisibleGame?.players ?? []).some((player) => player.id === knownViewerPlayerId)
+        : true
+
+      if (knownViewerPlayerId && !stillHasPlayerSeat) {
+        handleRemovedFromGame(playerSession.gameId)
+        return
+      }
 
       setPlayerSession((prev) => {
         if (!prev) {
@@ -3136,7 +3324,7 @@ export default function App() {
                 <div className="mt-3">
                   <button
                     type="button"
-                    className="input-surface w-full cursor-pointer text-left text-sm transition hover:border-white/20"
+                    className="input-surface w-full cursor-pointer truncate whitespace-nowrap text-left text-sm transition hover:border-white/20"
                     onClick={handleCopyShareLink}
                     aria-label={isShareLinkCopied ? 'Share link copied' : 'Copy share link'}
                     title={isShareLinkCopied ? 'Copied' : 'Copy link'}
@@ -3203,7 +3391,7 @@ export default function App() {
                               <button
                                 type="button"
                                 className="btn-danger btn-danger-soft px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                                onClick={() => handleRemovePlayer(player.id)}
+                                onClick={() => openLobbyRemovePlayerConfirm(player)}
                                 disabled={
                                   player.type === 'ai' ||
                                   player.id === ownerSession?.ownerPlayerId ||
@@ -3294,6 +3482,46 @@ export default function App() {
             </div>
           </div>
         </section>
+        {pendingLobbyRemovePlayer ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+            onClick={closeLobbyRemovePlayerConfirm}
+          >
+            <div
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold text-white">Remove Player?</h2>
+              <p className="mt-3 text-sm text-muted">
+                {`Remove ${pendingLobbyRemovePlayer.name} from this game?`}
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2"
+                  onClick={closeLobbyRemovePlayerConfirm}
+                  disabled={pendingPlayerActionId === pendingLobbyRemovePlayer.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
+                  onClick={async () => {
+                    const playerId = pendingLobbyRemovePlayer.id
+                    const didRemove = await handleRemovePlayer(playerId)
+                    if (didRemove) {
+                      closeLobbyRemovePlayerConfirm()
+                    }
+                  }}
+                  disabled={pendingPlayerActionId === pendingLobbyRemovePlayer.id}
+                >
+                  {pendingPlayerActionId === pendingLobbyRemovePlayer.id ? 'Removing...' : 'Remove Player'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {helpModal}
       </main>
     )

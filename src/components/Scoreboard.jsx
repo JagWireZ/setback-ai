@@ -197,7 +197,11 @@ export function ScoreHistory({ game, onClose }) {
                                   : 'divider'
                               }`}
                             >
-                              <td className="py-2 pr-4 font-medium text-white">{player.name}</td>
+                              <td className="py-2 pr-4 font-medium text-white">
+                                <span className="block max-w-[10rem] truncate" title={player.name}>
+                                  {truncateLabel(player.name, 18)}
+                                </span>
+                              </td>
                               <td className="py-2 pr-4 text-white">{player.bid}</td>
                               <td className="py-2 pr-4 text-white">{player.books}</td>
                               <td className="py-2 pr-4 text-white">{player.score}{player.rainbow ? ' 🌈' : ''}</td>
