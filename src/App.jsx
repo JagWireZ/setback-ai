@@ -906,19 +906,6 @@ function GameTablePage({
               setSelectedTrickCardIndex(null)
             }}
           >
-            <div className="mb-3 flex min-h-7 items-center justify-center">
-              {isGameOver || isTrickWinnerRevealVisible ? null : isViewerTurn ? (
-                <p className="status-turn px-6 py-2 text-xl font-semibold">
-                  {viewerTurnMessage}
-                </p>
-              ) : currentTurnPlayerId ? (
-                <p className="text-sm text-dim">
-                  {waitingAction
-                    ? `Waiting on ${getPlayerName(game, currentTurnPlayerId)} to ${waitingAction}`
-                    : `Waiting on ${getPlayerName(game, currentTurnPlayerId)}...`}
-                </p>
-              ) : null}
-            </div>
             {game.phase?.stage === 'Bidding' ? (
               <section className="panel-surface mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border px-3 py-3 sm:px-4">
                 <div className="flex items-center justify-between gap-3">
@@ -961,11 +948,6 @@ function GameTablePage({
                   })}
                 </ul>
               </section>
-            ) : null}
-            {bookWinnerMessage ? (
-              <div className="mb-3 flex items-center justify-center">
-                <p className="text-info text-center text-lg">{bookWinnerMessage}</p>
-              </div>
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
               <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
@@ -1029,6 +1011,21 @@ function GameTablePage({
             </p>
           </div>
         ) : null}
+        <div className="mt-3 flex min-h-7 items-center justify-center">
+          {bookWinnerMessage ? (
+            <p className="status-info px-6 py-2 text-center text-xl font-semibold">{bookWinnerMessage}</p>
+          ) : isGameOver || isTrickWinnerRevealVisible ? null : isViewerTurn ? (
+            <p className="status-turn px-6 py-2 text-xl font-semibold">
+              {viewerTurnMessage}
+            </p>
+          ) : currentTurnPlayerId ? (
+            <p className="text-sm text-dim">
+              {waitingAction
+                ? `Waiting on ${getPlayerName(game, currentTurnPlayerId)} to ${waitingAction}`
+                : `Waiting on ${getPlayerName(game, currentTurnPlayerId)}...`}
+            </p>
+          ) : null}
+        </div>
         <article
           className={`mt-3 shrink-0 overflow-hidden rounded-3xl border p-1 sm:overflow-x-auto ${
             isViewerTurn
