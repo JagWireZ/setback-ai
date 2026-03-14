@@ -793,6 +793,7 @@ function GameTablePage({
   isLeavingGame,
   isSortingCards,
   isLoadingRejoinGames,
+  menuCloseRequestKey = 0,
 }) {
   const viewerHand = getViewerHand(game)
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -800,6 +801,13 @@ function GameTablePage({
   )
   const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (menuCloseRequestKey > 0) {
+      setIsMenuModalOpen(false)
+    }
+  }, [menuCloseRequestKey])
+
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
@@ -1711,6 +1719,15 @@ function GameTablePage({
                 Close
               </button>
             </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2 text-sm"
+                onClick={() => setIsMenuModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1839,14 +1856,16 @@ function GameTablePage({
                   {`👤 ${shortenedMenuPlayerName}`}
                 </button>
               </div>
-              <button
-                type="button"
-                className="shrink-0 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
-                onClick={onCopyShareLink}
-                title="Copy game link"
-              >
-                {isShareLinkCopied ? '🔗 Copied!' : `🔗 ${game.id}`}
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
+                  onClick={onCopyShareLink}
+                  title="Copy game link"
+                >
+                  {isShareLinkCopied ? '🔗 Copied!' : '🔗 ' + game.id}
+                </button>
+              </div>
             </div>
             <div className="mt-4 border-t border-white/10" />
             {isEditingPlayerName ? (
@@ -1913,7 +1932,6 @@ function GameTablePage({
                 type="button"
                 className="btn-secondary w-[90%] px-4 py-3 text-left"
                 onClick={() => {
-                  setIsMenuModalOpen(false)
                   onOpenJoinGame?.()
                 }}
               >
@@ -1952,6 +1970,15 @@ function GameTablePage({
                 }}
               >
                 Help
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2 text-sm"
+                onClick={() => setIsMenuModalOpen(false)}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -2014,6 +2041,7 @@ export default function App() {
   const [isJoiningGame, setIsJoiningGame] = useState(false)
   const [isRejoiningGame, setIsRejoiningGame] = useState(false)
   const [isLoadingRejoinGames, setIsLoadingRejoinGames] = useState(false)
+  const [joinMenuCloseRequestKey, setJoinMenuCloseRequestKey] = useState(0)
   const [requestError, setRequestError] = useState('')
   const [sessionInfo, setSessionInfo] = useState(null)
   const [rejoinableGames, setRejoinableGames] = useState([])
@@ -3494,7 +3522,12 @@ export default function App() {
           onGoHome={resetActiveSessionState}
           onOpenHelp={() => setIsHelpModalOpen(true)}
           onOpenNewGame={handleOpenNewGame}
-          onOpenJoinGame={handleOpenJoinGame}
+          onOpenJoinGame={() => {
+            setRequestError('')
+            setSessionInfo(null)
+            setIsCreateModalOpen(false)
+            setIsJoinModalOpen(true)
+          }}
           isDealingCards={isDealingCards}
           isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
@@ -3505,6 +3538,7 @@ export default function App() {
           isLeavingGame={isLeavingGame}
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}
+          menuCloseRequestKey={joinMenuCloseRequestKey}
         />
 
         {isBidModalOpen && (
@@ -3605,6 +3639,120 @@ export default function App() {
                   Continue
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {isJoinModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
+            onClick={closeJoinModal}
+          >
+            <div
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold">Join Game</h2>
+              <form className="mt-4 flex flex-col gap-4" onSubmit={handleJoinGame}>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm text-muted">Game ID</span>
+                  <input
+                    type="text"
+                    value={joinGameId}
+                    onChange={(event) => {
+                      setJoinGameId(event.target.value)
+                      setJoinErrors((prev) => ({ ...prev, gameId: undefined }))
+                    }}
+                    className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter game ID"
+                    disabled={Boolean(selectedRejoinGameId)}
+                  />
+                  {joinErrors.gameId && (
+                    <span className="text-sm text-red-300">{joinErrors.gameId}</span>
+                  )}
+                </label>
+
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm text-muted">Player Name</span>
+                  <input
+                    type="text"
+                    value={joinPlayerName}
+                    onChange={(event) => {
+                      setJoinPlayerName(sanitizePlayerNameInput(event.target.value))
+                      setJoinErrors((prev) => ({ ...prev, playerName: undefined }))
+                    }}
+                    className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Enter your name"
+                    maxLength={MAX_PLAYER_NAME_LENGTH}
+                    disabled={Boolean(selectedRejoinGameId)}
+                  />
+                  {joinErrors.playerName && (
+                    <span className="text-sm text-red-300">{joinErrors.playerName}</span>
+                  )}
+                </label>
+
+                {rejoinableGames.length > 0 ? (
+                  <>
+                    <div className="relative my-1 border-t border-white/10">
+                      <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#9ed3b4]">
+                        OR
+                      </span>
+                    </div>
+
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm text-muted">Choose a Saved Session</span>
+                      <select
+                        value={selectedRejoinGameId}
+                        onChange={(event) => {
+                          const nextGameId = event.target.value
+                          const selectedGame = rejoinableGames.find((game) => game.gameId === nextGameId)
+                          setSelectedRejoinGameId(nextGameId)
+                          if (nextGameId) {
+                            setJoinGameId(nextGameId)
+                            setJoinPlayerName(selectedGame?.playerName ?? '')
+                            setJoinErrors((prev) => ({ ...prev, gameId: undefined, playerName: undefined }))
+                          setJoinMenuCloseRequestKey((current) => current + 1)
+                          } else {
+                            setJoinGameId('')
+                            setJoinPlayerName('')
+                          }
+                        }}
+                        className="input-surface"
+                        disabled={isLoadingRejoinGames || isRejoiningGame}
+                      >
+                        <option value=""></option>
+                        {rejoinableGames.map((game) => (
+                          <option key={game.gameId} value={game.gameId}>
+                            {game.gameId} ({game.phase})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : null}
+
+                <div className="mt-2 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2"
+                    onClick={closeJoinModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isJoiningGame || isRejoiningGame}
+                    className="btn-primary px-4 py-2"
+                  >
+                    {selectedRejoinGameId
+                      ? isRejoiningGame
+                        ? "Rejoining..."
+                        : "Join Game"
+                      : isJoiningGame
+                        ? "Joining..."
+                        : "Join Game"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
