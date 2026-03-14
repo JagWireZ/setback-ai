@@ -15,7 +15,6 @@
     "@aws-sdk/credential-provider-cognito-identity": "^3.972.11",
     "@aws-sdk/protocol-http": "^3.370.0",
     "@aws-sdk/signature-v4": "^3.370.0",
-    "flowbite": "^4.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
