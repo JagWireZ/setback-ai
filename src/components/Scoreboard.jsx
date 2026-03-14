@@ -51,7 +51,7 @@ export function ScoreSummary({
             key={player.id}
             className={`rounded border px-3 py-2 text-sm ${
               isWinner
-                ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
+                ? 'winner-surface'
                 : 'panel-surface-strong'
             }`}
           >
@@ -61,7 +61,7 @@ export function ScoreSummary({
                   {isOwner && typeof onSelectPlayer === 'function' ? (
                     <button
                       type="button"
-                      className="block w-full min-w-0 cursor-pointer truncate text-left font-medium text-white transition hover:text-[#d9f7e5]"
+                      className="block w-full min-w-0 cursor-pointer truncate text-left font-medium text-white transition hover:[color:var(--accent-green-soft)]"
                       title={player.name}
                       onClick={() => onSelectPlayer(player)}
                       aria-label={`Manage ${player.name}`}
@@ -76,7 +76,7 @@ export function ScoreSummary({
                 </div>
                 {player.id === currentDealerPlayerId ? (
                   <p className="mt-1">
-                    <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                    <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
                       Dealer
                     </span>
                   </p>
@@ -183,8 +183,8 @@ export function ScoreHistory({ game, onClose }) {
                               key={player.playerId}
                               className={`border-t ${
                                 winningScore !== null && player.score === winningScore
-                                  ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
-                                  : 'border-white/10'
+                                  ? 'winner-surface'
+                                  : 'divider'
                               }`}
                             >
                               <td className="py-2 pr-4 font-medium text-white">{player.name}</td>
@@ -264,7 +264,7 @@ export function ScoreSheet({
       <div className="mt-4 flex items-center justify-between gap-3">
         <button
           type="button"
-          className="text-sm font-medium text-[#9ed3b4] transition hover:text-[#d9f7e5]"
+          className="link-accent"
           onClick={onOpenHistory}
         >
           See History

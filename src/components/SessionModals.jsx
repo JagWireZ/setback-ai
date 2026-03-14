@@ -119,8 +119,8 @@ export function JoinGameModal({
 
           {rejoinableGames.length > 0 ? (
             <>
-              <div className="relative my-1 border-t border-white/10">
-                <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#9ed3b4]">
+              <div className="divider relative my-1 border-t">
+                <span className="divider-label text-accent absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-3 text-xs font-semibold uppercase tracking-[0.18em]">
                   OR
                 </span>
               </div>

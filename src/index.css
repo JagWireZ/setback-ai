@@ -12,8 +12,14 @@
     --table-border: #4a4a4a;
     --accent-blue: #2f6fdb;
     --accent-blue-strong: #1f58b7;
+    --accent-blue-soft: #d8e6ff;
     --accent-red: #c74343;
     --accent-red-strong: #a93434;
+    --accent-red-soft: #ffd7d7;
+    --accent-green: #228258;
+    --accent-green-strong: #166534;
+    --accent-green-soft: #d9f7e5;
+    --accent-green-muted: #9ed3b4;
     --border-color: #4a4a4a;
     --text-main: #f3f4f6;
     --text-muted: #cfcfcf;
@@ -148,14 +154,38 @@
     background-color: var(--accent-blue-strong);
   }
 
+  .btn-accent {
+    @apply rounded-md border font-medium transition text-white;
+    border-color: var(--accent-blue);
+    background-color: var(--accent-blue);
+  }
+
+  .btn-accent:hover {
+    background-color: var(--accent-blue-strong);
+  }
+
+  .btn-accent-glow {
+    box-shadow: 0 10px 24px rgba(47, 111, 219, 0.35);
+  }
+
+  .btn-accent-pulse {
+    border-color: var(--accent-red);
+    background-color: var(--accent-red);
+    box-shadow: 0 0 18px rgba(199, 67, 67, 0.45);
+  }
+
   .btn-danger {
     @apply rounded-md border font-medium transition;
     border-color: rgba(199, 67, 67, 0.7);
-    color: #ffd7d7;
+    color: var(--accent-red-soft);
   }
 
   .btn-danger:hover {
     background-color: rgba(199, 67, 67, 0.18);
+  }
+
+  .btn-danger-soft {
+    background-color: rgba(199, 67, 67, 0.12);
   }
 
   .status-error {
@@ -164,7 +194,7 @@
     background:
       linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.08)),
       rgba(199, 67, 67, 0.2);
-    color: #ffd7d7;
+    color: var(--accent-red-soft);
     box-shadow: 0 10px 24px rgba(199, 67, 67, 0.18);
   }
 
@@ -174,7 +204,7 @@
     background:
       linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.08)),
       rgba(47, 111, 219, 0.2);
-    color: #d8e6ff;
+    color: var(--accent-blue-soft);
     box-shadow: 0 10px 24px rgba(47, 111, 219, 0.18);
   }
 
@@ -184,7 +214,7 @@
     background:
       linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.1)),
       rgba(22, 101, 52, 0.28);
-    color: #d9f7e5;
+    color: var(--accent-green-soft);
     box-shadow: 0 10px 24px rgba(22, 101, 52, 0.22);
   }
 
@@ -199,6 +229,93 @@
 
   .text-dim {
     color: var(--text-dim);
+  }
+
+  .text-accent {
+    color: var(--accent-green-muted);
+  }
+
+  .text-accent-strong {
+    color: var(--accent-green-soft);
+  }
+
+  .text-info {
+    color: var(--accent-blue-soft);
+  }
+
+  .text-danger-soft {
+    color: #f1c5c5;
+  }
+
+  .link-accent {
+    @apply text-sm font-medium transition;
+    color: var(--accent-green-muted);
+  }
+
+  .link-accent:hover {
+    color: var(--accent-green-soft);
+  }
+
+  .badge-subtle {
+    border-color: rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+  }
+
+  .badge-subtle-strong {
+    border-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--text-dim);
+  }
+
+  .divider {
+    border-color: rgba(255, 255, 255, 0.10);
+  }
+
+  .divider-label {
+    background-color: var(--panel-bg);
+  }
+
+  .floating-panel {
+    background-color: rgba(58, 58, 58, 0.98);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .score-panel {
+    border-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(35, 35, 35, 0.25);
+  }
+
+  .callout-success {
+    border-color: rgba(34, 130, 88, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.08)),
+      rgba(22, 101, 52, 0.16);
+  }
+
+  .callout-success-strong {
+    border-color: rgba(34, 130, 88, 0.78);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.08)),
+      rgba(22, 101, 52, 0.24);
+    box-shadow: 0 0 18px rgba(22, 101, 52, 0.22);
+  }
+
+  .list-item-subtle {
+    border-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .winner-surface {
+    border-color: rgba(34, 130, 88, 0.4);
+    background-color: rgba(22, 101, 52, 0.16);
+  }
+
+  .error-inline {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.05)),
+      rgba(199, 67, 67, 0.08);
+    color: #f1c5c5;
   }
 
   .sort-toggle-icon {

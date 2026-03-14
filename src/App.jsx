@@ -526,7 +526,7 @@ function GameTablePage({
           {isMobileBar ? (
             <button
               type="button"
-              className="btn-secondary min-h-11 whitespace-nowrap border-[#2f6fdb] bg-[#2f6fdb] px-3 py-2.5 text-xs text-white hover:bg-[#1f58b7] sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
+              className="btn-accent min-h-11 whitespace-nowrap px-3 py-2.5 text-xs sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
               onClick={() => setIsScoreModalOpen(true)}
             >
               Score
@@ -535,7 +535,7 @@ function GameTablePage({
           {canSortCards ? (
             <button
               type="button"
-              className="btn-secondary min-h-11 whitespace-nowrap border-[#2f6fdb] bg-[#2f6fdb] px-3 py-2.5 text-xs text-white hover:bg-[#1f58b7] disabled:opacity-50 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
+              className="btn-accent min-h-11 whitespace-nowrap px-3 py-2.5 text-xs disabled:opacity-50 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
               onClick={onSortCards}
               disabled={isSortingCards}
             >
@@ -574,10 +574,10 @@ function GameTablePage({
                   type="button"
                   className={`min-h-11 whitespace-nowrap rounded-md border px-3 py-2.5 text-xs text-white disabled:opacity-50 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm ${
                     shouldFlashActionButton
-                      ? 'animate-pulse border-[#c74343] bg-[#c74343] shadow-[0_0_18px_rgba(199,67,67,0.45)]'
+                      ? 'btn-accent-pulse animate-pulse'
                       : isPrimaryAction
-                        ? 'border-[#2f6fdb] bg-[#2f6fdb] text-white shadow-[0_10px_24px_rgba(47,111,219,0.35)] hover:bg-[#1f58b7]'
-                        : 'btn-secondary border-[#2f6fdb] bg-[#2f6fdb] text-white hover:bg-[#1f58b7]'
+                        ? 'btn-accent btn-accent-glow'
+                        : 'btn-accent'
                   }`}
                   disabled={isDisabled}
                   onClick={
@@ -622,7 +622,7 @@ function GameTablePage({
         ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}
       >
         {isReactionModalOpen && isMobileBar === isMobileViewport ? (
-          <div className="absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl bg-[#3a3a3a] p-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)]">
+          <div className="floating-panel absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl p-3">
             <div className="grid grid-cols-4 gap-2">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
@@ -721,7 +721,7 @@ function GameTablePage({
         </article>
 
         <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[30%_1fr]">
-          <article className="score-scroll hidden min-h-0 max-h-full self-start overflow-auto rounded-2xl border border-white/10 bg-[rgba(35,35,35,0.25)] pb-4 pl-4 pr-1 pt-4 md:block">
+          <article className="score-scroll score-panel hidden min-h-0 max-h-full self-start overflow-auto rounded-2xl border pb-4 pl-4 pr-1 pt-4 md:block">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Score</h2>
               {isGameOver ? (
@@ -747,7 +747,7 @@ function GameTablePage({
             <div className="mt-4 flex justify-end pr-3">
               <button
                 type="button"
-                className="text-sm font-medium text-[#9ed3b4] transition hover:text-[#d9f7e5]"
+                className="link-accent"
                 onClick={() => setIsHistoryModalOpen(true)}
               >
                 See History
@@ -783,10 +783,10 @@ function GameTablePage({
               ) : null}
             </div>
             {game.phase?.stage === 'Bidding' ? (
-              <section className="mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border border-[rgba(34,130,88,0.34)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.08)),rgba(22,101,52,0.16)] px-3 py-3 sm:px-4">
+              <section className="callout-success mb-3 flex min-h-0 flex-1 flex-col rounded-2xl border px-3 py-3 sm:px-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d9f7e5]">Bids</h2>
-                  <p className="text-xs text-[#9ed3b4]">
+                  <h2 className="text-accent-strong text-sm font-semibold uppercase tracking-[0.18em]">Bids</h2>
+                  <p className="text-accent text-xs">
                     {bids.length}/{biddingPlayers.length} in
                   </p>
                 </div>
@@ -803,8 +803,8 @@ function GameTablePage({
                         key={player.id}
                         className={`rounded-xl border px-3 py-2 text-left ${
                           isCurrentBidder
-                            ? 'border-[rgba(34,130,88,0.78)] bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(0,0,0,0.08)),rgba(22,101,52,0.24)] shadow-[0_0_18px_rgba(22,101,52,0.22)]'
-                            : 'border-white/10 bg-[rgba(255,255,255,0.05)]'
+                            ? 'callout-success-strong'
+                            : 'list-item-subtle'
                         }`}
                       >
                         <div className="grid grid-cols-[minmax(0,1fr)_3rem_4.75rem] items-center gap-3">
@@ -812,7 +812,7 @@ function GameTablePage({
                             {player.name}
                             {playerRainbow ? ' 🌈' : ''}
                           </p>
-                          <p className={`text-right text-base font-semibold ${hasBid ? 'text-[#d9f7e5]' : 'text-dim'}`}>
+                          <p className={`text-right text-base font-semibold ${hasBid ? 'text-accent-strong' : 'text-dim'}`}>
                             {getBidDisplay(bidEntry)}
                           </p>
                           <p className="text-right text-[0.68rem] uppercase tracking-[0.14em] text-dim">
@@ -827,7 +827,7 @@ function GameTablePage({
             ) : null}
             {bookWinnerMessage ? (
               <div className="mb-3 flex items-center justify-center">
-                <p className="text-center text-lg text-[#d8e6ff]">{bookWinnerMessage}</p>
+                <p className="text-info text-center text-lg">{bookWinnerMessage}</p>
               </div>
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
@@ -878,7 +878,7 @@ function GameTablePage({
 
         {errorMessage ? (
           <div className="mt-3 flex justify-center">
-            <p className="max-w-xl rounded-md bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.05)),rgba(199,67,67,0.08)] px-3 py-2 text-center text-sm text-[#f1c5c5]">
+            <p className="error-inline max-w-xl rounded-md px-3 py-2 text-center text-sm">
               {errorMessage}
             </p>
           </div>
@@ -887,7 +887,7 @@ function GameTablePage({
           className={`mt-3 shrink-0 overflow-hidden rounded-3xl border p-1 sm:overflow-x-auto ${
             canSelectCards
               ? 'hand-active'
-              : 'border-white/10'
+              : 'divider'
           }`}
         >
           <div className="flex min-h-[8rem] items-center justify-center pt-6 pb-2">
@@ -1050,7 +1050,7 @@ function GameTablePage({
               <div className="flex justify-between gap-3">
                 <button
                   type="button"
-                  className="btn-danger bg-[rgba(199,67,67,0.12)] px-4 py-2 disabled:opacity-50"
+                  className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
                   onClick={async () => {
                     if (!selectedScorePlayer) {
                       return
@@ -1105,7 +1105,7 @@ function GameTablePage({
               <div className="min-w-0">
                 <button
                   type="button"
-                  className="block max-w-[12rem] min-w-0 truncate text-left text-xl font-semibold text-white transition hover:text-[#d9f7e5] sm:max-w-[14rem]"
+                  className="block max-w-[12rem] min-w-0 truncate text-left text-xl font-semibold text-white transition hover:[color:var(--accent-green-soft)] sm:max-w-[14rem]"
                   onClick={() => {
                     setIsEditingPlayerName(true)
                     setEditedPlayerName(currentPlayerName)
@@ -1118,7 +1118,7 @@ function GameTablePage({
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
+                  className="badge-subtle rounded-full border px-3 py-1 text-sm font-medium text-muted transition hover:text-white"
                   onClick={onCopyShareLink}
                   title="Copy game link"
                 >
@@ -1126,7 +1126,7 @@ function GameTablePage({
                 </button>
               </div>
             </div>
-            <div className="mt-4 border-t border-white/10" />
+            <div className="divider mt-4 border-t" />
             {isEditingPlayerName ? (
               <form
                 className="mt-4 flex flex-col gap-3"
@@ -1210,7 +1210,7 @@ function GameTablePage({
               ) : (
                 <button
                   type="button"
-                  className="btn-danger w-[90%] bg-[rgba(199,67,67,0.12)] px-4 py-3 text-left disabled:opacity-50"
+                  className="btn-danger btn-danger-soft w-[90%] px-4 py-3 text-left disabled:opacity-50"
                   onClick={() => {
                     setIsMenuModalOpen(false)
                     onLeaveGame?.()
@@ -1256,7 +1256,7 @@ function GameTablePage({
             <p className="mt-3 text-sm text-muted">
               This will erase the current game progress, send everyone back to the lobby, and restart from round 1.
             </p>
-            <p className="mt-2 text-sm text-[#f1c5c5]">
+            <p className="text-danger-soft mt-2 text-sm">
               This cannot be undone.
             </p>
             <div className="mt-5 flex justify-end gap-3">
@@ -1269,7 +1269,7 @@ function GameTablePage({
               </button>
               <button
                 type="button"
-                className="btn-danger bg-[rgba(199,67,67,0.12)] px-4 py-2"
+                className="btn-danger btn-danger-soft px-4 py-2"
                 onClick={() => {
                   setIsResetConfirmModalOpen(false)
                   onStartOver?.()
@@ -1341,6 +1341,24 @@ export default function App() {
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isLeavingGame || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
+
+  const getRestoredPlayerName = (restoredSession, fallbackName = '') => {
+    if (fallbackName) {
+      return fallbackName
+    }
+
+    if (!restoredSession?.game) {
+      return ''
+    }
+
+    if (restoredSession.role === 'owner') {
+      const ownerPlayerId = restoredSession.ownerPlayerId
+      return restoredSession.game.players?.find((player) => player.id === ownerPlayerId)?.name ?? ''
+    }
+
+    const viewerPlayerId = getViewerHand(restoredSession.game)?.playerId
+    return restoredSession.game.players?.find((player) => player.id === viewerPlayerId)?.name ?? ''
+  }
 
   useEffect(() => () => {
     if (shareLinkCopiedTimeoutRef.current) {
@@ -1438,7 +1456,12 @@ export default function App() {
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setPlayerSession(null)
         setIsJoinModalOpen(false)
-        saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'owner')
+        saveStoredGameSession(
+          gameIdFromUrl,
+          storedSession.playerToken,
+          'owner',
+          getRestoredPlayerName(restoredSession, storedSession.playerName ?? ''),
+        )
         return
       }
 
@@ -1451,7 +1474,12 @@ export default function App() {
         })
         setOwnerSession(null)
         setIsJoinModalOpen(false)
-        saveStoredGameSession(gameIdFromUrl, storedSession.playerToken, 'player')
+        saveStoredGameSession(
+          gameIdFromUrl,
+          storedSession.playerToken,
+          'player',
+          getRestoredPlayerName(restoredSession, storedSession.playerName ?? ''),
+        )
         return
       }
 
@@ -1517,7 +1545,7 @@ export default function App() {
           return {
             gameId,
             playerToken: storedSession.playerToken,
-            playerName: storedSession.playerName ?? '',
+            playerName: getRestoredPlayerName(normalized, storedSession.playerName ?? ''),
             phase: normalized.game.phase?.stage ?? 'Unknown',
             role: normalized.role,
             updatedAt: storedSession.updatedAt ?? 0,
@@ -2573,13 +2601,13 @@ export default function App() {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold">Welcome to Setback</h2>
         </div>
-        <div className="mt-4 flex gap-2 border-b border-white/10 pb-4">
+        <div className="divider mt-4 flex gap-2 border-b pb-4">
           <button
             type="button"
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               helpSection === 'how-to-play'
                 ? 'bg-white text-slate-900'
-                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
+                : 'badge-subtle border text-muted hover:text-white'
             }`}
             onClick={() => setHelpSection('how-to-play')}
           >
@@ -2590,7 +2618,7 @@ export default function App() {
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               helpSection === 'using-app'
                 ? 'bg-white text-slate-900'
-                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
+                : 'badge-subtle border text-muted hover:text-white'
             }`}
             onClick={() => setHelpSection('using-app')}
           >
@@ -2901,7 +2929,7 @@ export default function App() {
                       key={player.playerId}
                       className={`rounded-md border px-3 py-3 ${
                         isWinner
-                          ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
+                          ? 'winner-surface'
                           : 'panel-surface-strong'
                       }`}
                     >
@@ -2955,18 +2983,18 @@ export default function App() {
       <main className="theme-shell min-h-screen px-4 py-4 sm:py-6">
         <section className="mx-auto flex w-full max-w-5xl flex-col">
           <div className="table-surface rounded-[2rem] border px-4 py-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] sm:px-6 sm:py-6">
-            <header className="flex flex-col gap-2 border-b border-white/10 pb-5">
+            <header className="divider flex flex-col gap-2 border-b pb-5">
               <h1 className="text-3xl font-bold tracking-tight">
                 {isOwnerLobby ? 'Game Owner Lobby' : 'Game Lobby'}
               </h1>
               <div className="flex flex-wrap gap-3 text-sm">
-                <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
+                <p className="badge-subtle rounded-full border px-3 py-1 text-muted">
                   Game ID:{' '}
-                  <span className="font-medium text-[#9ed3b4] [text-shadow:0_0_12px_rgba(158,211,180,0.35)]">
+                  <span className="text-accent font-medium [text-shadow:0_0_12px_rgba(158,211,180,0.35)]">
                     {activeLobbySession.gameId}
                   </span>
                 </p>
-                <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-muted">
+                <p className="badge-subtle rounded-full border px-3 py-1 text-muted">
                   Phase: {activeLobbySession.game.phase?.stage}
                 </p>
               </div>
@@ -2984,8 +3012,8 @@ export default function App() {
                 </p>
               )}
 
-              <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
-                <div className="border-b border-white/10 pb-3">
+              <section className="lobby-panel rounded-2xl border p-4">
+                <div className="divider border-b pb-3">
                   <h2 className="text-lg font-semibold">Share Link</h2>
                 </div>
                 <div className="mt-3">
@@ -3001,8 +3029,8 @@ export default function App() {
                 </div>
               </section>
 
-              <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
-                <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+              <section className="lobby-panel rounded-2xl border p-4">
+                <div className="divider flex items-center justify-between gap-4 border-b pb-3">
                   <h2 className="text-lg font-semibold">Players</h2>
                 </div>
                 <ul className="mt-3 flex flex-col gap-2">
@@ -3012,7 +3040,7 @@ export default function App() {
                     return (
                       <li
                         key={player.id}
-                        className={`panel-surface-strong rounded-xl border bg-[rgba(52,52,52,0.85)] px-3 py-3 ${
+                        className={`lobby-panel-strong rounded-xl border px-3 py-3 ${
                           isOwnerLobby
                             ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3'
                             : 'flex items-center justify-between gap-3'
@@ -3028,7 +3056,7 @@ export default function App() {
                         </div>
                         <div className="flex items-center justify-end gap-2">
                           {isDealer ? (
-                            <span className="rounded-full border border-white/10 bg-white/6 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-dim">
+                            <span className="badge-subtle-strong rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-dim">
                               Dealer
                             </span>
                           ) : null}
@@ -3036,7 +3064,7 @@ export default function App() {
                             <>
                               <button
                                 type="button"
-                                className="btn-secondary border-white/15 bg-white/8 px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                className="badge-subtle btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
                                 onClick={() => handleMovePlayer(player.id, 'left')}
                                 disabled={isPending || isStartingGame}
                                 aria-label={`Move ${player.name} up`}
@@ -3045,7 +3073,7 @@ export default function App() {
                               </button>
                               <button
                                 type="button"
-                                className="btn-secondary border-white/15 bg-white/8 px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                className="badge-subtle btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
                                 onClick={() => handleMovePlayer(player.id, 'right')}
                                 disabled={isPending || isStartingGame}
                                 aria-label={`Move ${player.name} down`}
@@ -3054,7 +3082,7 @@ export default function App() {
                               </button>
                               <button
                                 type="button"
-                                className="btn-danger bg-[rgba(199,67,67,0.12)] px-3 py-1.5 text-xl font-black disabled:opacity-50"
+                                className="btn-danger btn-danger-soft px-3 py-1.5 text-xl font-black disabled:opacity-50"
                                 onClick={() => handleRemovePlayer(player.id)}
                                 disabled={
                                   player.type === 'ai' ||
@@ -3076,9 +3104,9 @@ export default function App() {
               </section>
 
               {isOwnerLobby && (
-                <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
+                <section className="lobby-panel rounded-2xl border p-4">
                   <div className="flex flex-col gap-3">
-                    <div className="border-b border-white/10 pb-3">
+                    <div className="divider border-b pb-3">
                       <h2 className="text-lg font-semibold">Options</h2>
                     </div>
                     <label className="flex items-center justify-end gap-2 text-sm text-muted">
@@ -3122,7 +3150,7 @@ export default function App() {
                     {isStartingGame ? 'Starting...' : 'Start Game'}
                   </button>
                 ) : (
-                  <p className="rounded-full border border-white/15 bg-white/8 px-3 py-1 text-sm text-muted">
+                  <p className="badge-subtle rounded-full border px-3 py-1 text-sm text-muted">
                     Waiting for game to start...
                   </p>
                 )}
