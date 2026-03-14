@@ -2023,7 +2023,7 @@ export default function App() {
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
     const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
-  const [helpSection, setHelpSection] = useState('using-app')
+  const [helpSection, setHelpSection] = useState('how-to-play')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
   const aiPauseUntilRef = useRef(0)
   const aiPauseTimeoutRef = useRef(null)
@@ -3206,17 +3206,6 @@ export default function App() {
           <button
             type="button"
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              helpSection === 'using-app'
-                ? 'bg-white text-slate-900'
-                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
-            }`}
-            onClick={() => setHelpSection('using-app')}
-          >
-            Using the App
-          </button>
-          <button
-            type="button"
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               helpSection === 'how-to-play'
                 ? 'bg-white text-slate-900'
                 : 'border border-white/15 bg-white/8 text-muted hover:text-white'
@@ -3224,6 +3213,17 @@ export default function App() {
             onClick={() => setHelpSection('how-to-play')}
           >
             How to Play
+          </button>
+          <button
+            type="button"
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+              helpSection === 'using-app'
+                ? 'bg-white text-slate-900'
+                : 'border border-white/15 bg-white/8 text-muted hover:text-white'
+            }`}
+            onClick={() => setHelpSection('using-app')}
+          >
+            Using the App
           </button>
         </div>
         <div className="score-scroll mt-4 min-h-0 flex-1 overflow-auto pr-1 text-sm text-muted">
