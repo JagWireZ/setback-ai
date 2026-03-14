@@ -173,6 +173,7 @@ function GameTablePage({
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const [revealedCompletedTrick, setRevealedCompletedTrick] = useState(null)
+  const [selectedTrickLabelStyle, setSelectedTrickLabelStyle] = useState(null)
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
   const selectedTrickCardTimeoutRef = useRef(null)
@@ -180,6 +181,8 @@ function GameTablePage({
   const reactionPickerRef = useRef(null)
   const hasAutoOpenedGameOverScoreRef = useRef(false)
   const gameOverScoreTimeoutRef = useRef(null)
+  const trickSurfaceRef = useRef(null)
+  const trickCardButtonRefs = useRef([])
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -211,9 +214,14 @@ function GameTablePage({
     selectedCardIndex !== null && viewerHand?.cards?.[selectedCardIndex]
       ? viewerHand.cards[selectedCardIndex]
       : null
+  const selectedTrickPlay =
+    selectedTrickCardIndex !== null && displayedTrickPlays?.[selectedTrickCardIndex]
+      ? displayedTrickPlays[selectedTrickCardIndex]
+      : null
   const handCardCount = viewerHand?.cards?.length ?? 0
   const isMobileViewport = viewportWidth < 640
   const currentPlayerName = getPlayerName(game, viewerPlayerId)
+  const selectedTrickPlayerName = selectedTrickPlay ? getPlayerName(game, selectedTrickPlay.playerId) : ''
   const selectedScorePlayer =
     orderedPlayers.find((player) => player.id === selectedScorePlayerId) ??
     game.players?.find((player) => player.id === selectedScorePlayerId) ??
@@ -327,6 +335,48 @@ function GameTablePage({
       }
     }
   }, [bookWinnerMessage, selectedTrickCardIndex])
+
+  useEffect(() => {
+    if (!selectedTrickPlay || bookWinnerMessage) {
+      setSelectedTrickLabelStyle(null)
+      return
+    }
+
+    const surfaceElement = trickSurfaceRef.current
+    const cardButtonElement = trickCardButtonRefs.current[selectedTrickCardIndex]
+
+    if (!surfaceElement || !cardButtonElement) {
+      setSelectedTrickLabelStyle(null)
+      return
+    }
+
+    const updateSelectedTrickLabelStyle = () => {
+      const surfaceRect = surfaceElement.getBoundingClientRect()
+      const cardRect = cardButtonElement.getBoundingClientRect()
+      const horizontalPadding = 12
+      const maxLabelWidth = Math.max(surfaceRect.width - horizontalPadding * 2, 0)
+      const estimatedLabelWidth = Math.min(maxLabelWidth, 224)
+      const cardCenter = cardRect.left + (cardRect.width / 2)
+      const minCenter = surfaceRect.left + horizontalPadding + (estimatedLabelWidth / 2)
+      const maxCenter = surfaceRect.right - horizontalPadding - (estimatedLabelWidth / 2)
+      const clampedCenter = Math.min(Math.max(cardCenter, minCenter), maxCenter)
+
+      setSelectedTrickLabelStyle({
+        left: `${clampedCenter - surfaceRect.left}px`,
+        maxWidth: `${maxLabelWidth}px`,
+      })
+    }
+
+    updateSelectedTrickLabelStyle()
+
+    window.addEventListener('resize', updateSelectedTrickLabelStyle)
+    surfaceElement.addEventListener('scroll', updateSelectedTrickLabelStyle, { passive: true })
+
+    return () => {
+      window.removeEventListener('resize', updateSelectedTrickLabelStyle)
+      surfaceElement.removeEventListener('scroll', updateSelectedTrickLabelStyle)
+    }
+  }, [bookWinnerMessage, selectedTrickCardIndex, selectedTrickPlay, selectedTrickPlayerName, viewportWidth])
 
   useEffect(() => {
     if (!isMenuModalOpen) {
@@ -838,47 +888,57 @@ function GameTablePage({
               </div>
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
-              <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto -translate-y-2">
-                {displayedTrickPlays.length > 0 ? (
-                  displayedTrickPlays.map((play, index) => (
-                    <li
-                      key={`${play.playerId}-${index}`}
-                      className="flex w-fit shrink-0 flex-col items-center text-sm"
-                      style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: selectedTrickCardIndex === index ? 100 : index + 1 }}
+              <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
+                {selectedTrickPlay && selectedTrickLabelStyle ? (
+                  <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-6">
+                    <p
+                      className="absolute top-0 -translate-x-1/2 truncate text-center text-lg text-white"
+                      style={selectedTrickLabelStyle}
                     >
-                      <div className="mb-3 flex h-5 items-end justify-center">
-                        {selectedTrickCardIndex === index ? (
-                          <p className="text-center text-lg text-white">{getPlayerName(game, play.playerId)}</p>
-                        ) : null}
-                      </div>
-                      <button
-                        type="button"
-                        className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
-                          selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
-                        }`}
-                        onClick={() => {
-                          if (bookWinnerMessage) {
-                            return
-                          }
-                          setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
-                        }}
-                        aria-label={getPlayerName(game, play.playerId)}
+                      {selectedTrickPlayerName}
+                    </p>
+                  </div>
+                ) : null}
+                <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-8 -translate-y-2">
+                  {displayedTrickPlays.length > 0 ? (
+                    displayedTrickPlays.map((play, index) => (
+                      <li
+                        key={`${play.playerId}-${index}`}
+                        className="flex w-fit shrink-0 flex-col items-center text-sm"
+                        style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: index + 1 }}
                       >
-                        <div className="aspect-[2.5/3.5] w-24 sm:w-28">
-                          <CardAsset
-                            card={play.card}
-                            jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
-                          />
-                        </div>
-                      </button>
+                        <button
+                          ref={(node) => {
+                            trickCardButtonRefs.current[index] = node
+                          }}
+                          type="button"
+                          className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
+                            selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
+                          }`}
+                          onClick={() => {
+                            if (bookWinnerMessage) {
+                              return
+                            }
+                            setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
+                          }}
+                          aria-label={getPlayerName(game, play.playerId)}
+                        >
+                          <div className="aspect-[2.5/3.5] w-24 sm:w-28">
+                            <CardAsset
+                              card={play.card}
+                              jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
+                            />
+                          </div>
+                        </button>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="self-center text-sm text-dim">
+                      {isGameOver ? '' : 'No cards played in this trick yet.'}
                     </li>
-                  ))
-                ) : (
-                  <li className="self-center text-sm text-dim">
-                    {isGameOver ? '' : 'No cards played in this trick yet.'}
-                  </li>
-                )}
-              </ul>
+                  )}
+                </ul>
+              </div>
             )}
           </article>
         </div>
@@ -2031,6 +2091,22 @@ export default function App() {
       .map((playerId) => playersById.get(playerId))
       .filter(Boolean)
   }, [activeLobbySession?.game])
+  const activeLobbyPlayerId = useMemo(() => {
+    if (!activeLobbySession?.game) {
+      return ''
+    }
+
+    if (ownerSession?.ownerPlayerId) {
+      return ownerSession.ownerPlayerId
+    }
+
+    const storedPlayerName = getStoredGameSession(activeLobbySession.gameId)?.playerName?.trim()
+    if (!storedPlayerName) {
+      return ''
+    }
+
+    return activeLobbySession.game.players?.find((player) => player.name === storedPlayerName)?.id ?? ''
+  }, [activeLobbySession?.game, activeLobbySession?.gameId, ownerSession?.ownerPlayerId])
 
   const shareLink = useMemo(() => {
     if (!activeLobbySession?.gameId || typeof window === 'undefined') {
@@ -3078,10 +3154,13 @@ export default function App() {
                   {orderedPlayers.map((player) => {
                     const isPending = pendingPlayerActionId === player.id
                     const isDealer = player.id === currentDealerPlayerId
+                    const isActiveLobbyPlayer = player.id === activeLobbyPlayerId
                     return (
                       <li
                         key={player.id}
-                        className={`lobby-panel-strong rounded-xl border px-3 py-3 ${
+                        className={`rounded-xl border px-3 py-3 ${
+                          isActiveLobbyPlayer ? 'viewer-score-surface' : 'lobby-panel-strong'
+                        } ${
                           isOwnerLobby
                             ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3'
                             : 'flex items-center justify-between gap-3'
