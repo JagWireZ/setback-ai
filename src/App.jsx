@@ -1339,6 +1339,7 @@ export default function App() {
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
   const latestShownRoundIndexRef = useRef(-1)
+  const lastDealtSortResetKeyRef = useRef('')
   const hydratedRoundSummaryGameIdRef = useRef('')
   const gameErrorTimeoutRef = useRef(null)
   const shareLinkCopiedTimeoutRef = useRef(null)
@@ -1928,6 +1929,31 @@ export default function App() {
   }, [activeGame, completedRoundCount])
 
   useEffect(() => {
+    const stage = activeGame?.phase?.stage
+    const viewerCardCount = getViewerHand(activeGame)?.cards?.length ?? 0
+    const dealKey =
+      activeGame?.phase && 'cards' in activeGame.phase
+        ? [
+            activeGame.id,
+            'roundIndex' in activeGame.phase ? activeGame.phase.roundIndex : 'no-round',
+            activeGame.phase.cards.trump?.suit ?? 'no-trump-suit',
+            activeGame.phase.cards.trump?.rank ?? 'no-trump-rank',
+          ].join(':')
+        : ''
+
+    if ((stage !== 'Bidding' && stage !== 'Playing') || viewerCardCount === 0 || !dealKey) {
+      return
+    }
+
+    if (lastDealtSortResetKeyRef.current === dealKey) {
+      return
+    }
+
+    lastDealtSortResetKeyRef.current = dealKey
+    setSortMode('byRank')
+  }, [activeGame])
+
+  useEffect(() => {
     if (gameErrorTimeoutRef.current) {
       clearTimeout(gameErrorTimeoutRef.current)
       gameErrorTimeoutRef.current = null
@@ -2328,6 +2354,8 @@ export default function App() {
             : prev,
         )
       }
+
+      setSortMode('byRank')
     } catch (error) {
       const message = toUserFacingActionError(error, 'Unable to deal cards')
       setGameError(message)
