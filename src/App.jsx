@@ -257,6 +257,7 @@ function ScoreSummary({
   bids,
   booksByPlayerId,
   currentRoundIndex,
+  isGameOver = false,
   isOwner = false,
   onSelectPlayer,
 }) {
@@ -267,10 +268,21 @@ function ScoreSummary({
       .filter(Boolean)
   const currentDealerPlayerId = game?.phase && 'dealerPlayerId' in game.phase ? game.phase.dealerPlayerId : ''
   const getPlayerRoleIcon = (player) => (player.type === 'ai' ? '🤖' : '👤')
+  const highestTotalScore = Array.isArray(game.scores)
+    ? game.scores.reduce((highest, entry) => Math.max(highest, entry?.total ?? Number.NEGATIVE_INFINITY), Number.NEGATIVE_INFINITY)
+    : Number.NEGATIVE_INFINITY
+  const displayedPlayers = orderedPlayers.length > 0 ? orderedPlayers : game.players ?? []
+  const sortedPlayers = isGameOver
+    ? [...displayedPlayers].sort((left, right) => {
+        const leftScore = game.scores?.find((entry) => entry.playerId === left.id)?.total ?? 0
+        const rightScore = game.scores?.find((entry) => entry.playerId === right.id)?.total ?? 0
+        return rightScore - leftScore
+      })
+    : displayedPlayers
 
   return (
     <ul className="mt-3 flex flex-col gap-2">
-      {(orderedPlayers.length > 0 ? orderedPlayers : game.players ?? []).map((player) => {
+      {sortedPlayers.map((player) => {
         const score = game.scores?.find((entry) => entry.playerId === player.id)
         const playerBidEntry = bids.find((bid) => bid.playerId === player.id)
         const playerBid =
@@ -283,9 +295,17 @@ function ScoreSummary({
           booksByPlayerId.get(player.id) ?? score?.rounds?.[currentRoundIndex]?.books ?? 0
         const playerRainbow = score?.rounds?.[currentRoundIndex]?.rainbow === true
         const playerDisplayName = truncateLabel(player.name, 22)
+        const isWinner = isGameOver && highestTotalScore !== Number.NEGATIVE_INFINITY && (score?.total ?? 0) === highestTotalScore
 
         return (
-          <li key={player.id} className="rounded border panel-surface-strong px-3 py-2 text-sm">
+          <li
+            key={player.id}
+            className={`rounded border px-3 py-2 text-sm ${
+              isWinner
+                ? 'border-[rgba(34,130,88,0.4)] bg-[rgba(22,101,52,0.16)]'
+                : 'panel-surface-strong'
+            }`}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -305,26 +325,31 @@ function ScoreSummary({
                     </p>
                   )}
                 </div>
-                <p className="mt-1 text-lg font-semibold text-white">
-                  {score?.total ?? 0}
-                  {playerRainbow ? <span className="ml-2" aria-label="Rainbow round">🌈</span> : null}
-                  {player.id === currentDealerPlayerId ? (
-                    <span className="ml-4 rounded-full border border-white/15 bg-white/8 px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                {player.id === currentDealerPlayerId ? (
+                  <p className="mt-1">
+                    <span className="rounded-full border border-white/15 bg-white/8 px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
                       Dealer
                     </span>
-                  ) : null}
-                </p>
+                  </p>
+                ) : null}
               </div>
-              <div className="flex flex-col items-end gap-1 text-xs text-muted">
-                <p>
-                  <span className="uppercase tracking-wide text-dim">Bid</span>{' '}
-                  <span className="ml-3 text-sm text-white">{playerBid}</span>
+              {isGameOver ? (
+                <p className="text-right text-lg font-semibold text-white">
+                  {score?.total ?? 0}
+                  {playerRainbow ? <span className="ml-2" aria-label="Rainbow round">🌈</span> : null}
                 </p>
-                <p>
-                  <span className="uppercase tracking-wide text-dim">Books</span>{' '}
-                  <span className="ml-3 text-sm text-white">{playerBooks}</span>
-                </p>
-              </div>
+              ) : (
+                <div className="flex flex-col items-end gap-1 text-xs text-muted">
+                  <p>
+                    <span className="uppercase tracking-wide text-dim">Bid</span>{' '}
+                    <span className="ml-3 text-sm text-white">{playerBid}</span>
+                  </p>
+                  <p>
+                    <span className="uppercase tracking-wide text-dim">Books</span>{' '}
+                    <span className="ml-3 text-sm text-white">{playerBooks}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </li>
         )
@@ -1411,6 +1436,7 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              isGameOver={isGameOver}
               isOwner={isOwner}
               onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
             />
@@ -1662,6 +1688,7 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              isGameOver={isGameOver}
               isOwner={isOwner}
               onSelectPlayer={(player) => setSelectedScorePlayerId(player.id)}
             />
@@ -1994,8 +2021,7 @@ export default function App() {
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
-  const [selectedDealerPlayerId, setSelectedDealerPlayerId] = useState('')
-  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
+    const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const [helpSection, setHelpSection] = useState('using-app')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
@@ -2107,7 +2133,6 @@ export default function App() {
           game: restoredSession.game,
           ownerPlayerId: restoredSession.ownerPlayerId,
         })
-        setSelectedDealerPlayerId(restoredSession.ownerPlayerId)
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setPlayerSession(null)
         setIsJoinModalOpen(false)
@@ -2270,9 +2295,6 @@ export default function App() {
         game: result?.game,
         ownerPlayerId: result?.game?.players?.find((player) => player.type === 'human')?.id,
       })
-      setSelectedDealerPlayerId(
-        result?.game?.players?.find((player) => player.type === 'human')?.id ?? '',
-      )
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setPlayerSession(null)
       setGameError('')
@@ -2381,7 +2403,6 @@ export default function App() {
           game: restoredSession.game,
           ownerPlayerId: restoredSession.ownerPlayerId,
         })
-        setSelectedDealerPlayerId(restoredSession.ownerPlayerId)
         setPlayerSession(null)
         saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner')
       } else {
@@ -2497,16 +2518,6 @@ export default function App() {
 
     return () => clearInterval(interval)
   }, [ownerSession?.gameId, ownerSession?.playerToken, isMutationInFlight])
-
-  useEffect(() => {
-    if (!ownerSession?.ownerPlayerId) {
-      return
-    }
-
-    if (!selectedDealerPlayerId) {
-      setSelectedDealerPlayerId(ownerSession.ownerPlayerId)
-    }
-  }, [ownerSession?.ownerPlayerId, selectedDealerPlayerId])
 
   useEffect(() => {
     if (!playerSession?.gameId || !playerSession?.playerToken) {
@@ -2771,7 +2782,7 @@ export default function App() {
         gameId: ownerSession.gameId,
         playerToken: ownerSession.playerToken,
         maxCards: Number(selectedMaxCards),
-        dealerPlayerId: selectedDealerPlayerId || undefined,
+        dealerPlayerId: orderedPlayers[0]?.id || undefined,
       })
       setOwnerSession((prev) =>
         prev
@@ -2845,7 +2856,6 @@ export default function App() {
             }
           : prev,
       )
-      setSelectedDealerPlayerId(ownerSession.ownerPlayerId ?? '')
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setLobbyInfo('Game reset to lobby.')
     } catch (error) {
@@ -3179,7 +3189,7 @@ export default function App() {
     }
   }
 
-  const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? selectedDealerPlayerId
+  const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? orderedPlayers[0]?.id ?? ''
   const helpModal = isHelpModalOpen ? (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
@@ -3579,86 +3589,53 @@ export default function App() {
               )}
 
               <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
-                <h2 className="text-lg font-semibold">Share Link</h2>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    type="text"
-                    readOnly
-                    value={shareLink}
-                    className="input-surface w-full text-sm"
-                  />
+                <div className="border-b border-white/10 pb-3">
+                  <h2 className="text-lg font-semibold">Share Link</h2>
+                </div>
+                <div className="mt-3">
                   <button
                     type="button"
-                    className="btn-primary px-4 py-2 text-sm"
+                    className="input-surface w-full cursor-pointer text-left text-sm transition hover:border-white/20"
                     onClick={handleCopyShareLink}
+                    aria-label={isShareLinkCopied ? 'Share link copied' : 'Copy share link'}
+                    title={isShareLinkCopied ? 'Copied' : 'Copy link'}
                   >
-                    {isShareLinkCopied ? 'Copied!' : 'Copy Link'}
+                    {isShareLinkCopied ? 'Copied!' : shareLink}
                   </button>
                 </div>
               </section>
 
               <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
                   <h2 className="text-lg font-semibold">Players</h2>
-                  {isOwnerLobby && (
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
-                      <label className="flex items-center gap-2">
-                        <span>Max Cards</span>
-                        <select
-                          value={selectedMaxCards}
-                          onChange={(event) => setSelectedMaxCards(event.target.value)}
-                          disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-                          className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
-                          aria-label="Select max cards"
-                        >
-                          {Array.from({ length: 10 }, (_, index) => {
-                            const value = String(10 - index)
-                            return (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            )
-                          })}
-                        </select>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <span>Dealer</span>
-                        <select
-                          value={selectedDealerPlayerId}
-                          onChange={(event) => setSelectedDealerPlayerId(event.target.value)}
-                          disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
-                          className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
-                          aria-label="Select dealer"
-                        >
-                          {orderedPlayers.map((player) => (
-                            <option key={player.id} value={player.id}>
-                              {player.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  )}
                 </div>
                 <ul className="mt-3 flex flex-col gap-2">
                   {orderedPlayers.map((player) => {
                     const isPending = pendingPlayerActionId === player.id
+                    const isDealer = player.id === currentDealerPlayerId
                     return (
                       <li
                         key={player.id}
                         className={`panel-surface-strong rounded-xl border bg-[rgba(52,52,52,0.85)] px-3 py-3 ${
                           isOwnerLobby
-                            ? 'grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'
-                            : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+                            ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3'
+                            : 'flex items-center justify-between gap-3'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{player.name}</span>
-                          <span className="rounded border px-2 py-0.5 text-xs uppercase tracking-wide text-muted" style={{ borderColor: 'var(--border-color)' }}>
-                            {player.type}
-                          </span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          {player.type === 'ai' ? (
+                            <span aria-hidden="true" className="text-sm text-muted">🤖</span>
+                          ) : (
+                            <span aria-hidden="true" className="text-sm text-muted">👤</span>
+                          )}
+                          <span className="truncate font-medium">{player.name}</span>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center justify-end gap-2">
+                          {isDealer ? (
+                            <span className="rounded-full border border-white/10 bg-white/6 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-dim">
+                              Dealer
+                            </span>
+                          ) : null}
                           {isOwnerLobby && (
                             <>
                               <button
@@ -3701,6 +3678,35 @@ export default function App() {
                   })}
                 </ul>
               </section>
+
+              {isOwnerLobby && (
+                <section className="panel-surface rounded-2xl border bg-[rgba(45,45,45,0.85)] p-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="border-b border-white/10 pb-3">
+                      <h2 className="text-lg font-semibold">Options</h2>
+                    </div>
+                    <label className="flex items-center justify-end gap-2 text-sm text-muted">
+                      <span>Max Cards</span>
+                      <select
+                        value={selectedMaxCards}
+                        onChange={(event) => setSelectedMaxCards(event.target.value)}
+                        disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                        className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
+                        aria-label="Select max cards"
+                      >
+                        {Array.from({ length: 10 }, (_, index) => {
+                          const value = String(10 - index)
+                          return (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+              )}
 
               <div className="flex items-center justify-between gap-3">
                 <button
