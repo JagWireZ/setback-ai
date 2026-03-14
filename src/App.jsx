@@ -62,6 +62,55 @@ const isInvalidPlayerTokenError = (error) => {
   return message.toLowerCase().includes('invalid player token')
 }
 
+const VIEWER_TURN_SOUND_STORAGE_KEY = 'setback.viewerTurnSoundEnabled'
+
+const getInitialViewerTurnSoundEnabled = () => {
+  if (typeof window === 'undefined') {
+    return true
+  }
+
+  const storedValue = window.localStorage.getItem(VIEWER_TURN_SOUND_STORAGE_KEY)
+  return storedValue !== 'false'
+}
+
+const playViewerTurnSound = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) {
+    return
+  }
+
+  const audioContext = new AudioContextClass()
+  const now = audioContext.currentTime
+  const gainNode = audioContext.createGain()
+  const oscillator = audioContext.createOscillator()
+
+  oscillator.type = 'square'
+  oscillator.frequency.setValueAtTime(880, now)
+  oscillator.frequency.exponentialRampToValueAtTime(720, now + 0.06)
+
+  gainNode.gain.setValueAtTime(0.0001, now)
+  gainNode.gain.exponentialRampToValueAtTime(0.035, now + 0.008)
+  gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.09)
+
+  oscillator.connect(gainNode)
+  gainNode.connect(audioContext.destination)
+
+  oscillator.start(now)
+  oscillator.stop(now + 0.1)
+
+  oscillator.addEventListener(
+    'ended',
+    () => {
+      audioContext.close().catch(() => {})
+    },
+    { once: true },
+  )
+}
+
 function GameTablePage({
   game,
   isOwner,
@@ -105,12 +154,24 @@ function GameTablePage({
   )
   const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
+  const [isViewerTurnSoundEnabled, setIsViewerTurnSoundEnabled] = useState(getInitialViewerTurnSoundEnabled)
 
   useEffect(() => {
     if (menuCloseRequestKey > 0) {
       setIsMenuModalOpen(false)
     }
   }, [menuCloseRequestKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    window.localStorage.setItem(
+      VIEWER_TURN_SOUND_STORAGE_KEY,
+      isViewerTurnSoundEnabled ? 'true' : 'false',
+    )
+  }, [isViewerTurnSoundEnabled])
 
   const viewerPlayerId = viewerHand?.playerId
   const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
@@ -193,6 +254,7 @@ function GameTablePage({
   const selectedTrickLabelRef = useRef(null)
   const previousTrickIndexRef = useRef(game?.phase?.trickIndex)
   const shouldClearSelectedTrickCardAfterRevealRef = useRef(false)
+  const previousIsViewerTurnRef = useRef(null)
 
   const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
@@ -312,6 +374,16 @@ function GameTablePage({
   useEffect(() => {
     setSelectedCardIndex(null)
   }, [game.phase?.stage, game.phase?.trickIndex, currentTurnPlayerId])
+
+  useEffect(() => {
+    const previousIsViewerTurn = previousIsViewerTurnRef.current
+
+    if (isViewerTurnSoundEnabled && previousIsViewerTurn !== null && !previousIsViewerTurn && isViewerTurn) {
+      playViewerTurnSound()
+    }
+
+    previousIsViewerTurnRef.current = isViewerTurn
+  }, [isViewerTurn, isViewerTurnSoundEnabled, game?.id, game?.version])
 
   useEffect(() => {
     if (winningDisplayedTrickCardIndex !== null && winningDisplayedTrickCardIndex >= 0) {
@@ -1031,9 +1103,11 @@ function GameTablePage({
         ) : null}
         <article
           className={`mt-3 shrink-0 overflow-hidden rounded-3xl border p-1 sm:overflow-x-auto ${
-            canSelectCards
-              ? 'hand-active'
-              : 'divider'
+            isViewerTurn
+              ? 'hand-active hand-active-turn'
+              : canSelectCards
+                ? 'hand-active'
+                : 'divider'
           }`}
         >
           <div className="flex min-h-[8rem] items-center justify-center pt-6 pb-2">
@@ -1375,7 +1449,16 @@ function GameTablePage({
                 Help
               </button>
             </div>
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="btn-secondary inline-flex items-center justify-center px-4 py-2 text-2xl leading-none"
+                onClick={() => setIsViewerTurnSoundEnabled((currentValue) => !currentValue)}
+                aria-label={isViewerTurnSoundEnabled ? 'Turn sound on' : 'Turn sound off'}
+                title={isViewerTurnSoundEnabled ? 'Turn sound on' : 'Turn sound off'}
+              >
+                {isViewerTurnSoundEnabled ? '🔉' : '🔇'}
+              </button>
               <button
                 type="button"
                 className="btn-secondary px-4 py-2 text-sm"
