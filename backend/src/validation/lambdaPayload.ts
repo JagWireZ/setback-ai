@@ -1,9 +1,10 @@
-import type { CardCount } from "@shared/types/game";
+import type { AIDifficulty, CardCount } from "@shared/types/game";
 import type { LambdaAction, LambdaEventPayload } from "@shared/types/lambda";
 
 const REACTION_EMOJIS = new Set(["😀", "😂", "😮", "😢", "😡", "👏", "🔥", "🎉"]);
 const CARD_SUITS = new Set(["Clubs", "Diamonds", "Hearts", "Spades", "Joker"]);
 const CARD_RANKS = new Set(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "LJ", "BJ"]);
+const AI_DIFFICULTIES = new Set<AIDifficulty>(["easy", "medium", "hard"]);
 
 const expectAction = <TAction extends LambdaAction>(
   event: LambdaEventPayload,
@@ -102,7 +103,7 @@ export function assertStartGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"startGame"> {
   const typedEvent = expectAction(event, "startGame");
-  const { gameId, playerToken, maxCards, dealerPlayerId } = typedEvent.payload;
+  const { gameId, playerToken, maxCards, dealerPlayerId, aiDifficulty } = typedEvent.payload;
 
   requireGameId(gameId, typedEvent.action);
   requirePlayerToken(playerToken, typedEvent.action);
@@ -112,6 +113,9 @@ export function assertStartGamePayload(
   }
 
   requireOptionalNonEmptyString(dealerPlayerId, typedEvent.action, "dealerPlayerId");
+  if (typeof aiDifficulty !== "undefined" && !AI_DIFFICULTIES.has(aiDifficulty)) {
+    throw new Error('startGame payload.aiDifficulty must be "easy", "medium", or "hard"');
+  }
 }
 
 export function assertStartOverPayload(

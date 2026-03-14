@@ -35,6 +35,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
     options: {
       maxCards: 10,
       blindBid: event.payload.blindBid ?? false,
+      aiDifficulty: "medium",
       rounds: [],
     },
     players: allPlayers,

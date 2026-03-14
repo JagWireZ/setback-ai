@@ -19,6 +19,7 @@ export const startGame = (
   }
 
   const selectedDealerPlayerId = event.payload.dealerPlayerId;
+  const selectedAiDifficulty = event.payload.aiDifficulty ?? existingGame.options.aiDifficulty ?? "medium";
   const rounds = generateRounds(event.payload.maxCards);
   let nextPlayerOrder = existingGame.playerOrder;
 
@@ -39,6 +40,7 @@ export const startGame = (
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
+      aiDifficulty: selectedAiDifficulty,
       rounds,
     },
     playerOrder: nextPlayerOrder,
@@ -48,6 +50,7 @@ export const startGame = (
     options: {
       ...existingGame.options,
       maxCards: event.payload.maxCards,
+      aiDifficulty: selectedAiDifficulty,
       rounds,
     },
     playerOrder: nextPlayerOrder,

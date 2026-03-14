@@ -1,4 +1,4 @@
-import type { Card, Game } from "@shared/types/game";
+import type { AIDifficulty, Card, Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
@@ -37,44 +37,213 @@ const getAiTurnPlayer = (game: Game): { playerId: string; token: string } | unde
 const clampBid = (bid: number, cardCount: number): number =>
   Math.max(0, Math.min(cardCount, Math.trunc(bid)));
 
-const getRankStrength = (card: Card): number => {
-  if (card.rank === "BJ") {
-    return 2.4;
-  }
-  if (card.rank === "LJ") {
-    return 2.1;
-  }
+const SUITS: Array<Card["suit"]> = ["Clubs", "Diamonds", "Hearts", "Spades"];
+const HIGH_TRUMP_RANKS = new Set<Card["rank"]>(["A", "K", "Q", "J", "10"]);
+const LOW_TRUMP_RANKS = new Set<Card["rank"]>(["2", "3", "4", "5", "6", "7", "8", "9"]);
+const ROYAL_RANKS = new Set<Card["rank"]>(["A", "K", "Q", "J"]);
 
-  const rankWeights: Record<string, number> = {
-    A: 0.8,
-    K: 0.65,
-    Q: 0.5,
-    J: 0.38,
-    "10": 0.3,
-    "9": 0.22,
-    "8": 0.17,
-    "7": 0.13,
-    "6": 0.1,
-    "5": 0.08,
-    "4": 0.07,
-    "3": 0.06,
-    "2": 0.05,
-  };
-
-  return rankWeights[card.rank] ?? 0.05;
+const getDifficultySettings = (
+  difficulty: AIDifficulty,
+): {
+  riskOffset: number;
+  pressurePenalty: number;
+  contestBoost: number;
+  tripSlack: number;
+  roundBias: (value: number) => number;
+} => {
+  switch (difficulty) {
+    case "easy":
+      return {
+        riskOffset: -0.35,
+        pressurePenalty: 0.38,
+        contestBoost: 0.12,
+        tripSlack: -0.2,
+        roundBias: (value) => Math.floor(Math.max(0, value + 0.1)),
+      };
+    case "hard":
+      return {
+        riskOffset: 0.35,
+        pressurePenalty: 0.14,
+        contestBoost: 0.45,
+        tripSlack: 0.2,
+        roundBias: (value) => Math.ceil(Math.max(0, value - 0.15)),
+      };
+    case "medium":
+    default:
+      return {
+        riskOffset: 0,
+        pressurePenalty: 0.24,
+        contestBoost: 0.26,
+        tripSlack: 0,
+        roundBias: (value) => Math.round(Math.max(0, value)),
+      };
+  }
 };
 
-const getCardStrength = (card: Card, trumpSuit: Card["suit"]): number => {
-  if (card.suit === "Joker") {
-    return getRankStrength(card);
+const getPlayerHistoryAdjustment = (game: Game, playerId: string): number => {
+  const score = game.scores.find((entry) => entry.playerId === playerId);
+  if (!score || !Array.isArray(score.rounds) || score.rounds.length === 0) {
+    return 0;
   }
 
-  const rankStrength = getRankStrength(card);
-  if (card.suit === trumpSuit) {
-    return rankStrength + 0.5;
+  const completedRounds = score.rounds.filter(
+    (round) => typeof round?.bid === "number" && typeof round?.books === "number",
+  );
+  if (completedRounds.length === 0) {
+    return 0;
   }
 
-  return rankStrength;
+  const averageDelta =
+    completedRounds.reduce((sum, round) => sum + (round.books - round.bid), 0) / completedRounds.length;
+
+  return Math.max(-0.35, Math.min(0.35, averageDelta * 0.18));
+};
+
+const countCardsOfSuit = (cards: Card[], suit: Card["suit"]): number =>
+  cards.filter((card) => card.suit === suit).length;
+
+const analyzeBidHand = (cards: Card[], trumpSuit: Card["suit"], roundCardCount: number) => {
+  const isSmallRound = roundCardCount <= 3;
+  const isBigRound = roundCardCount >= 6;
+  const trumpCards = cards.filter((card) => card.suit === trumpSuit);
+  const bigJokerCount = cards.filter((card) => card.rank === "BJ").length;
+  const littleJokerCount = cards.filter((card) => card.rank === "LJ").length;
+  const jokerCount = bigJokerCount + littleJokerCount;
+  const trumpEquivalentCount = trumpCards.length + jokerCount;
+  const highTrumpCards = trumpCards.filter((card) => HIGH_TRUMP_RANKS.has(card.rank));
+  const lowTrumpCards = trumpCards.filter((card) => LOW_TRUMP_RANKS.has(card.rank));
+  const offSuitAces = cards.filter((card) => card.rank === "A" && card.suit !== trumpSuit).length;
+  const offSuitKings = cards.filter((card) => card.rank === "K" && card.suit !== trumpSuit).length;
+  const hasAceTrump = trumpCards.some((card) => card.rank === "A");
+  const hasKingTrump = trumpCards.some((card) => card.rank === "K");
+  const hasRoyalOrAce = cards.some(
+    (card) => card.suit === "Joker" || ROYAL_RANKS.has(card.rank),
+  );
+  const missingNonTrumpSuitCount = SUITS.filter(
+    (suit) => suit !== trumpSuit && countCardsOfSuit(cards, suit) === 0,
+  ).length;
+
+  let expectedTricks = 0;
+  expectedTricks += bigJokerCount;
+  expectedTricks += littleJokerCount * (isSmallRound ? 0.95 : 0.85);
+  expectedTricks += highTrumpCards.reduce((sum, card) => {
+    if (card.rank === "A") {
+      return sum + (isSmallRound ? 1 : 0.95);
+    }
+    if (card.rank === "K") {
+      return sum + (isSmallRound ? 0.72 : 0.82);
+    }
+    if (card.rank === "Q") {
+      return sum + (isSmallRound ? 0.54 : 0.68);
+    }
+    if (card.rank === "J") {
+      return sum + (isSmallRound ? 0.42 : 0.56);
+    }
+    return sum + 0.5;
+  }, 0);
+  expectedTricks += lowTrumpCards.length * (isSmallRound ? 0.42 : 0.56);
+  expectedTricks += offSuitAces * (isSmallRound ? 0.55 : 0.9);
+  expectedTricks += offSuitKings * (isSmallRound ? 0.14 : 0.26);
+
+  if (missingNonTrumpSuitCount > 0 && trumpEquivalentCount > 0 && isBigRound) {
+    expectedTricks += Math.min(missingNonTrumpSuitCount, trumpEquivalentCount) * 0.38;
+  }
+
+  if (bigJokerCount > 0 && littleJokerCount > 0) {
+    expectedTricks = Math.max(expectedTricks, 2);
+  }
+
+  if (isBigRound && offSuitAces > 0 && trumpEquivalentCount === 0) {
+    expectedTricks = Math.max(expectedTricks, offSuitAces);
+  }
+
+  return {
+    isSmallRound,
+    isBigRound,
+    jokerCount,
+    bigJokerCount,
+    littleJokerCount,
+    trumpCards,
+    trumpEquivalentCount,
+    highTrumpCards,
+    lowTrumpCards,
+    offSuitAces,
+    hasAceTrump,
+    hasKingTrump,
+    hasRoyalOrAce,
+    missingNonTrumpSuitCount,
+    expectedTricks,
+  };
+};
+
+const isFirstHighestBidderIfMatched = (
+  game: Game,
+  aiPlayerId: string,
+  targetBid: number,
+): boolean => {
+  if (game.phase.stage !== "Bidding") {
+    return false;
+  }
+
+  const dealerIndex = game.playerOrder.indexOf(game.phase.dealerPlayerId);
+  if (dealerIndex < 0) {
+    return false;
+  }
+
+  const highestBidPlayers = new Set(
+    game.phase.bids.filter((bid) => bid.amount === targetBid).map((bid) => bid.playerId),
+  );
+  highestBidPlayers.add(aiPlayerId);
+
+  for (let offset = 1; offset <= game.playerOrder.length; offset += 1) {
+    const playerId = game.playerOrder[(dealerIndex + offset) % game.playerOrder.length];
+    if (highestBidPlayers.has(playerId)) {
+      return playerId === aiPlayerId;
+    }
+  }
+
+  return false;
+};
+
+const shouldTripBid = (
+  game: Game,
+  roundCardCount: number,
+  handAnalysis: ReturnType<typeof analyzeBidHand>,
+  candidateBid: number,
+  difficulty: AIDifficulty,
+): boolean => {
+  const alreadyTripped = game.phase.stage === "Bidding" && game.phase.bids.some((bid) => bid.trip);
+  const currentHighBid =
+    game.phase.stage === "Bidding" && game.phase.bids.length > 0
+      ? Math.max(...game.phase.bids.map((bid) => bid.amount))
+      : 0;
+  const difficultySettings = getDifficultySettings(difficulty);
+
+  if (roundCardCount === 3) {
+    return !alreadyTripped && handAnalysis.jokerCount > 0 && handAnalysis.trumpEquivalentCount >= 3;
+  }
+
+  if (roundCardCount === 2) {
+    return (
+      (handAnalysis.jokerCount > 0 || handAnalysis.hasAceTrump) &&
+      handAnalysis.trumpEquivalentCount >= 2
+    );
+  }
+
+  if (roundCardCount === 1) {
+    return handAnalysis.jokerCount > 0 || handAnalysis.hasAceTrump || handAnalysis.hasKingTrump;
+  }
+
+  if (
+    roundCardCount <= 3 &&
+    currentHighBid === 0 &&
+    candidateBid >= roundCardCount &&
+    handAnalysis.expectedTricks >= roundCardCount - 0.15 + difficultySettings.tripSlack
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 const chooseAiBid = (game: Game): { bid: number; trip?: boolean } => {
@@ -98,25 +267,75 @@ const chooseAiBid = (game: Game): { bid: number; trip?: boolean } => {
     return { bid: 0 };
   }
 
-  const handStrength = aiHand.cards.reduce(
-    (sum, card) => sum + getCardStrength(card, trumpSuit),
-    0,
-  );
+  const difficulty = game.options.aiDifficulty ?? "medium";
+  const difficultySettings = getDifficultySettings(difficulty);
+  const handAnalysis = analyzeBidHand(aiHand.cards, trumpSuit, round.cardCount);
+  const previousBids = game.options.blindBid ? [] : game.phase.bids;
+  const previousBidTotal = previousBids.reduce((sum, bid) => sum + bid.amount, 0);
+  const currentHighBid = previousBids.reduce((max, bid) => Math.max(max, bid.amount), 0);
+  const bidPressure = round.cardCount > 0 ? previousBidTotal / round.cardCount : 0;
+  const remainingPlayers = Math.max(0, game.playerOrder.length - previousBids.length - 1);
+  const remainingPressureEstimate = remainingPlayers * (round.cardCount / game.playerOrder.length) * 0.35;
+  const historyAdjustment = getPlayerHistoryAdjustment(game, aiPlayerId);
+  const strategy = Math.random() < 0.5 ? "maximize" : "contest";
 
-  const estimatedTricks = clampBid(Math.round(handStrength / 1.2), round.cardCount);
+  if (!handAnalysis.hasRoyalOrAce && handAnalysis.trumpEquivalentCount === 0) {
+    return { bid: 0 };
+  }
 
-  if (round.cardCount <= 3) {
-    const strongForSweep = estimatedTricks === round.cardCount && handStrength >= round.cardCount + 0.8;
-    if (strongForSweep) {
-      return {
-        bid: round.cardCount,
-        trip: true,
-      };
+  if (
+    handAnalysis.isBigRound &&
+    handAnalysis.lowTrumpCards.length > 0 &&
+    handAnalysis.highTrumpCards.length === 0 &&
+    handAnalysis.offSuitAces === 0 &&
+    handAnalysis.missingNonTrumpSuitCount === 0
+  ) {
+    return { bid: 0 };
+  }
+
+  let bidEstimate =
+    handAnalysis.expectedTricks +
+    difficultySettings.riskOffset +
+    historyAdjustment;
+
+  if (!game.options.blindBid) {
+    const strongHandBoost =
+      handAnalysis.bigJokerCount +
+      handAnalysis.highTrumpCards.length * 0.3 +
+      handAnalysis.offSuitAces * 0.2;
+    bidEstimate -= Math.max(0, bidPressure - strongHandBoost * 0.12) * difficultySettings.pressurePenalty;
+    bidEstimate -= remainingPressureEstimate * 0.12;
+
+    const canChallengeHighBid =
+      bidEstimate + handAnalysis.jokerCount * 0.25 + handAnalysis.highTrumpCards.length * 0.18 >=
+      currentHighBid - 0.2;
+
+    if (strategy === "contest" && currentHighBid > 0 && canChallengeHighBid) {
+      const tieAdvantage = isFirstHighestBidderIfMatched(game, aiPlayerId, currentHighBid);
+      if (tieAdvantage) {
+        bidEstimate = Math.max(bidEstimate, currentHighBid + difficultySettings.contestBoost * 0.5);
+      } else if (difficulty === "hard") {
+        bidEstimate = Math.max(bidEstimate, currentHighBid + difficultySettings.contestBoost);
+      } else {
+        bidEstimate = Math.max(bidEstimate, currentHighBid);
+      }
     }
   }
 
+  const roundedBid = clampBid(difficultySettings.roundBias(bidEstimate), round.cardCount);
+
+  if (shouldTripBid(game, round.cardCount, handAnalysis, roundedBid, difficulty)) {
+    return {
+      bid: round.cardCount,
+      trip: true,
+    };
+  }
+
   return {
-    bid: estimatedTricks,
+    bid:
+      handAnalysis.isBigRound && handAnalysis.offSuitAces > 0 && handAnalysis.trumpEquivalentCount === 0
+        ? Math.max(roundedBid, handAnalysis.offSuitAces)
+        : roundedBid,
   };
 };
 

@@ -145,12 +145,13 @@ export const sendReaction = ({ gameId, playerToken, emoji }) =>
     emoji,
   })
 
-export const startGame = ({ gameId, playerToken, maxCards, dealerPlayerId }) =>
+export const startGame = ({ gameId, playerToken, maxCards, dealerPlayerId, aiDifficulty }) =>
   invokeLambda('startGame', {
     gameId: normalizeGameId(gameId),
     playerToken,
     maxCards,
     dealerPlayerId,
+    ...(aiDifficulty ? { aiDifficulty } : {}),
   })
 
 export const startOver = ({ gameId, playerToken }) =>

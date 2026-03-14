@@ -132,6 +132,8 @@ export type PlayerToken = {
   token: string
 }
 
+export type AIDifficulty = 'easy' | 'medium' | 'hard'
+
 export type ReactionEmoji = '😀' | '😂' | '😮' | '😢' | '😡' | '👏' | '🔥' | '🎉'
 
 export type Reaction = {
@@ -144,6 +146,7 @@ export type Reaction = {
 export type Options = {
   maxCards: CardCount
   blindBid: boolean
+  aiDifficulty: AIDifficulty
   rounds: Round[]
 }
 

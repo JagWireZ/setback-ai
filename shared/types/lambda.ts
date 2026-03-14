@@ -1,4 +1,4 @@
-import type { Card, CardCount, ReactionEmoji, SortMode } from './game'
+import type { AIDifficulty, Card, CardCount, ReactionEmoji, SortMode } from './game'
 
 export type LambdaAction =
   | 'createGame'
@@ -35,6 +35,7 @@ type ActionPayloadMap = {
     gameId: string
     maxCards: CardCount
     dealerPlayerId?: string
+    aiDifficulty?: AIDifficulty
   }
   startOver: {
     gameId: string

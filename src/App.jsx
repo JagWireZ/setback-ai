@@ -51,6 +51,12 @@ import {
   validatePlayerName,
 } from './utils/playerName'
 
+const AI_DIFFICULTY_OPTIONS = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+]
+
 function GameTablePage({
   game,
   isOwner,
@@ -1291,6 +1297,7 @@ export default function App() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [selectedMaxCards, setSelectedMaxCards] = useState('10')
+  const [selectedAiDifficulty, setSelectedAiDifficulty] = useState('medium')
   const [joinGameId, setJoinGameId] = useState('')
   const [selectedRejoinGameId, setSelectedRejoinGameId] = useState('')
   const [joinPlayerName, setJoinPlayerName] = useState('')
@@ -1454,6 +1461,7 @@ export default function App() {
           ownerPlayerId: restoredSession.ownerPlayerId,
         })
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
+        setSelectedAiDifficulty(restoredSession.game?.options?.aiDifficulty ?? 'medium')
         setPlayerSession(null)
         setIsJoinModalOpen(false)
         saveStoredGameSession(
@@ -1655,6 +1663,7 @@ export default function App() {
         ownerPlayerId: result?.game?.players?.find((player) => player.type === 'human')?.id,
       })
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
+      setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
       setPlayerSession(null)
       setGameError('')
       setLobbyInfo('')
@@ -2182,6 +2191,7 @@ export default function App() {
         playerToken: ownerSession.playerToken,
         maxCards: Number(selectedMaxCards),
         dealerPlayerId: orderedPlayers[0]?.id || undefined,
+        aiDifficulty: selectedAiDifficulty,
       })
       setOwnerSession((prev) =>
         prev
@@ -2256,6 +2266,7 @@ export default function App() {
           : prev,
       )
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
+      setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
       setLobbyInfo('Game reset to lobby.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start over'
@@ -3126,6 +3137,22 @@ export default function App() {
                             </option>
                           )
                         })}
+                      </select>
+                    </label>
+                    <label className="flex items-center justify-end gap-2 text-sm text-muted">
+                      <span>AI Difficulty</span>
+                      <select
+                        value={selectedAiDifficulty}
+                        onChange={(event) => setSelectedAiDifficulty(event.target.value)}
+                        disabled={isStartingGame || ownerSession.game.phase?.stage !== 'Lobby'}
+                        className="input-surface px-3 py-1.5 text-sm capitalize disabled:opacity-50"
+                        aria-label="Select AI difficulty"
+                      >
+                        {AI_DIFFICULTY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   </div>

@@ -10,6 +10,7 @@ const createLobbyGame = () => ({
   options: {
     maxCards: 10,
     blindBid: false,
+    aiDifficulty: "medium",
     rounds: [],
   },
   players: [
@@ -36,10 +37,12 @@ test("startGame applies maxCards and generates rounds when leaving the lobby", (
       playerToken: "owner-token",
       maxCards: 5,
       dealerPlayerId: "p2",
+      aiDifficulty: "hard",
     },
   });
 
   assert.equal(updated.options.maxCards, 5);
+  assert.equal(updated.options.aiDifficulty, "hard");
   assert.deepEqual(
     updated.options.rounds.map((round) => `${round.cardCount}-${round.direction}`),
     ["5-down", "4-down", "3-down", "2-down", "1-down", "2-up", "3-up", "4-up", "5-up"],
