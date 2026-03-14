@@ -2802,6 +2802,8 @@ export default function App() {
 
     setGameError('')
     setLobbyInfo('')
+    setRequestError('')
+    setSessionInfo(null)
     setIsLeavingGame(true)
 
     try {
@@ -2810,6 +2812,8 @@ export default function App() {
         playerToken: playerSession.playerToken,
         playerId: leavingPlayerId,
       })
+      clearGameIdInUrl()
+      setSessionInfo(null)
       handleRemovedFromGame(playerSession.gameId, "You left game " + playerSession.gameId + ".")
       return true
     } catch (error) {
