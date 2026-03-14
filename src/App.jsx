@@ -771,6 +771,7 @@ function GameTablePage({
   onSetGameError,
   onRenamePlayer,
   onRemovePlayer,
+  onLeaveGame,
   onDealCards,
   onSubmitBid,
   onPlayCard,
@@ -789,6 +790,7 @@ function GameTablePage({
   isSendingReaction,
   isReactionOnCooldown,
   isRenamingPlayer,
+  isLeavingGame,
   isSortingCards,
   isLoadingRejoinGames,
 }) {
@@ -984,7 +986,7 @@ function GameTablePage({
 
   useEffect(() => {
     setSelectedCardIndex(null)
-  }, [game.phase?.stage, currentTurnPlayerId])
+  }, [game.phase?.stage, game.phase?.trickIndex, currentTurnPlayerId])
 
   useEffect(() => {
     if (winningDisplayedTrickCardIndex !== null && winningDisplayedTrickCardIndex >= 0) {
@@ -1928,7 +1930,19 @@ function GameTablePage({
                 >
                   Reset Game
                 </button>
-              ) : null}
+              ) : (
+                <button
+                  type="button"
+                  className="btn-danger w-[90%] bg-[rgba(199,67,67,0.12)] px-4 py-3 text-left disabled:opacity-50"
+                  onClick={() => {
+                    setIsMenuModalOpen(false)
+                    onLeaveGame?.()
+                  }}
+                  disabled={isLeavingGame}
+                >
+                  {isLeavingGame ? "Leaving..." : "Leave Game"}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn-secondary w-[90%] px-4 py-3 text-left"
@@ -2018,6 +2032,7 @@ export default function App() {
   const [isSendingReaction, setIsSendingReaction] = useState(false)
   const [isRenamingPlayer, setIsRenamingPlayer] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
+  const [isLeavingGame, setIsLeavingGame] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
@@ -2037,7 +2052,7 @@ export default function App() {
   const endOfRoundSummaryTimeoutRef = useRef(null)
   const gameOverScoreTimeoutRef = useRef(null)
   const isMutationInFlight =
-    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isStartingOver
+    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isLeavingGame || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
 
   useEffect(() => () => {
@@ -2059,7 +2074,7 @@ export default function App() {
     }
   }, [])
 
-  const handleRemovedFromGame = (gameId) => {
+  const handleRemovedFromGame = (gameId, message = "You have been removed from game " + gameId + ".") => {
     if (gameId) {
       clearStoredGameSession(gameId)
     }
@@ -2095,7 +2110,7 @@ export default function App() {
     setIsBidModalOpen(false)
     setIsSortModalOpen(false)
     setSessionInfo(null)
-    setRequestError(`You have been removed from game ${gameId}.`)
+    setRequestError(message)
     clearGameIdInUrl()
   }
 
@@ -2770,6 +2785,42 @@ export default function App() {
     }
   }
 
+  const handleLeaveGame = async () => {
+    if (!playerSession?.gameId || !playerSession?.playerToken) {
+      return false
+    }
+
+    const leavingPlayerId =
+      playerSession.game?.phase && 'cards' in playerSession.game.phase
+        ? playerSession.game.phase.cards.hands?.[0]?.playerId
+        : ''
+
+    if (!leavingPlayerId) {
+      setGameError('Unable to determine which player should leave this game')
+      return false
+    }
+
+    setGameError('')
+    setLobbyInfo('')
+    setIsLeavingGame(true)
+
+    try {
+      await removePlayer({
+        gameId: playerSession.gameId,
+        playerToken: playerSession.playerToken,
+        playerId: leavingPlayerId,
+      })
+      handleRemovedFromGame(playerSession.gameId, "You left game " + playerSession.gameId + ".")
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to leave game'
+      setGameError(message)
+      return false
+    } finally {
+      setIsLeavingGame(false)
+    }
+  }
+
   const handleStartGame = async () => {
     if (!ownerSession?.gameId || !ownerSession?.playerToken) {
       return
@@ -3428,6 +3479,7 @@ export default function App() {
           onSetGameError={setGameError}
           onRenamePlayer={handleRenamePlayer}
           onRemovePlayer={handleRemovePlayer}
+          onLeaveGame={handleLeaveGame}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
           onPlayCard={handlePlayCard}
@@ -3446,6 +3498,7 @@ export default function App() {
           isSendingReaction={isSendingReaction}
           isReactionOnCooldown={isReactionOnCooldown}
           isRenamingPlayer={isRenamingPlayer}
+          isLeavingGame={isLeavingGame}
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}
         />

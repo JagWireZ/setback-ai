@@ -96,7 +96,18 @@ export const engineReducer = (
       return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
     case "removePlayer": {
-      requireOwnerToken(game, event.payload.playerToken);
+      requirePlayerToken(game, event.payload.playerToken);
+      const existingGame = requireGame(game);
+      const targetPlayerToken = existingGame.playerTokens.find(
+        (entry) => entry.playerId === event.payload.playerId,
+      )?.token;
+      const isOwnerRequest = existingGame.ownerToken === event.payload.playerToken;
+      const isSelfRemoval = targetPlayerToken === event.payload.playerToken;
+
+      if (!isOwnerRequest && !isSelfRemoval) {
+        throw new Error("Only the owner can remove other players");
+      }
+
       const updatedGame = removePlayer(game, event);
       return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
     }
