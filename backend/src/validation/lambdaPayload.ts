@@ -1,189 +1,149 @@
 import type { CardCount } from "@shared/types/game";
-import type { LambdaEventPayload } from "@shared/types/lambda";
+import type { LambdaAction, LambdaEventPayload } from "@shared/types/lambda";
 
 const REACTION_EMOJIS = new Set(["😀", "😂", "😮", "😢", "😡", "👏", "🔥", "🎉"]);
+const CARD_SUITS = new Set(["Clubs", "Diamonds", "Hearts", "Spades", "Joker"]);
+const CARD_RANKS = new Set(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "LJ", "BJ"]);
+
+const expectAction = <TAction extends LambdaAction>(
+  event: LambdaEventPayload,
+  action: TAction,
+): LambdaEventPayload<TAction> => {
+  if (event.action !== action) {
+    throw new Error(`Invalid action for ${action} payload validation`);
+  }
+
+  return event as LambdaEventPayload<TAction>;
+};
+
+const requireNonEmptyString = (value: unknown, action: string, field: string): void => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${action} requires payload.${field}`);
+  }
+};
+
+const requirePlayerToken = (value: unknown, action: string): void => {
+  requireNonEmptyString(value, action, "playerToken");
+};
+
+const requireGameId = (value: unknown, action: string): void => {
+  requireNonEmptyString(value, action, "gameId");
+};
+
+const requireInteger = (value: unknown, action: string, field: string): void => {
+  if (typeof value !== "number" || !Number.isInteger(value)) {
+    throw new Error(`${action} requires payload.${field}`);
+  }
+};
+
+const requireOptionalBoolean = (value: unknown, action: string, field: string): void => {
+  if (typeof value !== "undefined" && typeof value !== "boolean") {
+    throw new Error(`${action} payload.${field} must be a boolean when provided`);
+  }
+};
+
+const requireOptionalNonEmptyString = (value: unknown, action: string, field: string): void => {
+  if (typeof value !== "undefined" && (typeof value !== "string" || value.trim().length === 0)) {
+    throw new Error(`${action} payload.${field} must be a non-empty string when provided`);
+  }
+};
 
 export function assertCreateGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"createGame"> {
-  if (event.action !== "createGame") {
-    throw new Error("Invalid action for createGame payload validation");
-  }
+  const typedEvent = expectAction(event, "createGame");
+  const { playerName, blindBid } = typedEvent.payload;
 
-  const { playerName, blindBid } = event.payload;
-
-  if (typeof playerName !== "string" || playerName.trim().length === 0) {
-    throw new Error("createGame requires payload.playerName");
-  }
-
-  if (typeof blindBid !== "undefined" && typeof blindBid !== "boolean") {
-    throw new Error("createGame payload.blindBid must be a boolean when provided");
-  }
+  requireNonEmptyString(playerName, typedEvent.action, "playerName");
+  requireOptionalBoolean(blindBid, typedEvent.action, "blindBid");
 }
 
 export function assertRemoveGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"removeGame"> {
-  if (event.action !== "removeGame") {
-    throw new Error("Invalid action for removeGame payload validation");
-  }
+  const typedEvent = expectAction(event, "removeGame");
+  const { gameId, playerToken } = typedEvent.payload;
 
-  const { gameId, playerToken } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("removeGame requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("removeGame requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 }
 
 export function assertJoinGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"joinGame"> {
-  if (event.action !== "joinGame") {
-    throw new Error("Invalid action for joinGame payload validation");
-  }
+  const typedEvent = expectAction(event, "joinGame");
+  const { gameId, playerName } = typedEvent.payload;
 
-  const { gameId, playerName } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("joinGame requires payload.gameId");
-  }
-
-  if (typeof playerName !== "string" || playerName.trim().length === 0) {
-    throw new Error("joinGame requires payload.playerName");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requireNonEmptyString(playerName, typedEvent.action, "playerName");
 }
 
 export function assertCheckStatePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"checkState"> {
-  if (event.action !== "checkState") {
-    throw new Error("Invalid action for checkState payload validation");
-  }
+  const typedEvent = expectAction(event, "checkState");
+  const { gameId, playerToken } = typedEvent.payload;
 
-  const { gameId, playerToken } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("checkState requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("checkState requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 }
 
 export function assertDealCardsPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"dealCards"> {
-  if (event.action !== "dealCards") {
-    throw new Error("Invalid action for dealCards payload validation");
-  }
+  const typedEvent = expectAction(event, "dealCards");
+  const { gameId, playerToken } = typedEvent.payload;
 
-  const { gameId, playerToken } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("dealCards requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("dealCards requires payload.playerToken");
-  }
-
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 }
 
 export function assertStartGamePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"startGame"> {
-  if (event.action !== "startGame") {
-    throw new Error("Invalid action for startGame payload validation");
-  }
+  const typedEvent = expectAction(event, "startGame");
+  const { gameId, playerToken, maxCards, dealerPlayerId } = typedEvent.payload;
 
-  const { gameId, playerToken, maxCards, dealerPlayerId } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("startGame requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("startGame requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 
   if (!isCardCount(maxCards)) {
     throw new Error("startGame requires payload.maxCards (1-10)");
   }
 
-  if (typeof dealerPlayerId !== "undefined" && (typeof dealerPlayerId !== "string" || dealerPlayerId.trim().length === 0)) {
-    throw new Error("startGame payload.dealerPlayerId must be a non-empty string when provided");
-  }
-
+  requireOptionalNonEmptyString(dealerPlayerId, typedEvent.action, "dealerPlayerId");
 }
 
 export function assertStartOverPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"startOver"> {
-  if (event.action !== "startOver") {
-    throw new Error("Invalid action for startOver payload validation");
-  }
+  const typedEvent = expectAction(event, "startOver");
+  const { gameId, playerToken } = typedEvent.payload;
 
-  const { gameId, playerToken } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("startOver requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("startOver requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 }
 
 export function assertSubmitBidPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"submitBid"> {
-  if (event.action !== "submitBid") {
-    throw new Error("Invalid action for submitBid payload validation");
-  }
+  const typedEvent = expectAction(event, "submitBid");
+  const { gameId, playerToken, bid, trip } = typedEvent.payload;
 
-  const { gameId, playerToken, bid, trip } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("submitBid requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("submitBid requires payload.playerToken");
-  }
-
-  if (typeof bid !== "number" || !Number.isInteger(bid)) {
-    throw new Error("submitBid requires payload.bid");
-  }
-
-  if (typeof trip !== "undefined" && typeof trip !== "boolean") {
-    throw new Error("submitBid payload.trip must be a boolean when provided");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireInteger(bid, typedEvent.action, "bid");
+  requireOptionalBoolean(trip, typedEvent.action, "trip");
 }
-
-const CARD_SUITS = new Set(["Clubs", "Diamonds", "Hearts", "Spades", "Joker"]);
-const CARD_RANKS = new Set(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "LJ", "BJ"]);
 
 export function assertPlayCardPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"playCard"> {
-  if (event.action !== "playCard") {
-    throw new Error("Invalid action for playCard payload validation");
-  }
+  const typedEvent = expectAction(event, "playCard");
+  const { gameId, playerToken, card } = typedEvent.payload;
 
-  const { gameId, playerToken, card } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("playCard requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("playCard requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 
   if (
     typeof card !== "object" ||
@@ -202,19 +162,11 @@ export function assertPlayCardPayload(
 export function assertSortCardsPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"sortCards"> {
-  if (event.action !== "sortCards") {
-    throw new Error("Invalid action for sortCards payload validation");
-  }
+  const typedEvent = expectAction(event, "sortCards");
+  const { gameId, playerToken, mode } = typedEvent.payload;
 
-  const { gameId, playerToken, mode } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("sortCards requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("sortCards requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 
   if (mode !== "bySuit" && mode !== "byRank") {
     throw new Error('sortCards requires payload.mode as "bySuit" or "byRank"');
@@ -224,23 +176,12 @@ export function assertSortCardsPayload(
 export function assertMovePlayerPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"movePlayer"> {
-  if (event.action !== "movePlayer") {
-    throw new Error("Invalid action for movePlayer payload validation");
-  }
+  const typedEvent = expectAction(event, "movePlayer");
+  const { gameId, playerToken, playerId, direction } = typedEvent.payload;
 
-  const { gameId, playerToken, playerId, direction } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("movePlayer requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("movePlayer requires payload.playerToken");
-  }
-
-  if (typeof playerId !== "string" || playerId.trim().length === 0) {
-    throw new Error("movePlayer requires payload.playerId");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerId, typedEvent.action, "playerId");
 
   if (direction !== "left" && direction !== "right") {
     throw new Error('movePlayer requires payload.direction as "left" or "right"');
@@ -250,63 +191,33 @@ export function assertMovePlayerPayload(
 export function assertRemovePlayerPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"removePlayer"> {
-  if (event.action !== "removePlayer") {
-    throw new Error("Invalid action for removePlayer payload validation");
-  }
+  const typedEvent = expectAction(event, "removePlayer");
+  const { gameId, playerToken, playerId } = typedEvent.payload;
 
-  const { gameId, playerToken, playerId } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("removePlayer requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("removePlayer requires payload.playerToken");
-  }
-
-  if (typeof playerId !== "string" || playerId.trim().length === 0) {
-    throw new Error("removePlayer requires payload.playerId");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerId, typedEvent.action, "playerId");
 }
 
 export function assertRenamePlayerPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"renamePlayer"> {
-  if (event.action !== "renamePlayer") {
-    throw new Error("Invalid action for renamePlayer payload validation");
-  }
+  const typedEvent = expectAction(event, "renamePlayer");
+  const { gameId, playerToken, playerName } = typedEvent.payload;
 
-  const { gameId, playerToken, playerName } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("renamePlayer requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("renamePlayer requires payload.playerToken");
-  }
-
-  if (typeof playerName !== "string" || playerName.trim().length === 0) {
-    throw new Error("renamePlayer requires payload.playerName");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerName, typedEvent.action, "playerName");
 }
 
 export function assertSendReactionPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"sendReaction"> {
-  if (event.action !== "sendReaction") {
-    throw new Error("Invalid action for sendReaction payload validation");
-  }
+  const typedEvent = expectAction(event, "sendReaction");
+  const { gameId, playerToken, emoji } = typedEvent.payload;
 
-  const { gameId, playerToken, emoji } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("sendReaction requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("sendReaction requires payload.playerToken");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
 
   if (typeof emoji !== "string" || !REACTION_EMOJIS.has(emoji)) {
     throw new Error("sendReaction requires payload.emoji");
@@ -316,23 +227,12 @@ export function assertSendReactionPayload(
 export function assertGetGameStatePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"getGameState"> {
-  if (event.action !== "getGameState") {
-    throw new Error("Invalid action for getGameState payload validation");
-  }
+  const typedEvent = expectAction(event, "getGameState");
+  const { gameId, playerToken, version } = typedEvent.payload;
 
-  const { gameId, playerToken, version } = event.payload;
-
-  if (typeof gameId !== "string" || gameId.trim().length === 0) {
-    throw new Error("getGameState requires payload.gameId");
-  }
-
-  if (typeof playerToken !== "string" || playerToken.trim().length === 0) {
-    throw new Error("getGameState requires payload.playerToken");
-  }
-
-  if (typeof version !== "number" || !Number.isInteger(version)) {
-    throw new Error("getGameState requires payload.version");
-  }
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireInteger(version, typedEvent.action, "version");
 }
 
 const isCardCount = (value: unknown): value is CardCount =>

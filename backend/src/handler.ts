@@ -24,7 +24,7 @@ import {
 } from "./validation/lambdaPayload";
 
 export const handler = async (
-  event: LambdaFunctionURLEvent
+  event: LambdaFunctionURLEvent,
 ): Promise<LambdaFunctionURLResult> => {
   try {
     const body = event.body ? JSON.parse(event.body) : {};
@@ -74,6 +74,23 @@ const parseLambdaEvent = (action: unknown, payload: unknown): LambdaEventPayload
   } as LambdaEventPayload;
 };
 
+type LoadedGameEvent = Exclude<LambdaEventPayload, LambdaEventPayload<"createGame">>;
+type AiFollowUpEvent = Exclude<
+  LambdaEventPayload,
+  LambdaEventPayload<"createGame" | "joinGame">
+>;
+
+const reduceLoadedGame = async (event: LoadedGameEvent): Promise<unknown> => {
+  const game = await getGameById(event.payload.gameId);
+  return engineReducer(game, event);
+};
+
+const reduceLoadedGameAndRunAi = async (event: AiFollowUpEvent): Promise<unknown> => {
+  const game = await getGameById(event.payload.gameId);
+  await engineReducer(game, event);
+  return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+};
+
 const handleAction = async (
   event: LambdaEventPayload,
 ): Promise<unknown> => {
@@ -88,36 +105,27 @@ const handleAction = async (
     }
     case "joinGame": {
       assertJoinGamePayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "checkState": {
       assertCheckStatePayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "dealCards": {
       assertDealCardsPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return reduceLoadedGameAndRunAi(event);
     }
     case "startGame": {
       assertStartGamePayload(event);
-      const game = await getGameById(event.payload.gameId);
-      await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return reduceLoadedGameAndRunAi(event);
     }
     case "startOver": {
       assertStartOverPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "submitBid": {
       assertSubmitBidPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      await engineReducer(game, event);
-      return runAiAndReturnForViewer(event.payload.gameId, event.payload.playerToken);
+      return reduceLoadedGameAndRunAi(event);
     }
     case "playCard": {
       assertPlayCardPayload(event);
@@ -144,28 +152,23 @@ const handleAction = async (
     }
     case "sortCards": {
       assertSortCardsPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "movePlayer": {
       assertMovePlayerPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "removePlayer": {
       assertRemovePlayerPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "renamePlayer": {
       assertRenamePlayerPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "sendReaction": {
       assertSendReactionPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      return engineReducer(game, event);
+      return reduceLoadedGame(event);
     }
     case "getGameState": {
       assertGetGameStatePayload(event);

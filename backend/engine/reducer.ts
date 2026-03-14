@@ -30,6 +30,54 @@ export type EngineReducerResult = {
   version?: number;
 };
 
+type OwnerActionEvent = LambdaEventPayload<"startGame" | "startOver" | "movePlayer">;
+type PlayerActionEvent = LambdaEventPayload<
+  "dealCards" | "submitBid" | "playCard" | "sortCards" | "renamePlayer" | "sendReaction"
+>;
+
+const persistAndReturn = (
+  updatedGame: Game,
+  viewerPlayerToken: string,
+): Promise<EngineReducerResult> =>
+  putGame(updatedGame).then(() => toResult(updatedGame, undefined, viewerPlayerToken));
+
+const runOwnerAction = <TEvent extends OwnerActionEvent>(
+  game: Game | undefined,
+  event: TEvent,
+  reducer: (game: Game | undefined, event: TEvent) => Game,
+): Promise<EngineReducerResult> => {
+  requireOwnerToken(game, event.payload.playerToken);
+  return persistAndReturn(reducer(game, event), event.payload.playerToken);
+};
+
+const runPlayerAction = <TEvent extends PlayerActionEvent>(
+  game: Game | undefined,
+  event: TEvent,
+  reducer: (game: Game | undefined, event: TEvent) => Game,
+): Promise<EngineReducerResult> => {
+  requirePlayerToken(game, event.payload.playerToken);
+  return persistAndReturn(reducer(game, event), event.payload.playerToken);
+};
+
+const runOwnerOrSelfRemovePlayer = (
+  game: Game | undefined,
+  event: LambdaEventPayload<"removePlayer">,
+): Promise<EngineReducerResult> => {
+  requirePlayerToken(game, event.payload.playerToken);
+  const existingGame = requireGame(game);
+  const targetPlayerToken = existingGame.playerTokens.find(
+    (entry) => entry.playerId === event.payload.playerId,
+  )?.token;
+  const isOwnerRequest = existingGame.ownerToken === event.payload.playerToken;
+  const isSelfRemoval = targetPlayerToken === event.payload.playerToken;
+
+  if (!isOwnerRequest && !isSelfRemoval) {
+    throw new Error("Only the owner can remove other players");
+  }
+
+  return persistAndReturn(removePlayer(game, event), event.payload.playerToken);
+};
+
 export const engineReducer = (
   game: Game | undefined,
   event: LambdaEventPayload,
@@ -53,74 +101,31 @@ export const engineReducer = (
       const updatedGame = checkState(game, event);
 
       if (updatedGame.version !== existingGame.version) {
-        return putGame(updatedGame).then(() =>
-          toResult(updatedGame, undefined, event.payload.playerToken),
-        );
+        return persistAndReturn(updatedGame, event.payload.playerToken);
       }
 
       return Promise.resolve(toResult(updatedGame, undefined, event.payload.playerToken));
     }
-    case "startGame": {
-      requireOwnerToken(game, event.payload.playerToken);
-      const updatedGame = startGame(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "startOver": {
-      requireOwnerToken(game, event.payload.playerToken);
-      const updatedGame = startOver(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "dealCards": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = dealCards(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "submitBid": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = submitBid(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "playCard": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = playCard(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "movePlayer": {
-      requireOwnerToken(game, event.payload.playerToken);
-      const updatedGame = movePlayer(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "sortCards": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = sortCards(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "removePlayer": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const existingGame = requireGame(game);
-      const targetPlayerToken = existingGame.playerTokens.find(
-        (entry) => entry.playerId === event.payload.playerId,
-      )?.token;
-      const isOwnerRequest = existingGame.ownerToken === event.payload.playerToken;
-      const isSelfRemoval = targetPlayerToken === event.payload.playerToken;
-
-      if (!isOwnerRequest && !isSelfRemoval) {
-        throw new Error("Only the owner can remove other players");
-      }
-
-      const updatedGame = removePlayer(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "renamePlayer": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = renamePlayer(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
-    case "sendReaction": {
-      requirePlayerToken(game, event.payload.playerToken);
-      const updatedGame = sendReaction(game, event);
-      return putGame(updatedGame).then(() => toResult(updatedGame, undefined, event.payload.playerToken));
-    }
+    case "startGame":
+      return runOwnerAction(game, event, startGame);
+    case "startOver":
+      return runOwnerAction(game, event, startOver);
+    case "dealCards":
+      return runPlayerAction(game, event, dealCards);
+    case "submitBid":
+      return runPlayerAction(game, event, submitBid);
+    case "playCard":
+      return runPlayerAction(game, event, playCard);
+    case "movePlayer":
+      return runOwnerAction(game, event, movePlayer);
+    case "sortCards":
+      return runPlayerAction(game, event, sortCards);
+    case "removePlayer":
+      return runOwnerOrSelfRemovePlayer(game, event);
+    case "renamePlayer":
+      return runPlayerAction(game, event, renamePlayer);
+    case "sendReaction":
+      return runPlayerAction(game, event, sendReaction);
     case "removeGame":
       return removeGame(event);
     case "getGameState":
