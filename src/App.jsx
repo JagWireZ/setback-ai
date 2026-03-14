@@ -794,6 +794,7 @@ function GameTablePage({
   isSortingCards,
   isLoadingRejoinGames,
   menuCloseRequestKey = 0,
+  isJoinModalOpen = false,
 }) {
   const viewerHand = getViewerHand(game)
   const [viewportWidth, setViewportWidth] = useState(() =>
@@ -1833,7 +1834,7 @@ function GameTablePage({
           </div>
         </div>
       ) : null}
-      {isMenuModalOpen && (
+      {isMenuModalOpen && !isJoinModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4"
           onClick={() => setIsMenuModalOpen(false)}
@@ -3539,6 +3540,7 @@ export default function App() {
           isSortingCards={isSortingCards}
           isLoadingRejoinGames={isLoadingRejoinGames}
           menuCloseRequestKey={joinMenuCloseRequestKey}
+          isJoinModalOpen={isJoinModalOpen}
         />
 
         {isBidModalOpen && (
