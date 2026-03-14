@@ -337,7 +337,7 @@ function GameTablePage({
   }, [bookWinnerMessage, selectedTrickCardIndex])
 
   useEffect(() => {
-    if (!selectedTrickPlay || bookWinnerMessage) {
+    if (!selectedTrickPlay) {
       setSelectedTrickLabelStyle(null)
       return
     }
@@ -376,7 +376,7 @@ function GameTablePage({
       window.removeEventListener('resize', updateSelectedTrickLabelStyle)
       surfaceElement.removeEventListener('scroll', updateSelectedTrickLabelStyle)
     }
-  }, [bookWinnerMessage, selectedTrickCardIndex, selectedTrickPlay, selectedTrickPlayerName, viewportWidth])
+  }, [selectedTrickCardIndex, selectedTrickPlay, selectedTrickPlayerName, viewportWidth])
 
   useEffect(() => {
     if (!isMenuModalOpen) {
@@ -890,7 +890,7 @@ function GameTablePage({
             {game.phase?.stage === 'Bidding' ? null : (
               <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
                 {selectedTrickPlay && selectedTrickLabelStyle ? (
-                  <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-6">
+                  <div className="pointer-events-none absolute inset-x-0 top-[4.75rem] z-20 h-7">
                     <p
                       className="absolute top-0 -translate-x-1/2 truncate text-center text-lg text-white"
                       style={selectedTrickLabelStyle}
@@ -899,7 +899,7 @@ function GameTablePage({
                     </p>
                   </div>
                 ) : null}
-                <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-8 -translate-y-2">
+                <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2">
                   {displayedTrickPlays.length > 0 ? (
                     displayedTrickPlays.map((play, index) => (
                       <li
@@ -913,7 +913,7 @@ function GameTablePage({
                           }}
                           type="button"
                           className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
-                            selectedTrickCardIndex === index ? '-translate-y-2' : 'translate-y-0'
+                            selectedTrickCardIndex === index ? '-translate-y-4' : 'translate-y-0'
                           }`}
                           onClick={() => {
                             if (bookWinnerMessage) {
