@@ -1,3 +1,8 @@
+output "env" {
+  description = "Environment for this stack"
+  value       = var.env
+}
+
 output "lambda_function_name" {
   description = "Deployed Lambda function name"
   value       = aws_lambda_function.backend.function_name

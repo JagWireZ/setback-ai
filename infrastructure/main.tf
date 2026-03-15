@@ -1,10 +1,15 @@
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile != "" ? var.aws_profile : null
 }
 
 data "aws_caller_identity" "current" {}
 
 locals {
+  env                  = var.env
+  lambda_function_name = "${var.lambda_function_name}-${local.env}"
+  dynamodb_table_name  = "${var.dynamodb_table_name}-${local.env}"
+
   backend_source_files = concat(
     [for file in fileset("${path.module}/../backend/src", "**/*.ts") : "backend/src/${file}"],
     [for file in fileset("${path.module}/../backend/engine", "**/*.ts") : "backend/engine/${file}"],
@@ -38,7 +43,7 @@ locals {
     join("", [for file in local.frontend_source_files : filesha256("${path.module}/../${file}")]),
   )
 
-  frontend_bucket_name = var.frontend_bucket_name != "" ? var.frontend_bucket_name : null
+  frontend_bucket_name = var.frontend_bucket_name != "" ? "${var.frontend_bucket_name}-${local.env}" : null
 }
 
 resource "terraform_data" "build_backend" {
@@ -72,7 +77,7 @@ data "archive_file" "lambda_package" {
 }
 
 resource "aws_dynamodb_table" "setback_game" {
-  name         = var.dynamodb_table_name
+  name         = local.dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
 
@@ -99,7 +104,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda_execution" {
-  name               = "${var.lambda_function_name}-execution-role"
+  name               = "${local.lambda_function_name}-execution-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
 }
 
@@ -125,7 +130,7 @@ data "aws_iam_policy_document" "lambda_dynamodb_access" {
 }
 
 resource "aws_iam_policy" "lambda_dynamodb_access" {
-  name   = "${var.lambda_function_name}-dynamodb-policy"
+  name   = "${local.lambda_function_name}-dynamodb-policy"
   policy = data.aws_iam_policy_document.lambda_dynamodb_access.json
 }
 
@@ -135,15 +140,15 @@ resource "aws_iam_role_policy_attachment" "lambda_dynamodb_access" {
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${var.lambda_function_name}"
+  name              = "/aws/lambda/${local.lambda_function_name}"
   retention_in_days = 14
 }
 
 resource "aws_lambda_function" "backend" {
-  function_name = var.lambda_function_name
+  function_name = local.lambda_function_name
   role          = aws_iam_role.lambda_execution.arn
   runtime       = "nodejs22.x"
-  description   = "setback-backend-${substr(local.backend_source_hash, 0, 12)}"
+  description   = "${local.lambda_function_name}-${substr(local.backend_source_hash, 0, 12)}"
 
   handler = "dist/backend/src/handler.handler"
 
@@ -188,7 +193,7 @@ resource "aws_lambda_function_url" "backend" {
 }
 
 resource "aws_cognito_identity_pool" "frontend" {
-  identity_pool_name               = "${var.lambda_function_name}-frontend-guests"
+  identity_pool_name               = "${local.lambda_function_name}-frontend-guests"
   allow_unauthenticated_identities = true
 }
 
@@ -218,7 +223,7 @@ data "aws_iam_policy_document" "frontend_unauth_assume_role" {
 }
 
 resource "aws_iam_role" "frontend_unauth" {
-  name               = "${var.lambda_function_name}-frontend-unauth"
+  name               = "${local.lambda_function_name}-frontend-unauth"
   assume_role_policy = data.aws_iam_policy_document.frontend_unauth_assume_role.json
 }
 
@@ -288,7 +293,7 @@ resource "terraform_data" "build_frontend" {
 
 resource "aws_s3_bucket" "frontend" {
   bucket        = local.frontend_bucket_name
-  bucket_prefix = local.frontend_bucket_name == null ? "setback-frontend-" : null
+  bucket_prefix = local.frontend_bucket_name == null ? "setback-frontend-${local.env}-" : null
   force_destroy = true
 }
 

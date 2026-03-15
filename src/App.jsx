@@ -20,6 +20,7 @@ import { RoundStatusLabel, ScoreHistory, ScoreSheet, ScoreSummary } from './comp
 import { CreateGameModal, JoinGameModal } from './components/SessionModals'
 import {
   AI_ACTION_DELAY_MS,
+  RATE_LIMIT_BACKOFF_MS,
   REACTION_COOLDOWN_MS,
   REACTION_EMOJIS,
   TRICK_COMPLETE_DELAY_MS,
@@ -1564,6 +1565,10 @@ export default function App() {
   const reactionCooldownTimeoutRef = useRef(null)
   const endOfRoundSummaryTimeoutRef = useRef(null)
   const gameOverScoreTimeoutRef = useRef(null)
+  const ownerRefreshInFlightRef = useRef(false)
+  const playerRefreshInFlightRef = useRef(false)
+  const ownerRefreshBlockedUntilRef = useRef(0)
+  const playerRefreshBlockedUntilRef = useRef(0)
   const isMutationInFlight =
     isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isLeavingGame || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
@@ -2041,19 +2046,22 @@ export default function App() {
       return
     }
 
-    if (isMutationInFlight) {
+    if (isMutationInFlight || ownerRefreshInFlightRef.current) {
       return
     }
 
-    if (Date.now() < aiPauseUntilRef.current) {
+    if (Date.now() < aiPauseUntilRef.current || Date.now() < ownerRefreshBlockedUntilRef.current) {
       return
     }
+
+    ownerRefreshInFlightRef.current = true
 
     try {
       const result = await checkState({
         gameId: ownerSession.gameId,
         playerToken: ownerSession.playerToken,
       })
+      ownerRefreshBlockedUntilRef.current = 0
 
       setOwnerSession((prev) => {
         if (!prev) {
@@ -2066,8 +2074,19 @@ export default function App() {
         }
       })
     } catch (error) {
+      const messageText = error instanceof Error ? error.message.toLowerCase() : ''
+      if (
+        messageText.includes('rate exceeded') ||
+        messageText.includes('too many requests') ||
+        messageText.includes('throttl')
+      ) {
+        ownerRefreshBlockedUntilRef.current = Date.now() + RATE_LIMIT_BACKOFF_MS
+      }
+
       const message = toUserFacingActionError(error, 'Unable to refresh game state')
       setGameError(message)
+    } finally {
+      ownerRefreshInFlightRef.current = false
     }
   }
 
@@ -2076,9 +2095,15 @@ export default function App() {
       return
     }
 
-    if (isMutationInFlight) {
+    if (isMutationInFlight || playerRefreshInFlightRef.current) {
       return
     }
+
+    if (Date.now() < playerRefreshBlockedUntilRef.current) {
+      return
+    }
+
+    playerRefreshInFlightRef.current = true
 
     try {
       const result = await getGameState({
@@ -2086,6 +2111,7 @@ export default function App() {
         playerToken: playerSession.playerToken,
         version: playerSession.version ?? playerSession.game?.version ?? 0,
       })
+      playerRefreshBlockedUntilRef.current = 0
       const nextVisibleGame = result?.game ?? playerSession.game
 
       const knownViewerPlayerId =
@@ -2113,6 +2139,15 @@ export default function App() {
         }
       })
     } catch (error) {
+      const messageText = error instanceof Error ? error.message.toLowerCase() : ''
+      if (
+        messageText.includes('rate exceeded') ||
+        messageText.includes('too many requests') ||
+        messageText.includes('throttl')
+      ) {
+        playerRefreshBlockedUntilRef.current = Date.now() + RATE_LIMIT_BACKOFF_MS
+      }
+
       if (isInvalidPlayerTokenError(error)) {
         handleRemovedFromGame(playerSession.gameId)
         return
@@ -2120,6 +2155,8 @@ export default function App() {
 
       const message = toUserFacingActionError(error, 'Unable to refresh game state')
       setGameError(message)
+    } finally {
+      playerRefreshInFlightRef.current = false
     }
   }
 

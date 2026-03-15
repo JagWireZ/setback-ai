@@ -2,6 +2,7 @@ export const REACTION_EMOJIS = ['😀', '😂', '😮', '😢', '😡', '👏', 
 export const REACTION_COOLDOWN_MS = 5000
 export const AI_ACTION_DELAY_MS = 1500
 export const TRICK_COMPLETE_DELAY_MS = 5000
+export const RATE_LIMIT_BACKOFF_MS = 5000
 
 export const getPlayerName = (game, playerId) =>
   game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
@@ -71,9 +72,18 @@ export const getInvalidPlayMessage = (game, viewerHand, candidateCard) => {
 
 export const toUserFacingActionError = (error, fallbackMessage) => {
   const message = error instanceof Error ? error.message : fallbackMessage
+  const normalizedMessage = message.toLowerCase()
 
   if (message.includes('TransactionConflict') || message.includes('Transaction cancelled')) {
     return 'Another move updated the game at the same time. Please try again.'
+  }
+
+  if (
+    normalizedMessage.includes('rate exceeded') ||
+    normalizedMessage.includes('too many requests') ||
+    normalizedMessage.includes('throttl')
+  ) {
+    return 'The service is a little busy right now. Please wait a moment and try again.'
   }
 
   return message

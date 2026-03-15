@@ -5,19 +5,30 @@ variable "aws_region" {
 }
 
 variable "aws_profile" {
-  description = "Named AWS CLI profile to use for Terraform operations"
+  description = "Optional named AWS CLI profile to use for Terraform operations"
   type        = string
-  default     = "default"
+  default     = ""
+}
+
+variable "env" {
+  description = "Environment for this stack"
+  type        = string
+  default     = "staging"
+
+  validation {
+    condition     = contains(["staging", "prod"], var.env)
+    error_message = "env must be either \"staging\" or \"prod\"."
+  }
 }
 
 variable "lambda_function_name" {
-  description = "Name of the backend Lambda function"
+  description = "Base name of the backend Lambda function"
   type        = string
   default     = "setback-backend"
 }
 
 variable "dynamodb_table_name" {
-  description = "Name of the DynamoDB table for game state"
+  description = "Base name of the DynamoDB table for game state"
   type        = string
   default     = "setback-game"
 }
@@ -29,7 +40,7 @@ variable "frontend_allowed_origins" {
 }
 
 variable "frontend_bucket_name" {
-  description = "Optional S3 bucket name for frontend hosting. Leave empty for auto-generated name."
+  description = "Optional base name for the frontend S3 bucket. Leave empty for an environment-scoped auto-generated name."
   type        = string
   default     = ""
 }
