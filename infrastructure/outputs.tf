@@ -52,3 +52,23 @@ output "frontend_bucket_public_url" {
   description = "Public HTTPS URL for the frontend index document in the S3 bucket"
   value       = "https://${aws_s3_bucket.frontend.bucket_regional_domain_name}/index.html"
 }
+
+output "frontend_domain_name" {
+  description = "Custom domain name for the frontend"
+  value       = local.frontend_domain_name
+}
+
+output "frontend_cloudfront_domain_name" {
+  description = "CloudFront distribution domain name for the frontend"
+  value       = aws_cloudfront_distribution.frontend.domain_name
+}
+
+output "frontend_cloudfront_url" {
+  description = "CloudFront URL for the frontend"
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "frontend_custom_domain_url" {
+  description = "Custom HTTPS URL for the frontend"
+  value       = local.frontend_origin
+}

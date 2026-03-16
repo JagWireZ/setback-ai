@@ -5,11 +5,19 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_route53_zone" "frontend" {
+  name         = var.domain
+  private_zone = false
+}
+
 locals {
   env                  = var.env
   lambda_function_name = "${var.lambda_function_name}-${local.env}"
   dynamodb_table_name  = "${var.dynamodb_table_name}-${local.env}"
   frontend_dist_dir    = "${path.module}/../dist"
+  frontend_subdomain   = local.env == "prod" ? "setback" : "staging.setback"
+  frontend_domain_name = "${local.frontend_subdomain}.${var.domain}"
+  frontend_origin      = "https://${local.frontend_domain_name}"
 
   backend_source_files = concat(
     [for file in fileset("${path.module}/../backend/src", "**/*.ts") : "backend/src/${file}"],
@@ -27,8 +35,24 @@ locals {
     join("", [for file in local.backend_source_files : filesha256("${path.module}/../${file}")]),
   )
 
+  frontend_source_files = concat(
+    [for file in fileset("${path.module}/../src", "**/*") : "src/${file}"],
+    [for file in fileset("${path.module}/../public", "**/*") : "public/${file}"],
+    [
+      "index.html",
+      "package.json",
+      "package-lock.json",
+      "vite.config.js",
+      "tailwind.config.js",
+      "postcss.config.js"
+    ]
+  )
+
+  frontend_source_hash = sha256(
+    join("", [for file in local.frontend_source_files : filesha256("${path.module}/../${file}")]),
+  )
+
   frontend_bucket_name = var.frontend_bucket_name != "" ? "${var.frontend_bucket_name}-${local.env}" : null
-  frontend_dist_files  = try(fileset(local.frontend_dist_dir, "**"), [])
 
   frontend_content_types = {
     ".css"  = "text/css"
@@ -47,6 +71,17 @@ locals {
   }
 }
 
+resource "terraform_data" "build_backend" {
+  triggers_replace = {
+    source_hash = local.backend_source_hash
+  }
+
+  provisioner "local-exec" {
+    working_dir = "${path.module}/.."
+    command     = "npm --prefix ./backend run build"
+  }
+}
+
 data "archive_file" "lambda_package" {
   type        = "zip"
   source_dir  = "${path.module}/../backend"
@@ -62,6 +97,8 @@ data "archive_file" "lambda_package" {
     "*.ts",
     "tsconfig.json"
   ]
+
+  depends_on = [terraform_data.build_backend]
 
 }
 
@@ -168,7 +205,7 @@ resource "aws_lambda_function_url" "backend" {
   cors {
     allow_origins = distinct(concat(
       var.frontend_allowed_origins,
-      ["https://${aws_s3_bucket.frontend.bucket_regional_domain_name}"],
+      [local.frontend_origin],
     ))
     allow_methods = ["POST"]
     allow_headers = [
@@ -295,6 +332,110 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
   }
 }
 
+resource "aws_acm_certificate" "frontend" {
+  domain_name       = local.frontend_domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "frontend_certificate_validation" {
+  for_each = {
+    for option in aws_acm_certificate.frontend.domain_validation_options :
+    option.domain_name => {
+      name   = option.resource_record_name
+      record = option.resource_record_value
+      type   = option.resource_record_type
+    }
+  }
+
+  zone_id = data.aws_route53_zone.frontend.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+}
+
+resource "aws_acm_certificate_validation" "frontend" {
+  certificate_arn         = aws_acm_certificate.frontend.arn
+  validation_record_fqdns = [for record in aws_route53_record.frontend_certificate_validation : record.fqdn]
+}
+
+resource "aws_cloudfront_distribution" "frontend" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "${local.frontend_domain_name} frontend"
+  default_root_object = "index.html"
+  aliases             = [local.frontend_domain_name]
+
+  origin {
+    domain_name = aws_s3_bucket_website_configuration.frontend.website_endpoint
+    origin_id   = "frontend-s3-website"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "frontend-s3-website"
+
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+
+      cookies {
+        forward = "none"
+      }
+    }
+  }
+
+  custom_error_response {
+    error_code            = 403
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  }
+
+  custom_error_response {
+    error_code            = 404
+    response_code         = 200
+    response_page_path    = "/index.html"
+    error_caching_min_ttl = 0
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    acm_certificate_arn      = aws_acm_certificate_validation.frontend.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  depends_on = [aws_acm_certificate_validation.frontend]
+}
+
+resource "aws_route53_record" "frontend_cname" {
+  zone_id = data.aws_route53_zone.frontend.zone_id
+  name    = local.frontend_domain_name
+  type    = "CNAME"
+  ttl     = 300
+  records = [aws_cloudfront_distribution.frontend.domain_name]
+}
+
 data "aws_iam_policy_document" "frontend_public_read" {
   statement {
     effect = "Allow"
@@ -316,19 +457,55 @@ resource "aws_s3_bucket_policy" "frontend_public_read" {
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
-resource "aws_s3_object" "frontend_dist" {
-  for_each = { for file in local.frontend_dist_files : file => file }
+resource "terraform_data" "build_frontend" {
+  triggers_replace = {
+    source_hash      = local.frontend_source_hash
+    backend_url      = aws_lambda_function_url.backend.function_url
+    identity_pool_id = aws_cognito_identity_pool.frontend.id
+    app_env          = local.env
+  }
 
-  bucket = aws_s3_bucket.frontend.id
-  key    = each.value
-  source = "${local.frontend_dist_dir}/${each.value}"
-  etag   = filemd5("${local.frontend_dist_dir}/${each.value}")
+  provisioner "local-exec" {
+    working_dir = "${path.module}/.."
+    command     = "npm run build:frontend"
 
-  content_type = lookup(
-    local.frontend_content_types,
-    lower(try(regex("\\.[^.]+$", each.value), "")),
-    "application/octet-stream",
-  )
+    environment = {
+      VITE_BACKEND_URL              = aws_lambda_function_url.backend.function_url
+      VITE_COGNITO_IDENTITY_POOL_ID = aws_cognito_identity_pool.frontend.id
+      VITE_AWS_REGION               = var.aws_region
+      VITE_APP_ENV                  = local.env == "staging" ? "staging" : ""
+    }
+  }
 
-  depends_on = [aws_s3_bucket_policy.frontend_public_read]
+  depends_on = [
+    aws_lambda_function_url.backend,
+    aws_cognito_identity_pool.frontend,
+    aws_s3_bucket.frontend,
+  ]
+}
+
+resource "terraform_data" "deploy_frontend" {
+  triggers_replace = {
+    source_hash     = local.frontend_source_hash
+    bucket          = aws_s3_bucket.frontend.id
+    distribution_id = aws_cloudfront_distribution.frontend.id
+  }
+
+  provisioner "local-exec" {
+    working_dir = "${path.module}/.."
+    command     = "node ./scripts/deploy-frontend.mjs"
+
+    environment = {
+      AWS_REGION                 = var.aws_region
+      AWS_PROFILE                = var.aws_profile != "" ? var.aws_profile : ""
+      FRONTEND_BUCKET            = aws_s3_bucket.frontend.id
+      CLOUDFRONT_DISTRIBUTION_ID = aws_cloudfront_distribution.frontend.id
+    }
+  }
+
+  depends_on = [
+    terraform_data.build_frontend,
+    aws_s3_bucket_policy.frontend_public_read,
+    aws_cloudfront_distribution.frontend,
+  ]
 }
