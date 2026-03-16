@@ -58,6 +58,8 @@ const AI_DIFFICULTY_OPTIONS = [
   { value: 'hard', label: 'Hard' },
 ]
 
+const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
+
 const isInvalidPlayerTokenError = (error) => {
   const message = error instanceof Error ? error.message : ''
   return message.toLowerCase().includes('invalid player token')
@@ -3565,6 +3567,11 @@ export default function App() {
 
   return (
     <main className="theme-shell h-[100dvh] overflow-hidden px-4 py-4">
+      {isStagingBuild ? (
+        <p className="build-badge fixed left-4 top-4 z-10 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]">
+          Build: Staging
+        </p>
+      ) : null}
       <section className="mx-auto flex h-full max-w-xl flex-col items-center justify-center px-2 py-4 text-center sm:py-6">
         <div className="table-surface flex max-h-full w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border px-6 pb-8 pt-5 sm:pb-10 sm:pt-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)]">
         <img

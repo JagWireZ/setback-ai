@@ -128,6 +128,14 @@
     color: var(--text-muted);
   }
 
+  .build-badge {
+    border-color: rgba(255, 255, 255, 0.16);
+    background-color: rgba(18, 18, 18, 0.46);
+    color: rgba(243, 244, 246, 0.72);
+    backdrop-filter: blur(8px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
   .dialog-surface {
     @apply rounded-lg border shadow-xl;
     border-color: var(--border-color);

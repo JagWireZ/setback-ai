@@ -9,7 +9,7 @@
     "build:frontend": "vite build",
     "build:backend": "npm --prefix ./backend run build",
     "preview": "vite preview",
-    "deploy:staging": "npm run build && tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
+    "deploy:staging": "VITE_APP_ENV=staging npm run build && tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
     "deploy:prod": "npm run build && tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select prod || tf -chdir=./infrastructure workspace new prod) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
   },
   "dependencies": {
