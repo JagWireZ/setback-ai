@@ -23,11 +23,6 @@ output "dynamodb_table_arn" {
   value       = aws_dynamodb_table.setback_game.arn
 }
 
-output "lambda_function_url" {
-  description = "Lambda function URL (AWS_IAM authenticated)"
-  value       = aws_lambda_function_url.backend.function_url
-}
-
 output "frontend_cognito_identity_pool_id" {
   description = "Cognito Identity Pool id for guest frontend credentials"
   value       = aws_cognito_identity_pool.frontend.id
@@ -41,16 +36,6 @@ output "frontend_unauth_role_arn" {
 output "frontend_bucket_name" {
   description = "S3 bucket name hosting the frontend"
   value       = aws_s3_bucket.frontend.id
-}
-
-output "frontend_website_url" {
-  description = "Public S3 website URL for the frontend"
-  value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
-}
-
-output "frontend_bucket_public_url" {
-  description = "Public HTTPS URL for the frontend index document in the S3 bucket"
-  value       = "https://${aws_s3_bucket.frontend.bucket_regional_domain_name}/index.html"
 }
 
 output "frontend_domain_name" {
