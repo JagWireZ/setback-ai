@@ -10,6 +10,11 @@ variable "aws_profile" {
   default     = ""
 }
 
+variable "domain" {
+  description = "Public domain"
+  type        = string
+}
+
 variable "env" {
   description = "Environment for this stack"
   type        = string
@@ -42,5 +47,10 @@ variable "frontend_allowed_origins" {
 variable "frontend_bucket_name" {
   description = "Optional base name for the frontend S3 bucket. Leave empty for an environment-scoped auto-generated name."
   type        = string
-  default     = ""
+  default     = "setback-frontend"
+}
+
+variable "tfstate_bucket" {
+  description = "Name of S3 bucket to hold the Terraform state files"
+  type        = string
 }

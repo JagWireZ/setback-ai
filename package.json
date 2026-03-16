@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "vite build",
+    "build:backend": "npm --prefix ./backend run build",
     "preview": "vite preview",
-    "tf:prod": "tf -chdir=./infrastructure init && tf -chdir=./infrastructure workspace select prod && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\"",
-    "tf:staging": "tf -chdir=./infrastructure init && tf -chdir=./infrastructure workspace select staging && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\""
+    "deploy:staging": "npm run build && tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
+    "deploy:prod": "npm run build && tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select prod || tf -chdir=./infrastructure workspace new prod) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
   },
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",

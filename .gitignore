@@ -5,3 +5,4 @@ dist
 terraform.tfstate*
 .env.local
 .env.*.local
+infrastructure/local.auto.tfvars

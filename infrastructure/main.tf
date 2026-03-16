@@ -9,6 +9,7 @@ locals {
   env                  = var.env
   lambda_function_name = "${var.lambda_function_name}-${local.env}"
   dynamodb_table_name  = "${var.dynamodb_table_name}-${local.env}"
+  frontend_dist_dir    = "${path.module}/../dist"
 
   backend_source_files = concat(
     [for file in fileset("${path.module}/../backend/src", "**/*.ts") : "backend/src/${file}"],
@@ -22,38 +23,27 @@ locals {
     ]
   )
 
-  frontend_source_files = concat(
-    [for file in fileset("${path.module}/../src", "**/*") : "src/${file}"],
-    [for file in fileset("${path.module}/../public", "**/*") : "public/${file}"],
-    [
-      "index.html",
-      "package.json",
-      "package-lock.json",
-      "vite.config.js",
-      "tailwind.config.js",
-      "postcss.config.js"
-    ]
-  )
-
   backend_source_hash = sha256(
     join("", [for file in local.backend_source_files : filesha256("${path.module}/../${file}")]),
   )
 
-  frontend_source_hash = sha256(
-    join("", [for file in local.frontend_source_files : filesha256("${path.module}/../${file}")]),
-  )
-
   frontend_bucket_name = var.frontend_bucket_name != "" ? "${var.frontend_bucket_name}-${local.env}" : null
-}
+  frontend_dist_files  = try(fileset(local.frontend_dist_dir, "**"), [])
 
-resource "terraform_data" "build_backend" {
-  triggers_replace = {
-    source_hash = local.backend_source_hash
-  }
-
-  provisioner "local-exec" {
-    command     = "npm run build"
-    working_dir = "${path.module}/../backend"
+  frontend_content_types = {
+    ".css"  = "text/css"
+    ".gif"  = "image/gif"
+    ".html" = "text/html"
+    ".ico"  = "image/x-icon"
+    ".jpeg" = "image/jpeg"
+    ".jpg"  = "image/jpeg"
+    ".js"   = "application/javascript"
+    ".json" = "application/json"
+    ".map"  = "application/json"
+    ".png"  = "image/png"
+    ".svg"  = "image/svg+xml"
+    ".txt"  = "text/plain"
+    ".webp" = "image/webp"
   }
 }
 
@@ -73,13 +63,13 @@ data "archive_file" "lambda_package" {
     "tsconfig.json"
   ]
 
-  depends_on = [terraform_data.build_backend]
 }
 
 resource "aws_dynamodb_table" "setback_game" {
   name         = local.dynamodb_table_name
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id"
+  deletion_protection_enabled = false
 
   attribute {
     name = "id"
@@ -149,6 +139,7 @@ resource "aws_lambda_function" "backend" {
   role          = aws_iam_role.lambda_execution.arn
   runtime       = "nodejs22.x"
   description   = "${local.lambda_function_name}-${substr(local.backend_source_hash, 0, 12)}"
+  skip_destroy  = false
 
   handler = "dist/backend/src/handler.handler"
 
@@ -166,8 +157,7 @@ resource "aws_lambda_function" "backend" {
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,
     aws_iam_role_policy_attachment.lambda_dynamodb_access,
-    aws_cloudwatch_log_group.lambda,
-    terraform_data.build_backend
+    aws_cloudwatch_log_group.lambda
   ]
 }
 
@@ -278,19 +268,6 @@ resource "aws_lambda_permission" "allow_frontend_invoker_function_url" {
   function_url_auth_type = "AWS_IAM"
 }
 
-resource "terraform_data" "build_frontend" {
-  triggers_replace = {
-    source_hash      = local.frontend_source_hash
-    backend_url      = aws_lambda_function_url.backend.function_url
-    identity_pool_id = aws_cognito_identity_pool.frontend.id
-  }
-
-  provisioner "local-exec" {
-    command     = "VITE_BACKEND_URL='${aws_lambda_function_url.backend.function_url}' VITE_COGNITO_IDENTITY_POOL_ID='${aws_cognito_identity_pool.frontend.id}' VITE_AWS_REGION='${var.aws_region}' npm run build"
-    working_dir = "${path.module}/.."
-  }
-}
-
 resource "aws_s3_bucket" "frontend" {
   bucket        = local.frontend_bucket_name
   bucket_prefix = local.frontend_bucket_name == null ? "setback-frontend-${local.env}-" : null
@@ -339,19 +316,19 @@ resource "aws_s3_bucket_policy" "frontend_public_read" {
   depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
-resource "terraform_data" "deploy_frontend" {
-  triggers_replace = {
-    source_hash = local.frontend_source_hash
-    bucket      = aws_s3_bucket.frontend.id
-  }
+resource "aws_s3_object" "frontend_dist" {
+  for_each = { for file in local.frontend_dist_files : file => file }
 
-  depends_on = [
-    terraform_data.build_frontend,
-    aws_s3_bucket_policy.frontend_public_read,
-  ]
+  bucket = aws_s3_bucket.frontend.id
+  key    = each.value
+  source = "${local.frontend_dist_dir}/${each.value}"
+  etag   = filemd5("${local.frontend_dist_dir}/${each.value}")
 
-  provisioner "local-exec" {
-    command     = "node infrastructure/scripts/syncFrontendToS3.mjs ${aws_s3_bucket.frontend.id} dist"
-    working_dir = "${path.module}/.."
-  }
+  content_type = lookup(
+    local.frontend_content_types,
+    lower(try(regex("\\.[^.]+$", each.value), "")),
+    "application/octet-stream",
+  )
+
+  depends_on = [aws_s3_bucket_policy.frontend_public_read]
 }
