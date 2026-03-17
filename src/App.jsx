@@ -61,6 +61,29 @@ const AI_DIFFICULTY_OPTIONS = [
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
 
+function HelpIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path
+        d="M8.75 8.5C8.75 6.35 10.3 5 12.45 5c1.95 0 3.8 1.18 3.8 3.35 0 1.82-1 2.78-2.15 3.6-1.08.77-1.8 1.42-1.8 3.05"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12.3 19v.35" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function DownloadIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M12 4.5v9" />
+      <path d="m8.25 10.5 3.75 3.75 3.75-3.75" />
+      <path d="M5.25 18.75h13.5" />
+    </svg>
+  )
+}
+
 function GameTablePage({
   game,
   isOwner,
@@ -1592,37 +1615,46 @@ function GameTablePage({
                   {isLeavingGame ? "Leaving..." : "Leave Game"}
                 </button>
               )}
-              <button
-                type="button"
-                className="btn-secondary w-[90%] px-4 py-3 text-left"
-                onClick={() => {
-                  setIsMenuModalOpen(false)
-                  onOpenHelp?.()
-                }}
-              >
-                Help
-              </button>
-              {canInstallApp ? (
+              <div className="mt-1 w-[90%] border-t border-[color:var(--border-color)] pt-3" />
+            </div>
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="btn-secondary w-[90%] px-4 py-3 text-left"
-                  onClick={async () => {
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--accent-blue)] bg-[rgba(47,111,219,0.12)] p-0 text-[color:var(--accent-blue-soft)] transition hover:bg-[rgba(47,111,219,0.2)]"
+                  aria-label="Help"
+                  title="Help"
+                  onClick={() => {
                     setIsMenuModalOpen(false)
-                    await onInstallApp?.()
+                    onOpenHelp?.()
                   }}
                 >
-                  Install App
+                  <HelpIcon className="h-[1.5625rem] w-[1.5625rem]" />
                 </button>
-              ) : null}
-            </div>
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                className="btn-secondary px-4 py-2 text-sm"
-                onClick={() => setIsMenuModalOpen(false)}
-              >
-                Close
-              </button>
+                {canInstallApp ? (
+                  <button
+                    type="button"
+                    className="btn-secondary btn-install inline-flex h-10 w-10 items-center justify-center p-0"
+                    aria-label="Install App"
+                    title="Install App"
+                    onClick={async () => {
+                      setIsMenuModalOpen(false)
+                      await onInstallApp?.()
+                    }}
+                  >
+                    <DownloadIcon className="h-[1.5625rem] w-[1.5625rem]" />
+                  </button>
+                ) : null}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2 text-sm"
+                  onClick={() => setIsMenuModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -3769,24 +3801,32 @@ export default function App() {
           >
             Join Game
           </button>
-          <button
-            type="button"
-            className="btn-secondary px-4 py-2"
-            onClick={() => setIsHelpModalOpen(true)}
-          >
-            Help
-          </button>
-          {canInstallApp ? (
-            <button
-              type="button"
-              className="btn-secondary btn-install px-4 py-2"
-              onClick={() => {
-                void promptToInstall()
-              }}
-            >
-              Install App
-            </button>
-          ) : null}
+          <div className="mt-1 border-t border-[color:var(--border-color)] pt-3">
+            <div className="flex justify-end gap-2">
+              {canInstallApp ? (
+                <button
+                  type="button"
+                  className="btn-secondary btn-install inline-flex h-10 w-10 items-center justify-center p-0"
+                  aria-label="Install App"
+                  title="Install App"
+                  onClick={() => {
+                    void promptToInstall()
+                  }}
+                >
+                  <DownloadIcon className="h-[1.5625rem] w-[1.5625rem]" />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--accent-blue)] bg-[rgba(47,111,219,0.12)] p-0 text-[color:var(--accent-blue-soft)] transition hover:bg-[rgba(47,111,219,0.2)]"
+                aria-label="Help"
+                title="Help"
+                onClick={() => setIsHelpModalOpen(true)}
+              >
+                <HelpIcon className="h-[1.5625rem] w-[1.5625rem]" />
+              </button>
+            </div>
+          </div>
         </div>
         </div>
       </section>
