@@ -76,6 +76,7 @@ type ActionPayloadMap = {
   }
   removeGame: {
     gameId: string
+    playerToken: string
   }
   getGameState: {
     gameId: string

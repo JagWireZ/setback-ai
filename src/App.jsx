@@ -9,18 +9,18 @@ import {
   playCard,
   renamePlayer,
   removePlayer,
+  setActiveGameSession,
   sendReaction,
   sortCards,
   startGame,
   startOver,
   submitBid,
+  subscribeToGameEvents,
 } from './api/lambdaClient'
 import { CardAsset, CardBack } from './components/Cards'
 import { RoundStatusLabel, ScoreHistory, ScoreSheet, ScoreSummary } from './components/Scoreboard'
 import { CreateGameModal, JoinGameModal } from './components/SessionModals'
 import {
-  AI_ACTION_DELAY_MS,
-  RATE_LIMIT_BACKOFF_MS,
   REACTION_COOLDOWN_MS,
   REACTION_EMOJIS,
   TRICK_COMPLETE_DELAY_MS,
@@ -59,11 +59,6 @@ const AI_DIFFICULTY_OPTIONS = [
 ]
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
-
-const isInvalidPlayerTokenError = (error) => {
-  const message = error instanceof Error ? error.message : ''
-  return message.toLowerCase().includes('invalid player token')
-}
 
 function GameTablePage({
   game,
@@ -116,7 +111,7 @@ function GameTablePage({
   }, [menuCloseRequestKey])
 
   const viewerPlayerId = viewerHand?.playerId
-  const currentTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
+  const actualTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
   const totalRounds = game?.options?.rounds?.length ?? 0
   const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : 0
@@ -183,6 +178,7 @@ function GameTablePage({
   const [editedPlayerName, setEditedPlayerName] = useState('')
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const [revealedCompletedTrick, setRevealedCompletedTrick] = useState(null)
+  const [displayedTurnPlayerId, setDisplayedTurnPlayerId] = useState(actualTurnPlayerId)
   const [selectedTrickLabelStyle, setSelectedTrickLabelStyle] = useState(null)
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
@@ -196,9 +192,15 @@ function GameTablePage({
   const selectedTrickLabelRef = useRef(null)
   const previousTrickIndexRef = useRef(game?.phase?.trickIndex)
   const shouldClearSelectedTrickCardAfterRevealRef = useRef(false)
+  const isHoldingTurnPlayerRef = useRef(false)
+  const latestActualTurnPlayerIdRef = useRef(actualTurnPlayerId)
 
-  const isViewerTurn = Boolean(viewerPlayerId && currentTurnPlayerId && viewerPlayerId === currentTurnPlayerId)
-  const canSelectCards = game.phase?.stage === 'Playing' && isViewerTurn
+  latestActualTurnPlayerIdRef.current = actualTurnPlayerId
+
+  const isViewerActualTurn = Boolean(viewerPlayerId && actualTurnPlayerId && viewerPlayerId === actualTurnPlayerId)
+  const isViewerDisplayedTurn = Boolean(
+    viewerPlayerId && displayedTurnPlayerId && viewerPlayerId === displayedTurnPlayerId,
+  )
   const viewerTurnMessage =
     game.phase?.stage === 'Playing'
       ? 'Your Turn to Play'
@@ -216,7 +218,9 @@ function GameTablePage({
           ? 'Deal'
           : ''
   const isGameOver = game.phase?.stage === 'GameOver'
-  const isTrickWinnerRevealVisible = Boolean(bookWinnerMessage)
+  const isTrickWinnerRevealVisible = Boolean(bookWinnerMessage || revealedCompletedTrick)
+  const isViewerTurnVisible = isViewerDisplayedTurn && !isTrickWinnerRevealVisible
+  const canSelectCards = game.phase?.stage === 'Playing' && isViewerActualTurn && !isTrickWinnerRevealVisible
   const displayedTrick = revealedCompletedTrick ?? currentTrick
   const displayedTrickPlays = displayedTrick?.plays ?? []
   const winningDisplayedTrickCardIndex =
@@ -313,8 +317,21 @@ function GameTablePage({
   }, [canSelectCards, viewerHand?.cards, selectedCardIndex])
 
   useEffect(() => {
+    setDisplayedTurnPlayerId(actualTurnPlayerId)
+    isHoldingTurnPlayerRef.current = false
+  }, [actualTurnPlayerId, game?.id])
+
+  useEffect(() => {
+    if (isHoldingTurnPlayerRef.current || bookWinnerMessage) {
+      return
+    }
+
+    setDisplayedTurnPlayerId(actualTurnPlayerId)
+  }, [actualTurnPlayerId, bookWinnerMessage])
+
+  useEffect(() => {
     setSelectedCardIndex(null)
-  }, [game.phase?.stage, game.phase?.trickIndex, currentTurnPlayerId])
+  }, [displayedTurnPlayerId, game.phase?.stage, game.phase?.trickIndex])
 
   useEffect(() => {
     if (winningDisplayedTrickCardIndex !== null && winningDisplayedTrickCardIndex >= 0) {
@@ -541,21 +558,26 @@ function GameTablePage({
     const previousCompletedTrickCount = previousCompletedTrickCountRef.current
 
     if (completedTricks.length < previousCompletedTrickCount) {
+      isHoldingTurnPlayerRef.current = false
       setBookWinnerMessage('')
       setRevealedCompletedTrick(null)
+      setDisplayedTurnPlayerId(latestActualTurnPlayerIdRef.current)
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
         bookWinnerTimeoutRef.current = null
       }
     } else if (completedTricks.length > previousCompletedTrickCount && latestTrick?.winnerPlayerId) {
+      isHoldingTurnPlayerRef.current = true
       setRevealedCompletedTrick(latestTrick)
       setBookWinnerMessage(`${getPlayerName(game, latestTrick.winnerPlayerId)} won the book!`)
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
       }
       bookWinnerTimeoutRef.current = setTimeout(() => {
+        isHoldingTurnPlayerRef.current = false
         setBookWinnerMessage('')
         setRevealedCompletedTrick(null)
+        setDisplayedTurnPlayerId(latestActualTurnPlayerIdRef.current)
         bookWinnerTimeoutRef.current = null
       }, TRICK_COMPLETE_DELAY_MS)
     }
@@ -580,11 +602,11 @@ function GameTablePage({
   const availableActions = (() => {
     switch (game.phase?.stage) {
       case 'Dealing':
-        return isViewerTurn ? ['Deal Cards'] : []
+        return isViewerActualTurn ? ['Deal Cards'] : []
       case 'Bidding':
-        return isViewerTurn ? ['Submit Bid'] : []
+        return isViewerActualTurn ? ['Submit Bid'] : []
       case 'Playing':
-        return isViewerTurn ? ['Play Card'] : []
+        return isViewerActualTurn ? ['Play Card'] : []
       case 'Scoring':
         return []
       case 'GameOver':
@@ -701,8 +723,8 @@ function GameTablePage({
                 isSortingCards ||
                 isStartingOver
               const shouldFlashActionButton =
-                ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerTurn && !isDisabled) ||
-                (action === 'Play Card' && isViewerTurn && selectedCard !== null && !isDisabled)
+                ((action === 'Deal Cards' || action === 'Submit Bid') && isViewerActualTurn && !isDisabled) ||
+                (action === 'Play Card' && isViewerActualTurn && selectedCard !== null && !isDisabled)
               const isPrimaryAction =
                 !isDisabled &&
                 (action === 'Deal Cards' || action === 'Submit Bid' || action === 'Play Card' || action === 'Start Over')
@@ -920,7 +942,7 @@ function GameTablePage({
                 <ul className="score-scroll mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto pr-1">
                   {biddingPlayers.map((player) => {
                     const bidEntry = bidsByPlayerId.get(player.id)
-                    const isCurrentBidder = currentTurnPlayerId === player.id
+                    const isCurrentBidder = displayedTurnPlayerId === player.id
                     const hasBid = Boolean(bidEntry)
                     const playerScore = game.scores?.find((entry) => entry.playerId === player.id)
                     const playerRainbow = playerScore?.rounds?.[currentRoundIndex]?.rainbow === true
@@ -1017,21 +1039,21 @@ function GameTablePage({
         <div className="mt-3 flex min-h-7 items-center justify-center">
           {bookWinnerMessage ? (
             <p className="status-info px-6 py-2 text-center text-xl font-semibold">{bookWinnerMessage}</p>
-          ) : isGameOver || isTrickWinnerRevealVisible ? null : isViewerTurn ? (
+          ) : isGameOver || isTrickWinnerRevealVisible ? null : isViewerTurnVisible ? (
             <p className="status-turn px-6 py-2 text-xl font-semibold">
               {viewerTurnMessage}
             </p>
-          ) : currentTurnPlayerId ? (
+          ) : displayedTurnPlayerId ? (
             <p className="text-sm text-dim">
               {waitingAction
-                ? `Waiting on ${getPlayerName(game, currentTurnPlayerId)} to ${waitingAction}`
-                : `Waiting on ${getPlayerName(game, currentTurnPlayerId)}...`}
+                ? `Waiting on ${getPlayerName(game, displayedTurnPlayerId)} to ${waitingAction}`
+                : `Waiting on ${getPlayerName(game, displayedTurnPlayerId)}...`}
             </p>
           ) : null}
         </div>
         <article
           className={`mt-3 shrink-0 overflow-hidden rounded-3xl border p-1 sm:overflow-x-auto ${
-            isViewerTurn
+            isViewerTurnVisible
               ? 'hand-active hand-active-turn'
               : canSelectCards
                 ? 'hand-active'
@@ -1567,12 +1589,6 @@ export default function App() {
   const reactionCooldownTimeoutRef = useRef(null)
   const endOfRoundSummaryTimeoutRef = useRef(null)
   const gameOverScoreTimeoutRef = useRef(null)
-  const ownerRefreshInFlightRef = useRef(false)
-  const playerRefreshInFlightRef = useRef(false)
-  const ownerRefreshBlockedUntilRef = useRef(0)
-  const playerRefreshBlockedUntilRef = useRef(0)
-  const isMutationInFlight =
-    isStartingGame || isDealingCards || isSubmittingBid || isPlayingCard || isSendingReaction || isSortingCards || isLeavingGame || isStartingOver
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
 
   const openLobbyRemovePlayerConfirm = (player) => {
@@ -1667,6 +1683,144 @@ export default function App() {
     setRequestError(message)
     clearGameIdInUrl()
   }
+
+  const getResultVersion = (result) => result?.version ?? result?.game?.version ?? 0
+  const isConcurrentUpdateError = (error) => {
+    const message = error instanceof Error ? error.message : String(error ?? '')
+    return message.includes('TransactionConflict') || message.includes('Transaction cancelled')
+  }
+
+  const shouldApplyGameVersion = (currentVersion, nextVersion) =>
+    typeof nextVersion !== 'number' || nextVersion >= currentVersion
+
+  const mergeOwnerSessionResult = (previousSession, result) => {
+    if (!previousSession || !result?.game) {
+      return previousSession
+    }
+
+    const currentVersion = previousSession.game?.version ?? 0
+    const nextVersion = getResultVersion(result)
+    if (!shouldApplyGameVersion(currentVersion, nextVersion)) {
+      return previousSession
+    }
+
+    return {
+      ...previousSession,
+      game: result.game,
+    }
+  }
+
+  const mergePlayerSessionResult = (previousSession, result) => {
+    if (!previousSession || !result?.game) {
+      return previousSession
+    }
+
+    const currentVersion = previousSession.version ?? previousSession.game?.version ?? 0
+    const nextVersion = getResultVersion(result)
+    if (!shouldApplyGameVersion(currentVersion, nextVersion)) {
+      return previousSession
+    }
+
+    return {
+      ...previousSession,
+      game: result.game,
+      version: nextVersion,
+    }
+  }
+
+  const applyRealtimeResult = (result, role = ownerSession ? 'owner' : 'player') => {
+    if (!result?.game) {
+      return
+    }
+
+    if (role === 'owner') {
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
+      return
+    }
+
+    setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
+  }
+
+  const requestActiveStateReview = async () => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    try {
+      const result = ownerSession
+        ? await checkState({
+            gameId: activeSession.gameId,
+            playerToken: activeSession.playerToken,
+          })
+        : await getGameState({
+            gameId: activeSession.gameId,
+            playerToken: activeSession.playerToken,
+            version: activeSession.version ?? activeSession.game?.version ?? 0,
+          })
+
+      applyRealtimeResult(result, ownerSession ? 'owner' : 'player')
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message.toLowerCase() : ''
+      if (messageText.includes('invalid player token') || messageText.includes('game not found')) {
+        handleRemovedFromGame(activeSession.gameId)
+        return
+      }
+
+      const message = toUserFacingActionError(error, 'Unable to refresh game state')
+      setGameError(message)
+    }
+  }
+
+  useEffect(() => {
+    if (ownerSession?.gameId && ownerSession?.playerToken) {
+      setActiveGameSession({
+        role: 'owner',
+        gameId: ownerSession.gameId,
+        playerToken: ownerSession.playerToken,
+      })
+      return
+    }
+
+    if (playerSession?.gameId && playerSession?.playerToken) {
+      setActiveGameSession({
+        role: 'player',
+        gameId: playerSession.gameId,
+        playerToken: playerSession.playerToken,
+      })
+      return
+    }
+
+    setActiveGameSession(null)
+  }, [ownerSession?.gameId, ownerSession?.playerToken, playerSession?.gameId, playerSession?.playerToken])
+
+  useEffect(() => {
+    return subscribeToGameEvents((event) => {
+      if (event?.type === 'playerRemoved' || event?.type === 'gameRemoved') {
+        handleRemovedFromGame(event.gameId, event.message)
+        return
+      }
+
+      if (event?.type === 'sessionError') {
+        const messageText = event.error instanceof Error ? event.error.message.toLowerCase() : ''
+        if (messageText.includes('invalid player token') || messageText.includes('game not found')) {
+          handleRemovedFromGame(event.gameId)
+        }
+        return
+      }
+
+      if (event?.type !== 'gameState' && event?.type !== 'sessionSync') {
+        return
+      }
+
+      const activeSession = ownerSession ?? playerSession
+      if (!activeSession?.gameId || event.gameId !== activeSession.gameId) {
+        return
+      }
+
+      applyRealtimeResult(event.result, ownerSession ? 'owner' : 'player')
+    })
+  }, [ownerSession, playerSession])
 
   useEffect(() => {
     const gameIdFromUrl = getGameIdFromUrl()
@@ -2043,153 +2197,6 @@ export default function App() {
     }
   }
 
-  const refreshOwnerGame = async () => {
-    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
-      return
-    }
-
-    if (isMutationInFlight || ownerRefreshInFlightRef.current) {
-      return
-    }
-
-    if (Date.now() < aiPauseUntilRef.current || Date.now() < ownerRefreshBlockedUntilRef.current) {
-      return
-    }
-
-    ownerRefreshInFlightRef.current = true
-
-    try {
-      const result = await checkState({
-        gameId: ownerSession.gameId,
-        playerToken: ownerSession.playerToken,
-      })
-      ownerRefreshBlockedUntilRef.current = 0
-
-      setOwnerSession((prev) => {
-        if (!prev) {
-          return prev
-        }
-
-        return {
-          ...prev,
-          game: result?.game ?? prev.game,
-        }
-      })
-    } catch (error) {
-      const messageText = error instanceof Error ? error.message.toLowerCase() : ''
-      if (
-        messageText.includes('rate exceeded') ||
-        messageText.includes('too many requests') ||
-        messageText.includes('throttl')
-      ) {
-        ownerRefreshBlockedUntilRef.current = Date.now() + RATE_LIMIT_BACKOFF_MS
-      }
-
-      const message = toUserFacingActionError(error, 'Unable to refresh game state')
-      setGameError(message)
-    } finally {
-      ownerRefreshInFlightRef.current = false
-    }
-  }
-
-  const refreshPlayerGame = async () => {
-    if (!playerSession?.gameId || !playerSession?.playerToken) {
-      return
-    }
-
-    if (isMutationInFlight || playerRefreshInFlightRef.current) {
-      return
-    }
-
-    if (Date.now() < playerRefreshBlockedUntilRef.current) {
-      return
-    }
-
-    playerRefreshInFlightRef.current = true
-
-    try {
-      const result = await getGameState({
-        gameId: playerSession.gameId,
-        playerToken: playerSession.playerToken,
-        version: playerSession.version ?? playerSession.game?.version ?? 0,
-      })
-      playerRefreshBlockedUntilRef.current = 0
-      const nextVisibleGame = result?.game ?? playerSession.game
-
-      const knownViewerPlayerId =
-        getViewerHand(nextVisibleGame)?.playerId ??
-        getViewerHand(playerSession.game)?.playerId ??
-        ''
-      const stillHasPlayerSeat = knownViewerPlayerId
-        ? (nextVisibleGame?.players ?? []).some((player) => player.id === knownViewerPlayerId)
-        : true
-
-      if (knownViewerPlayerId && !stillHasPlayerSeat) {
-        handleRemovedFromGame(playerSession.gameId)
-        return
-      }
-
-      setPlayerSession((prev) => {
-        if (!prev) {
-          return prev
-        }
-
-        return {
-          ...prev,
-          game: result?.game ?? prev.game,
-          version: result?.version ?? prev.version,
-        }
-      })
-    } catch (error) {
-      const messageText = error instanceof Error ? error.message.toLowerCase() : ''
-      if (
-        messageText.includes('rate exceeded') ||
-        messageText.includes('too many requests') ||
-        messageText.includes('throttl')
-      ) {
-        playerRefreshBlockedUntilRef.current = Date.now() + RATE_LIMIT_BACKOFF_MS
-      }
-
-      if (isInvalidPlayerTokenError(error)) {
-        handleRemovedFromGame(playerSession.gameId)
-        return
-      }
-
-      const message = toUserFacingActionError(error, 'Unable to refresh game state')
-      setGameError(message)
-    } finally {
-      playerRefreshInFlightRef.current = false
-    }
-  }
-
-  useEffect(() => {
-    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
-      return undefined
-    }
-
-    refreshOwnerGame()
-
-    const interval = setInterval(() => {
-      refreshOwnerGame()
-    }, AI_ACTION_DELAY_MS)
-
-    return () => clearInterval(interval)
-  }, [ownerSession?.gameId, ownerSession?.playerToken, isMutationInFlight])
-
-  useEffect(() => {
-    if (!playerSession?.gameId || !playerSession?.playerToken) {
-      return undefined
-    }
-
-    refreshPlayerGame()
-
-    const interval = setInterval(() => {
-      refreshPlayerGame()
-    }, AI_ACTION_DELAY_MS)
-
-    return () => clearInterval(interval)
-  }, [playerSession?.gameId, playerSession?.playerToken, playerSession?.version, isMutationInFlight])
-
   const activeLobbySession = ownerSession ?? playerSession
   const isOwnerLobby = Boolean(ownerSession)
   const activeGame = activeLobbySession?.game
@@ -2354,10 +2361,42 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!activeLobbySession?.gameId || !activeLobbySession?.playerToken || !activeLobbySession?.game?.phase) {
+      return undefined
+    }
+
+    if (activeLobbySession.game.phase.stage === 'Scoring') {
+      const timeout = setTimeout(() => {
+        void requestActiveStateReview()
+      }, 0)
+
+      return () => clearTimeout(timeout)
+    }
+
+    if (activeLobbySession.game.phase.stage === 'EndOfRound') {
+      const delay = Math.max(0, (activeLobbySession.game.phase.advanceAfter ?? Date.now()) - Date.now())
+      const timeout = setTimeout(() => {
+        void requestActiveStateReview()
+      }, delay)
+
+      return () => clearTimeout(timeout)
+    }
+
+    return undefined
+  }, [
+    activeLobbySession?.gameId,
+    activeLobbySession?.playerToken,
+    activeLobbySession?.game?.phase?.stage,
+    activeLobbySession?.game?.phase?.advanceAfter,
+    ownerSession,
+    playerSession,
+  ])
+
+  useEffect(() => {
     const completedTricks =
       activeGame?.phase && 'cards' in activeGame.phase ? activeGame.phase.cards.completedTricks ?? [] : []
 
-    if (!ownerSession?.gameId || !activeGame) {
+    if (!activeLobbySession?.gameId || !activeGame) {
       previousCompletedTrickCountRef.current = completedTricks.length
       aiPauseUntilRef.current = 0
       return
@@ -2377,9 +2416,9 @@ export default function App() {
     aiPauseTimeoutRef.current = setTimeout(() => {
       aiPauseUntilRef.current = 0
       aiPauseTimeoutRef.current = null
-      refreshOwnerGame()
+      void requestActiveStateReview()
     }, TRICK_COMPLETE_DELAY_MS)
-  }, [activeGame, ownerSession?.gameId])
+  }, [activeGame, activeLobbySession?.gameId, ownerSession, playerSession])
 
   const handleCopyShareLink = async () => {
     if (!shareLink) {
@@ -2417,14 +2456,7 @@ export default function App() {
         playerId,
         direction,
       })
-      setOwnerSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              game: result?.game ?? prev.game,
-            }
-          : prev,
-      )
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to move player'
       setGameError(message)
@@ -2448,14 +2480,7 @@ export default function App() {
         playerToken: ownerSession.playerToken,
         playerId,
       })
-      setOwnerSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              game: result?.game ?? prev.game,
-            }
-          : prev,
-      )
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove player'
@@ -2523,14 +2548,7 @@ export default function App() {
         dealerPlayerId: orderedPlayers[0]?.id || undefined,
         aiDifficulty: selectedAiDifficulty,
       })
-      setOwnerSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              game: result?.game ?? prev.game,
-            }
-          : prev,
-      )
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       setLobbyInfo('Game started.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start game'
@@ -2587,14 +2605,7 @@ export default function App() {
         playerToken: ownerSession.playerToken,
       })
 
-      setOwnerSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              game: result?.game ?? prev.game,
-            }
-          : prev,
-      )
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
       setLobbyInfo('Game reset to lobby.')
@@ -2639,28 +2650,18 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
       setSortMode('byRank')
     } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to deal cards')
       setGameError(message)
     } finally {
@@ -2700,28 +2701,18 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
       closeSubmitBidModal()
     } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to submit bid')
       setGameError(message)
     } finally {
@@ -2748,28 +2739,18 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
       setSortMode(mode)
     } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to sort cards')
       setGameError(message)
     } finally {
@@ -2798,24 +2779,9 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
       const nextCooldownUntil = Date.now() + REACTION_COOLDOWN_MS
@@ -2828,6 +2794,11 @@ export default function App() {
         reactionCooldownTimeoutRef.current = null
       }, REACTION_COOLDOWN_MS)
     } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to send reaction')
       setGameError(message)
       throw error
@@ -2855,24 +2826,9 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
       return true
@@ -2904,26 +2860,16 @@ export default function App() {
       })
 
       if (ownerSession) {
-        setOwnerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-              }
-            : prev,
-        )
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
       } else {
-        setPlayerSession((prev) =>
-          prev
-            ? {
-                ...prev,
-                game: result?.game ?? prev.game,
-                version: result?.version ?? prev.version,
-              }
-            : prev,
-        )
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
     } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
       const message = toUserFacingActionError(error, 'Unable to play card')
       setGameError(message)
     } finally {

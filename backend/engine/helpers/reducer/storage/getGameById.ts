@@ -13,6 +13,9 @@ export const getGameById = (gameId: string): Promise<Game | undefined> =>
       return undefined;
     }
 
-    const { expiresAt: _expiresAt, ...game } = item;
+    const { expiresAt: _expiresAt, gameId: _gameId, entityType: _entityType, ...game } = item as GameStorageItem & {
+      gameId?: string;
+      entityType?: string;
+    };
     return game;
   });

@@ -6,6 +6,7 @@ const VERSION_ITEM_SUFFIX = "#version";
 export type GameVersionItem = {
   id: string;
   gameId: string;
+  entityType: string;
   version: number;
   playerTokens: PlayerToken[];
 } & ExpiringItem;
@@ -16,6 +17,7 @@ export const toGameVersionItem = (game: Game): GameVersionItem =>
   withExpiration({
     id: gameVersionItemId(game.id),
     gameId: game.id,
+    entityType: "version",
     version: game.version,
     playerTokens: game.playerTokens,
   });

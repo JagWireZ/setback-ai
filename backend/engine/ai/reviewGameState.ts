@@ -896,7 +896,7 @@ const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Ca
   return chooseStrategicPlayableCard(game, aiPlayerId, token);
 };
 
-const applyAutomationStep = (game: Game): Game | undefined => {
+export const applyAutomationStep = (game: Game): Game | undefined => {
   if (game.phase.stage === "Scoring") {
     return withNextVersion(game, {
       phase: advancePhase(game),
@@ -963,14 +963,9 @@ export const reviewGameState = (game: Game): Game => {
   let current = game;
 
   for (let step = 0; step < MAX_REVIEW_STEPS; step += 1) {
-    const shouldPauseAfterStep =
-      current.phase.stage === "Bidding" || current.phase.stage === "Playing";
     const updatedGame = applyAutomationStep(current);
     if (!updatedGame) {
       return current;
-    }
-    if (shouldPauseAfterStep) {
-      return updatedGame;
     }
     current = updatedGame;
   }

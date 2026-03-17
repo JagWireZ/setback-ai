@@ -10,7 +10,11 @@ export const putGame = (game: Game): Promise<void> =>
       {
         put: {
           tableName: tableName(),
-          item: withExpiration(game),
+          item: withExpiration({
+            ...game,
+            gameId: game.id,
+            entityType: "game",
+          }),
         },
       },
       {

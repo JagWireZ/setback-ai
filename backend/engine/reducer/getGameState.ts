@@ -1,10 +1,30 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
+import { reviewGameState } from "../ai/reviewGameState";
 import { getGameById } from "../helpers/reducer/storage/getGameById";
 import { getGameVersionById } from "../helpers/reducer/storage/getGameVersionById";
 import { putGame } from "../helpers/reducer/storage/putGame";
 import { requirePlayerToken } from "../helpers/reducer/validation/requirePlayerToken";
 import { toResult } from "../helpers/reducer/gameState/toResult";
+
+const reviewVisibleGame = async (
+  existingGame: Game,
+  playerToken: string,
+  version: number,
+): Promise<{ game?: Omit<Game, "playerTokens" | "ownerToken">; playerToken?: string; version?: number }> => {
+  requirePlayerToken(existingGame, playerToken);
+
+  const reviewedGame = reviewGameState(existingGame);
+  if (reviewedGame.version !== existingGame.version) {
+    await putGame(reviewedGame);
+  }
+
+  if (version >= reviewedGame.version) {
+    return { version: reviewedGame.version };
+  }
+
+  return toResult(reviewedGame, undefined, playerToken);
+};
 
 export const getGameState = (
   _game: Game | undefined,
@@ -17,15 +37,7 @@ export const getGameState = (
           throw new Error("Game not found");
         }
 
-        requirePlayerToken(existingGame, event.payload.playerToken);
-
-        return putGame(existingGame).then(() => {
-          if (event.payload.version >= existingGame.version) {
-            return { version: existingGame.version };
-          }
-
-          return toResult(existingGame, undefined, event.payload.playerToken);
-        });
+        return reviewVisibleGame(existingGame, event.payload.playerToken, event.payload.version);
       });
     }
 
@@ -36,15 +48,11 @@ export const getGameState = (
       throw new Error("Invalid player token");
     }
 
-    if (event.payload.version >= versionItem.version) {
-      return { version: versionItem.version };
-    }
-
     return getGameById(event.payload.gameId).then((existingGame) => {
       if (!existingGame) {
         throw new Error("Game not found");
       }
 
-      return toResult(existingGame, undefined, event.payload.playerToken);
+      return reviewVisibleGame(existingGame, event.payload.playerToken, event.payload.version);
     });
   });

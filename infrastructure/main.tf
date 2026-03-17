@@ -113,6 +113,23 @@ resource "aws_dynamodb_table" "setback_game" {
     type = "S"
   }
 
+  attribute {
+    name = "gameId"
+    type = "S"
+  }
+
+  attribute {
+    name = "entityType"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "gameId-entityType-index"
+    hash_key        = "gameId"
+    range_key       = "entityType"
+    projection_type = "ALL"
+  }
+
   ttl {
     attribute_name = "expiresAt"
     enabled        = true
@@ -152,7 +169,10 @@ data "aws_iam_policy_document" "lambda_dynamodb_access" {
       "dynamodb:Query",
       "dynamodb:Scan"
     ]
-    resources = [aws_dynamodb_table.setback_game.arn]
+    resources = [
+      aws_dynamodb_table.setback_game.arn,
+      "${aws_dynamodb_table.setback_game.arn}/index/*",
+    ]
   }
 }
 
@@ -164,6 +184,28 @@ resource "aws_iam_policy" "lambda_dynamodb_access" {
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb_access" {
   role       = aws_iam_role.lambda_execution.name
   policy_arn = aws_iam_policy.lambda_dynamodb_access.arn
+}
+
+data "aws_iam_policy_document" "lambda_manage_websocket_connections" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "execute-api:ManageConnections"
+    ]
+    resources = [
+      "${aws_apigatewayv2_api.backend.execution_arn}/*/POST/@connections/*"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_manage_websocket_connections" {
+  name   = "${local.lambda_function_name}-websocket-connections-policy"
+  policy = data.aws_iam_policy_document.lambda_manage_websocket_connections.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_manage_websocket_connections" {
+  role       = aws_iam_role.lambda_execution.name
+  policy_arn = aws_iam_policy.lambda_manage_websocket_connections.arn
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
@@ -194,8 +236,60 @@ resource "aws_lambda_function" "backend" {
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,
     aws_iam_role_policy_attachment.lambda_dynamodb_access,
+    aws_iam_role_policy_attachment.lambda_manage_websocket_connections,
     aws_cloudwatch_log_group.lambda
   ]
+}
+
+resource "aws_apigatewayv2_api" "backend" {
+  name                       = "${local.lambda_function_name}-ws"
+  protocol_type              = "WEBSOCKET"
+  route_selection_expression = "$request.body.action"
+}
+
+resource "aws_apigatewayv2_integration" "backend" {
+  api_id                 = aws_apigatewayv2_api.backend.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_function.backend.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "1.0"
+}
+
+resource "aws_apigatewayv2_route" "backend_connect" {
+  api_id    = aws_apigatewayv2_api.backend.id
+  route_key = "$connect"
+  target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
+}
+
+resource "aws_apigatewayv2_route" "backend_disconnect" {
+  api_id    = aws_apigatewayv2_api.backend.id
+  route_key = "$disconnect"
+  target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
+}
+
+resource "aws_apigatewayv2_route" "backend_default" {
+  api_id    = aws_apigatewayv2_api.backend.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
+}
+
+resource "aws_apigatewayv2_stage" "backend" {
+  api_id      = aws_apigatewayv2_api.backend.id
+  name        = local.env
+  auto_deploy = true
+
+  default_route_settings {
+    throttling_burst_limit = 50
+    throttling_rate_limit  = 100
+  }
+}
+
+resource "aws_lambda_permission" "allow_api_gateway_websocket" {
+  statement_id  = "AllowApiGatewayWebSocketInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.backend.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.backend.execution_arn}/*/*"
 }
 
 resource "aws_lambda_function_url" "backend" {
@@ -460,8 +554,7 @@ resource "aws_s3_bucket_policy" "frontend_public_read" {
 resource "terraform_data" "build_frontend" {
   triggers_replace = {
     source_hash      = local.frontend_source_hash
-    backend_url      = aws_lambda_function_url.backend.function_url
-    identity_pool_id = aws_cognito_identity_pool.frontend.id
+    websocket_url    = aws_apigatewayv2_stage.backend.invoke_url
     app_env          = local.env
   }
 
@@ -470,16 +563,13 @@ resource "terraform_data" "build_frontend" {
     command     = "npm run build:frontend"
 
     environment = {
-      VITE_BACKEND_URL              = aws_lambda_function_url.backend.function_url
-      VITE_COGNITO_IDENTITY_POOL_ID = aws_cognito_identity_pool.frontend.id
-      VITE_AWS_REGION               = var.aws_region
+      VITE_WEBSOCKET_URL            = aws_apigatewayv2_stage.backend.invoke_url
       VITE_APP_ENV                  = local.env == "staging" ? "staging" : ""
     }
   }
 
   depends_on = [
-    aws_lambda_function_url.backend,
-    aws_cognito_identity_pool.frontend,
+    aws_apigatewayv2_stage.backend,
     aws_s3_bucket.frontend,
   ]
 }

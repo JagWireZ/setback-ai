@@ -4,6 +4,7 @@ import {
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
@@ -29,6 +30,14 @@ type GetItemParams = {
 type DeleteItemParams = {
   tableName: string;
   key: DynamoKey;
+};
+
+type QueryItemsParams = {
+  tableName: string;
+  indexName?: string;
+  keyConditionExpression: string;
+  expressionAttributeNames?: Record<string, string>;
+  expressionAttributeValues: Record<string, unknown>;
 };
 
 type TransactWriteParams = {
@@ -132,6 +141,39 @@ export const DeleteItem = async (
       Key: key,
     }),
   );
+};
+
+export const QueryItems = async <TItem extends Record<string, unknown>>(
+  params: QueryItemsParams,
+): Promise<TItem[]> => {
+  const {
+    tableName,
+    indexName,
+    keyConditionExpression,
+    expressionAttributeNames,
+    expressionAttributeValues,
+  } = params;
+
+  const items: TItem[] = [];
+  let exclusiveStartKey: DynamoKey | undefined;
+
+  do {
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: tableName,
+        IndexName: indexName,
+        KeyConditionExpression: keyConditionExpression,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+
+    items.push(...((result.Items as TItem[] | undefined) ?? []));
+    exclusiveStartKey = result.LastEvaluatedKey as DynamoKey | undefined;
+  } while (exclusiveStartKey);
+
+  return items;
 };
 
 export const TransactWriteItems = async (

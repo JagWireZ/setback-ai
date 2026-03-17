@@ -57,3 +57,8 @@ output "frontend_custom_domain_url" {
   description = "Custom HTTPS URL for the frontend"
   value       = local.frontend_origin
 }
+
+output "backend_websocket_url" {
+  description = "WebSocket URL for the backend"
+  value       = aws_apigatewayv2_stage.backend.invoke_url
+}
