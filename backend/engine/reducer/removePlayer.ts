@@ -48,7 +48,12 @@ export const removePlayer = (
             ...player,
             name: aiName,
             type: "ai",
-            connected: true,
+            presence: {
+              connected: true,
+              lastSeenAt: Date.now(),
+              away: false,
+            },
+            controller: "human",
           }
         : player,
     ),

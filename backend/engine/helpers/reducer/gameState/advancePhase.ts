@@ -13,6 +13,7 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
     stage: "Dealing",
     dealerPlayerId,
     turnPlayerId: dealerPlayerId,
+    turnStartedAt: Date.now(),
     roundIndex,
     trickIndex: 0,
     bids: [],
@@ -79,6 +80,7 @@ export const advancePhase = (game: Game): Phase => {
         ...game.phase,
         stage: "Bidding",
         turnPlayerId: getNextPlayerId(game.playerOrder, game.phase.dealerPlayerId),
+        turnStartedAt: Date.now(),
       };
     case "Bidding":
       return {
@@ -89,6 +91,7 @@ export const advancePhase = (game: Game): Phase => {
           game.phase.dealerPlayerId,
           game.phase.bids,
         ),
+        turnStartedAt: Date.now(),
       };
     case "Playing": {
       const { turnPlayerId: _turnPlayerId, ...scoringPhase } = game.phase;

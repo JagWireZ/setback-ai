@@ -1,12 +1,14 @@
 import {
   ApiGatewayManagementApiClient,
   DeleteConnectionCommand,
+  GetConnectionCommand,
   GoneException,
   PostToConnectionCommand,
 } from "@aws-sdk/client-apigatewaymanagementapi";
 import type { Game } from "@shared/types/game";
 import { toResult } from "../engine/helpers/reducer/gameState/toResult";
 import { deleteConnectionById } from "../engine/helpers/reducer/storage/deleteConnectionById";
+import type { ConnectionItem } from "../engine/helpers/reducer/storage/connectionItem";
 import { getConnectionsByGameId } from "../engine/helpers/reducer/storage/getConnectionsByGameId";
 import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 
@@ -107,6 +109,45 @@ export const sendSocketResponse = (
   return postBestEffort(client, connectionId, message);
 };
 
+const isLiveConnection = async (
+  client: ApiGatewayManagementApiClient,
+  connectionId: string,
+): Promise<boolean> => {
+  try {
+    await client.send(
+      new GetConnectionCommand({
+        ConnectionId: connectionId,
+      }),
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof GoneException) {
+      await deleteConnectionById(connectionId);
+      return false;
+    }
+
+    return true;
+  }
+};
+
+export const filterLiveConnections = async (
+  domainName: string,
+  stage: string,
+  connections: ConnectionItem[],
+): Promise<ConnectionItem[]> => {
+  const client = createManagementClient(domainName, stage);
+  const statuses = await Promise.all(
+    connections.map(async (connection) => ({
+      connection,
+      active: await isLiveConnection(client, connection.connectionId),
+    })),
+  );
+
+  return statuses
+    .filter((entry) => entry.active)
+    .map((entry) => entry.connection);
+};
+
 const buildPersonalizedState = (game: Game, playerToken: string) =>
   toResult(game, undefined, playerToken);
 
@@ -116,10 +157,11 @@ export const broadcastGameState = async (
   gameId: string,
 ): Promise<void> => {
   const client = createManagementClient(domainName, stage);
-  const [connections, latestGame] = await Promise.all([
+  const [storedConnections, latestGame] = await Promise.all([
     getConnectionsByGameId(gameId),
     getGameById(gameId),
   ]);
+  const connections = await filterLiveConnections(domainName, stage, storedConnections);
 
   if (!latestGame) {
     await Promise.all(

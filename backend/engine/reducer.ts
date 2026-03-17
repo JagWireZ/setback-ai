@@ -9,13 +9,17 @@ import { movePlayer } from "./reducer/movePlayer";
 import { getGameState } from "./reducer/getGameState";
 import { removeGame } from "./reducer/removeGame";
 import { removePlayer } from "./reducer/removePlayer";
+import { setPlayerAway } from "./reducer/setPlayerAway";
+import { returnFromAway } from "./reducer/returnFromAway";
 import { renamePlayer } from "./reducer/renamePlayer";
 import { sendReaction } from "./reducer/sendReaction";
 import { dealCards } from "./reducer/dealCards";
 import { submitBid } from "./reducer/submitBid";
 import { playCard } from "./reducer/playCard";
+import { coverAwayPlayerTurn } from "./reducer/coverAwayPlayerTurn";
 import { sortCards } from "./reducer/sortCards";
 import { requireOwnerToken } from "./helpers/reducer/validation/requireOwnerToken";
+import { touchPlayerActivity } from "./helpers/reducer/player/touchPlayerActivity";
 import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerToken";
 import { requireGame } from "./helpers/reducer/validation/requireGame";
 import { putGame } from "./helpers/reducer/storage/putGame";
@@ -30,9 +34,11 @@ export type EngineReducerResult = {
   version?: number;
 };
 
-type OwnerActionEvent = LambdaEventPayload<"startGame" | "startOver" | "movePlayer">;
+type OwnerActionEvent = LambdaEventPayload<
+  "startGame" | "startOver" | "movePlayer" | "setPlayerAway" | "coverAwayPlayerTurn"
+>;
 type PlayerActionEvent = LambdaEventPayload<
-  "dealCards" | "submitBid" | "playCard" | "sortCards" | "renamePlayer" | "sendReaction"
+  "dealCards" | "submitBid" | "playCard" | "sortCards" | "renamePlayer" | "sendReaction" | "returnFromAway"
 >;
 
 const persistAndReturn = (
@@ -56,7 +62,16 @@ const runPlayerAction = <TEvent extends PlayerActionEvent>(
   reducer: (game: Game | undefined, event: TEvent) => Game,
 ): Promise<EngineReducerResult> => {
   requirePlayerToken(game, event.payload.playerToken);
-  return persistAndReturn(reducer(game, event), event.payload.playerToken);
+  const existingGame = requireGame(game);
+  const playerId = existingGame.playerTokens.find(
+    (entry) => entry.token === event.payload.playerToken,
+  )?.playerId;
+  if (!playerId) {
+    throw new Error("Invalid player token");
+  }
+
+  const updatedGame = reducer(game, event);
+  return persistAndReturn(touchPlayerActivity(updatedGame, playerId, { connected: true }), event.payload.playerToken);
 };
 
 const runOwnerOrSelfRemovePlayer = (
@@ -116,8 +131,14 @@ export const engineReducer = (
       return runPlayerAction(game, event, submitBid);
     case "playCard":
       return runPlayerAction(game, event, playCard);
+    case "returnFromAway":
+      return runPlayerAction(game, event, returnFromAway);
+    case "coverAwayPlayerTurn":
+      return runOwnerAction(game, event, coverAwayPlayerTurn);
     case "movePlayer":
       return runOwnerAction(game, event, movePlayer);
+    case "setPlayerAway":
+      return runOwnerAction(game, event, setPlayerAway);
     case "sortCards":
       return runPlayerAction(game, event, sortCards);
     case "removePlayer":

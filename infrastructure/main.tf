@@ -193,7 +193,7 @@ data "aws_iam_policy_document" "lambda_manage_websocket_connections" {
       "execute-api:ManageConnections"
     ]
     resources = [
-      "${aws_apigatewayv2_api.backend.execution_arn}/*/POST/@connections/*"
+      "${aws_apigatewayv2_api.backend.execution_arn}/*/*/@connections/*"
     ]
   }
 }

@@ -192,11 +192,13 @@ const syncActiveSession = async ({ silent = false } = {}) => {
         ? {
             gameId: activeSession.gameId,
             playerToken: activeSession.playerToken,
+            associateConnection: true,
           }
         : {
             gameId: activeSession.gameId,
             playerToken: activeSession.playerToken,
             version: 0,
+            associateConnection: true,
           },
     )
 
@@ -262,17 +264,19 @@ export const joinGame = ({ gameId, playerName }) =>
     playerName,
   })
 
-export const checkState = ({ gameId, playerToken }) =>
+export const checkState = ({ gameId, playerToken, associateConnection = false }) =>
   invoke('checkState', {
     gameId: normalizeGameId(gameId),
     playerToken,
+    associateConnection,
   })
 
-export const getGameState = ({ gameId, playerToken, version }) =>
+export const getGameState = ({ gameId, playerToken, version, associateConnection = false }) =>
   invoke('getGameState', {
     gameId: normalizeGameId(gameId),
     playerToken,
     version,
+    associateConnection,
   })
 
 export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
@@ -281,6 +285,13 @@ export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
     playerToken,
     playerId,
     direction,
+  })
+
+export const setPlayerAway = ({ gameId, playerToken, playerId }) =>
+  invoke('setPlayerAway', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+    playerId,
   })
 
 export const removePlayer = ({ gameId, playerToken, playerId }) =>
@@ -339,6 +350,19 @@ export const playCard = ({ gameId, playerToken, card }) =>
     gameId: normalizeGameId(gameId),
     playerToken,
     card,
+  })
+
+export const returnFromAway = ({ gameId, playerToken }) =>
+  invoke('returnFromAway', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+  })
+
+export const coverAwayPlayerTurn = ({ gameId, playerToken, playerId }) =>
+  invoke('coverAwayPlayerTurn', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+    playerId,
   })
 
 export const sortCards = ({ gameId, playerToken, mode }) =>

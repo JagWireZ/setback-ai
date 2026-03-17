@@ -83,10 +83,11 @@ export function assertCheckStatePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"checkState"> {
   const typedEvent = expectAction(event, "checkState");
-  const { gameId, playerToken } = typedEvent.payload;
+  const { gameId, playerToken, associateConnection } = typedEvent.payload;
 
   requireGameId(gameId, typedEvent.action);
   requirePlayerToken(playerToken, typedEvent.action);
+  requireOptionalBoolean(associateConnection, typedEvent.action, "associateConnection");
 }
 
 export function assertDealCardsPayload(
@@ -163,6 +164,27 @@ export function assertPlayCardPayload(
   }
 }
 
+export function assertReturnFromAwayPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"returnFromAway"> {
+  const typedEvent = expectAction(event, "returnFromAway");
+  const { gameId, playerToken } = typedEvent.payload;
+
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+}
+
+export function assertCoverAwayPlayerTurnPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"coverAwayPlayerTurn"> {
+  const typedEvent = expectAction(event, "coverAwayPlayerTurn");
+  const { gameId, playerToken, playerId } = typedEvent.payload;
+
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerId, typedEvent.action, "playerId");
+}
+
 export function assertSortCardsPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"sortCards"> {
@@ -190,6 +212,17 @@ export function assertMovePlayerPayload(
   if (direction !== "left" && direction !== "right") {
     throw new Error('movePlayer requires payload.direction as "left" or "right"');
   }
+}
+
+export function assertSetPlayerAwayPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"setPlayerAway"> {
+  const typedEvent = expectAction(event, "setPlayerAway");
+  const { gameId, playerToken, playerId } = typedEvent.payload;
+
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerId, typedEvent.action, "playerId");
 }
 
 export function assertRemovePlayerPayload(
@@ -232,11 +265,12 @@ export function assertGetGameStatePayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"getGameState"> {
   const typedEvent = expectAction(event, "getGameState");
-  const { gameId, playerToken, version } = typedEvent.payload;
+  const { gameId, playerToken, version, associateConnection } = typedEvent.payload;
 
   requireGameId(gameId, typedEvent.action);
   requirePlayerToken(playerToken, typedEvent.action);
   requireInteger(version, typedEvent.action, "version");
+  requireOptionalBoolean(associateConnection, typedEvent.action, "associateConnection");
 }
 
 const isCardCount = (value: unknown): value is CardCount =>

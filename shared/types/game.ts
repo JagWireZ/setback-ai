@@ -72,6 +72,7 @@ type RoundPhaseBase = {
   dealerPlayerId: string
   roundIndex: number
   trickIndex: number
+  turnStartedAt?: number
   bids: Bid[]
   cards: PhaseCards
 }
@@ -120,11 +121,22 @@ export type Phase =
 // Player types
 export type PlayerType = 'ai' | 'human'
 
+export type PlayerPresence = {
+  connected: boolean
+  lastSeenAt?: number
+  away: boolean
+}
+
+export type PlayerController = 'human' | 'ai-temporary'
+
 export type Player = {
   id: string
   name: string
   type: PlayerType
-  connected: boolean
+  presence?: PlayerPresence
+  controller?: PlayerController
+  connected?: boolean
+  lastActiveAt?: number
 }
 
 export type PlayerToken = {

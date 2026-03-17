@@ -1,4 +1,5 @@
 import { getBidDisplay, getCompletedRoundCount, getPlayerName, getRoundDirectionArrow } from '../utils/gameUi'
+import { getPlayerPresence } from '../utils/playerPresence'
 import { truncateLabel } from '../utils/playerName'
 
 export function ScoreSummary({
@@ -6,6 +7,7 @@ export function ScoreSummary({
   bids,
   booksByPlayerId,
   currentRoundIndex,
+  nowMs = Date.now(),
   isGameOver = false,
   isOwner = false,
   viewerPlayerId = '',
@@ -47,6 +49,16 @@ export function ScoreSummary({
         const playerDisplayName = truncateLabel(player.name, 22)
         const isWinner = isGameOver && highestTotalScore !== Number.NEGATIVE_INFINITY && (score?.total ?? 0) === highestTotalScore
         const isViewerPlayer = Boolean(viewerPlayerId && player.id === viewerPlayerId)
+        const playerPresence = getPlayerPresence(player)
+        const isAway = player.type === 'human' && playerPresence.away
+        const turnIdleSince = Math.max(playerPresence.lastSeenAt ?? 0, 'turnPlayerId' in (game.phase ?? {}) ? game.phase.turnStartedAt ?? 0 : 0)
+        const isIdle =
+          !isAway &&
+          player.type === 'human' &&
+          'turnPlayerId' in (game.phase ?? {}) &&
+          game.phase.turnPlayerId === player.id &&
+          turnIdleSince > 0 &&
+          nowMs - turnIdleSince >= 60_000
 
         return (
           <li
@@ -84,6 +96,15 @@ export function ScoreSummary({
                       {score?.total ?? 0}
                       {playerRainbow ? <span className="ml-1" aria-label="Rainbow round">🌈</span> : null}
                     </p>
+                    {isAway ? (
+                      <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                        Away
+                      </span>
+                    ) : isIdle ? (
+                      <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
+                        Idle
+                      </span>
+                    ) : null}
                     {player.id === currentDealerPlayerId ? (
                       <span className="badge-subtle rounded-full border px-2 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-dim">
                         Dealer
@@ -254,6 +275,7 @@ export function ScoreSheet({
   booksByPlayerId,
   currentRoundIndex,
   currentRoundConfig,
+  nowMs = Date.now(),
   isGameOver,
   isOwner,
   viewerPlayerId = '',
@@ -272,6 +294,7 @@ export function ScoreSheet({
         bids={bids}
         booksByPlayerId={booksByPlayerId}
         currentRoundIndex={currentRoundIndex}
+        nowMs={nowMs}
         isGameOver={isGameOver}
         isOwner={isOwner}
         viewerPlayerId={viewerPlayerId}

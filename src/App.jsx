@@ -7,6 +7,8 @@ import {
   joinGame,
   movePlayer,
   playCard,
+  returnFromAway,
+  coverAwayPlayerTurn,
   renamePlayer,
   removePlayer,
   setActiveGameSession,
@@ -51,6 +53,7 @@ import {
   truncateLabel,
   validatePlayerName,
 } from './utils/playerName'
+import { getPlayerPresence } from './utils/playerPresence'
 import { usePwaInstall } from './utils/pwa'
 
 const AI_DIFFICULTY_OPTIONS = [
@@ -58,6 +61,8 @@ const AI_DIFFICULTY_OPTIONS = [
   { value: 'medium', label: 'Medium' },
   { value: 'hard', label: 'Hard' },
 ]
+
+const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
 
@@ -96,6 +101,7 @@ function GameTablePage({
   onSetGameError,
   onRenamePlayer,
   onRemovePlayer,
+  onCoverAwayPlayerTurn,
   onLeaveGame,
   onDealCards,
   onSubmitBid,
@@ -138,6 +144,10 @@ function GameTablePage({
 
   const viewerPlayerId = viewerHand?.playerId
   const actualTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
+  const actualTurnPlayer = actualTurnPlayerId
+    ? (game.players ?? []).find((player) => player.id === actualTurnPlayerId)
+    : null
+  const isAwayTurnPlayer = actualTurnPlayer?.type === 'human' && getPlayerPresence(actualTurnPlayer).away
   const currentRound = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex + 1 : 1
   const totalRounds = game?.options?.rounds?.length ?? 0
   const currentRoundIndex = game?.phase && 'roundIndex' in game.phase ? game.phase.roundIndex : 0
@@ -205,6 +215,7 @@ function GameTablePage({
   const [bookWinnerMessage, setBookWinnerMessage] = useState('')
   const [revealedCompletedTrick, setRevealedCompletedTrick] = useState(null)
   const [displayedTurnPlayerId, setDisplayedTurnPlayerId] = useState(actualTurnPlayerId)
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const [selectedTrickLabelStyle, setSelectedTrickLabelStyle] = useState(null)
   const [passiveTrickLabelStyles, setPassiveTrickLabelStyles] = useState([])
   const [returningTrickLabel, setReturningTrickLabel] = useState(null)
@@ -332,6 +343,16 @@ function GameTablePage({
 
     return () => {
       window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(intervalId)
     }
   }, [])
 
@@ -1091,6 +1112,7 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              nowMs={nowMs}
               isGameOver={isGameOver}
               isOwner={isOwner}
               viewerPlayerId={viewerPlayerId}
@@ -1273,8 +1295,8 @@ function GameTablePage({
           ) : displayedTurnPlayerId ? (
             <p className="text-sm text-dim">
               {waitingAction
-                ? `Waiting on ${getPlayerName(game, displayedTurnPlayerId)} to ${waitingAction}`
-                : `Waiting on ${getPlayerName(game, displayedTurnPlayerId)}...`}
+                ? `Waiting on ${getPlayerName(game, displayedTurnPlayerId)}${isOwner && isAwayTurnPlayer ? ' (Away)' : ''} to ${waitingAction}`
+                : `Waiting on ${getPlayerName(game, displayedTurnPlayerId)}${isOwner && isAwayTurnPlayer ? ' (Away)' : ''}...`}
             </p>
           ) : null}
         </div>
@@ -1377,6 +1399,7 @@ function GameTablePage({
               bids={bids}
               booksByPlayerId={booksByPlayerId}
               currentRoundIndex={currentRoundIndex}
+              nowMs={nowMs}
               currentRoundConfig={currentRoundConfig}
               isGameOver={isGameOver}
               isOwner={isOwner}
@@ -1403,10 +1426,43 @@ function GameTablePage({
             className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
             onClick={(event) => event.stopPropagation()}
           >
+            {(() => {
+              const selectedPlayerPresence = getPlayerPresence(selectedScorePlayer)
+              const isSelectedPlayerAway = selectedScorePlayer.type === 'human' && selectedPlayerPresence.away
+              const isSelectedPlayerTurn = selectedScorePlayer.id === actualTurnPlayerId
+              const selectedPlayerIdleSince = Math.max(
+                selectedPlayerPresence.lastSeenAt ?? 0,
+                game.phase?.turnStartedAt ?? 0,
+              )
+              const isSelectedPlayerIdleOnTurn =
+                selectedScorePlayer.type === 'human' &&
+                !selectedPlayerPresence.away &&
+                isSelectedPlayerTurn &&
+                selectedPlayerIdleSince > 0 &&
+                nowMs - selectedPlayerIdleSince >= OWNER_IDLE_TURN_TIMEOUT_MS
+              const canCoverSelectedPlayerTurn =
+                selectedScorePlayer.id !== ownerPlayerId &&
+                ((isSelectedPlayerAway && isSelectedPlayerTurn) || isSelectedPlayerIdleOnTurn)
+
+              return (
+                <>
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">Manage Player</h2>
             </div>
-            <p className="mt-2 text-sm text-muted">{selectedScorePlayer.name}</p>
+            <p className="mt-2 text-sm text-muted">
+              {selectedScorePlayer.name}
+              {isSelectedPlayerAway ? ' • Away' : ''}
+            </p>
+            {isSelectedPlayerIdleOnTurn ? (
+              <p className="status-info mt-4 text-sm">
+                This player has been idle on their turn for at least 60 seconds.
+              </p>
+            ) : null}
+            {isSelectedPlayerAway && isSelectedPlayerTurn ? (
+              <p className="status-info mt-4 text-sm">
+                This player is away and it is currently their turn.
+              </p>
+            ) : null}
             <form
               className="mt-4 flex flex-col gap-4"
               onSubmit={async (event) => {
@@ -1445,6 +1501,29 @@ function GameTablePage({
                   autoFocus
                 />
               </label>
+              {canCoverSelectedPlayerTurn ? (
+                <button
+                  type="button"
+                  className="btn-primary px-4 py-2 disabled:opacity-50"
+                  onClick={async () => {
+                    if (!selectedScorePlayer) {
+                      return
+                    }
+
+                    onSetGameError('')
+                    const didCover = await onCoverAwayPlayerTurn?.(selectedScorePlayer.id)
+                    if (didCover) {
+                      closeScorePlayerModal()
+                    }
+                  }}
+                  disabled={
+                    pendingPlayerActionId === selectedScorePlayer.id ||
+                    isRenamingPlayer
+                  }
+                >
+                  {pendingPlayerActionId === selectedScorePlayer.id ? 'Playing...' : 'Let AI Play Turn'}
+                </button>
+              ) : null}
               <div className="flex justify-between gap-3">
                 <button
                   type="button"
@@ -1484,6 +1563,9 @@ function GameTablePage({
                 </div>
               </div>
             </form>
+                </>
+              )
+            })()}
           </div>
         </div>
       ) : null}
@@ -1802,6 +1884,7 @@ export default function App() {
   const [requestError, setRequestError] = useState('')
   const [sessionInfo, setSessionInfo] = useState(null)
   const [rejoinableGames, setRejoinableGames] = useState([])
+  const [showAwayContinueModal, setShowAwayContinueModal] = useState(false)
 
   const [ownerSession, setOwnerSession] = useState(null)
   const [playerSession, setPlayerSession] = useState(null)
@@ -1817,6 +1900,7 @@ export default function App() {
   const [isSendingReaction, setIsSendingReaction] = useState(false)
   const [isRenamingPlayer, setIsRenamingPlayer] = useState(false)
   const [isSortingCards, setIsSortingCards] = useState(false)
+  const [isContinuingGame, setIsContinuingGame] = useState(false)
   const [isLeavingGame, setIsLeavingGame] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
   const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
@@ -1828,6 +1912,8 @@ export default function App() {
   const [helpSection, setHelpSection] = useState('how-to-play')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
   const aiPauseUntilRef = useRef(0)
+  const awayModalSessionKeyRef = useRef('')
+  const wasLocalPlayerAwayRef = useRef(false)
   const aiPauseTimeoutRef = useRef(null)
   const previousCompletedTrickCountRef = useRef(0)
   const latestShownRoundIndexRef = useRef(-1)
@@ -1990,7 +2076,7 @@ export default function App() {
     setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
   }
 
-  const requestActiveStateReview = async () => {
+  const requestActiveStateReview = async ({ associateConnection = false } = {}) => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
@@ -2001,11 +2087,13 @@ export default function App() {
         ? await checkState({
             gameId: activeSession.gameId,
             playerToken: activeSession.playerToken,
+            associateConnection,
           })
         : await getGameState({
             gameId: activeSession.gameId,
             playerToken: activeSession.playerToken,
             version: activeSession.version ?? activeSession.game?.version ?? 0,
+            associateConnection,
           })
 
       applyRealtimeResult(result, ownerSession ? 'owner' : 'player')
@@ -2100,11 +2188,17 @@ export default function App() {
       }
 
       if (restoredSession?.role === 'owner') {
+        const resumedSession = await returnFromAway({
+          gameId: gameIdFromUrl,
+          playerToken: storedSession.playerToken,
+        })
+
         setOwnerSession({
           gameId: gameIdFromUrl,
           playerToken: storedSession.playerToken,
-          game: restoredSession.game,
-          ownerPlayerId: restoredSession.ownerPlayerId,
+          game: resumedSession?.game ?? restoredSession.game,
+          ownerPlayerId:
+            resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
         })
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setSelectedAiDifficulty(restoredSession.game?.options?.aiDifficulty ?? 'medium')
@@ -2120,11 +2214,16 @@ export default function App() {
       }
 
       if (restoredSession?.role === 'player') {
+        const resumedSession = await returnFromAway({
+          gameId: gameIdFromUrl,
+          playerToken: storedSession.playerToken,
+        })
+
         setPlayerSession({
           gameId: gameIdFromUrl,
           playerToken: storedSession.playerToken,
-          game: restoredSession.game,
-          version: restoredSession.version,
+          game: resumedSession?.game ?? restoredSession.game,
+          version: resumedSession?.version ?? restoredSession.version,
         })
         setOwnerSession(null)
         setIsJoinModalOpen(false)
@@ -2411,20 +2510,31 @@ export default function App() {
       }
 
       if (restoredSession.role === 'owner') {
+        const resumedSession = await returnFromAway({
+          gameId: selectedGame.gameId,
+          playerToken: selectedGame.playerToken,
+        })
+
         setOwnerSession({
           gameId: selectedGame.gameId,
           playerToken: selectedGame.playerToken,
-          game: restoredSession.game,
-          ownerPlayerId: restoredSession.ownerPlayerId,
+          game: resumedSession?.game ?? restoredSession.game,
+          ownerPlayerId:
+            resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
         })
         setPlayerSession(null)
         saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner', selectedGame.playerName ?? '')
       } else {
+        const resumedSession = await returnFromAway({
+          gameId: selectedGame.gameId,
+          playerToken: selectedGame.playerToken,
+        })
+
         setPlayerSession({
           gameId: selectedGame.gameId,
           playerToken: selectedGame.playerToken,
-          game: restoredSession.game,
-          version: restoredSession.version,
+          game: resumedSession?.game ?? restoredSession.game,
+          version: resumedSession?.version ?? restoredSession.version,
         })
         setOwnerSession(null)
         saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'player', selectedGame.playerName ?? '')
@@ -2582,6 +2692,11 @@ export default function App() {
       return ownerSession.ownerPlayerId
     }
 
+    const viewerPlayerId = getViewerHand(activeLobbySession.game)?.playerId
+    if (viewerPlayerId) {
+      return viewerPlayerId
+    }
+
     const storedPlayerName = getStoredGameSession(activeLobbySession.gameId)?.playerName?.trim()
     if (!storedPlayerName) {
       return ''
@@ -2589,6 +2704,42 @@ export default function App() {
 
     return activeLobbySession.game.players?.find((player) => player.name === storedPlayerName)?.id ?? ''
   }, [activeLobbySession?.game, activeLobbySession?.gameId, ownerSession?.ownerPlayerId])
+  const activeLobbyPlayer =
+    activeLobbyPlayerId && activeLobbySession?.game
+      ? activeLobbySession.game.players?.find((player) => player.id === activeLobbyPlayerId) ?? null
+      : null
+  const isLocalPlayerMarkedAway =
+    !ownerSession &&
+    activeLobbyPlayer?.type === 'human' &&
+    getPlayerPresence(activeLobbyPlayer).away
+  const activeSessionKey = ownerSession
+    ? `owner:${ownerSession.gameId}:${ownerSession.playerToken}`
+    : playerSession
+      ? `player:${playerSession.gameId}:${playerSession.playerToken}`
+      : ''
+
+  useEffect(() => {
+    if (awayModalSessionKeyRef.current !== activeSessionKey) {
+      awayModalSessionKeyRef.current = activeSessionKey
+      wasLocalPlayerAwayRef.current = Boolean(isLocalPlayerMarkedAway)
+      setShowAwayContinueModal(false)
+      return
+    }
+
+    if (!activeSessionKey) {
+      wasLocalPlayerAwayRef.current = false
+      setShowAwayContinueModal(false)
+      return
+    }
+
+    if (!wasLocalPlayerAwayRef.current && isLocalPlayerMarkedAway) {
+      setShowAwayContinueModal(true)
+    } else if (!isLocalPlayerMarkedAway) {
+      setShowAwayContinueModal(false)
+    }
+
+    wasLocalPlayerAwayRef.current = Boolean(isLocalPlayerMarkedAway)
+  }, [activeSessionKey, isLocalPlayerMarkedAway])
 
   const shareLink = useMemo(() => {
     if (!activeLobbySession?.gameId || typeof window === 'undefined') {
@@ -2733,6 +2884,37 @@ export default function App() {
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove player'
+      setGameError(message)
+      return false
+    } finally {
+      setPendingPlayerActionId('')
+    }
+  }
+
+  const handleCoverAwayPlayerTurn = async (playerId) => {
+    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
+      return false
+    }
+
+    setGameError('')
+    setLobbyInfo('')
+    setPendingPlayerActionId(playerId)
+
+    try {
+      const result = await coverAwayPlayerTurn({
+        gameId: ownerSession.gameId,
+        playerToken: ownerSession.playerToken,
+        playerId,
+      })
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
+      return true
+    } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return false
+      }
+
+      const message = toUserFacingActionError(error, 'Unable to play for away player')
       setGameError(message)
       return false
     } finally {
@@ -3009,6 +3191,32 @@ export default function App() {
 
   const toggleSortCards = () => {
     void handleSortCards(sortMode === 'bySuit' ? 'byRank' : 'bySuit')
+  }
+
+  const handleContinueGame = async () => {
+    const activeSession = ownerSession ?? playerSession
+    if (!activeSession?.gameId || !activeSession?.playerToken) {
+      return
+    }
+
+    setGameError('')
+    setIsContinuingGame(true)
+
+    try {
+      const result = await returnFromAway({
+        gameId: activeSession.gameId,
+        playerToken: activeSession.playerToken,
+      })
+      setShowAwayContinueModal(false)
+
+      if (ownerSession) {
+        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
+      } else {
+        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
+      }
+    } finally {
+      setIsContinuingGame(false)
+    }
   }
 
   const handleSendReaction = async (emoji) => {
@@ -3348,6 +3556,27 @@ export default function App() {
     </div>
   ) : null
 
+  const awayContinueModal = showAwayContinueModal && isLocalPlayerMarkedAway ? (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-black/75 px-4 py-4">
+      <div className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left">
+        <h2 className="text-xl font-semibold">Continue Game?</h2>
+        <p className="mt-3 text-sm text-muted">
+          The game owner marked you as away. Continue to return to the game.
+        </p>
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            className="btn-primary px-4 py-2 disabled:opacity-50"
+            onClick={handleContinueGame}
+            disabled={isContinuingGame}
+          >
+            {isContinuingGame ? 'Continuing...' : 'Continue Game'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
   if (activeGame && activeGame.phase?.stage !== 'Lobby') {
     return (
       <>
@@ -3363,6 +3592,7 @@ export default function App() {
           onSetGameError={setGameError}
           onRenamePlayer={handleRenamePlayer}
           onRemovePlayer={handleRemovePlayer}
+          onCoverAwayPlayerTurn={handleCoverAwayPlayerTurn}
           onLeaveGame={handleLeaveGame}
           onDealCards={handleDealCards}
           onSubmitBid={openSubmitBidModal}
@@ -3513,6 +3743,7 @@ export default function App() {
           onJoinPlayerNameChange={handleJoinPlayerNameInputChange}
           onSelectedRejoinGameIdChange={handleRejoinSelectionChange}
         />
+        {awayContinueModal}
         {helpModal}
       </>
     )
@@ -3578,6 +3809,7 @@ export default function App() {
                     const isPending = pendingPlayerActionId === player.id
                     const isDealer = player.id === currentDealerPlayerId
                     const isActiveLobbyPlayer = player.id === activeLobbyPlayerId
+                    const isAway = player.type === 'human' && getPlayerPresence(player).away
                     return (
                       <li
                         key={player.id}
@@ -3598,6 +3830,11 @@ export default function App() {
                           <span className="truncate font-medium">{player.name}</span>
                         </div>
                         <div className="flex items-center justify-end gap-2">
+                          {isAway ? (
+                            <span className="badge-subtle-strong rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-dim">
+                              Away
+                            </span>
+                          ) : null}
                           {isDealer ? (
                             <span className="badge-subtle-strong rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-dim">
                               Dealer
@@ -3757,6 +3994,7 @@ export default function App() {
             </div>
           </div>
         ) : null}
+        {awayContinueModal}
         {helpModal}
       </main>
     )

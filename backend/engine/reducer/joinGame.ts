@@ -41,6 +41,12 @@ export const joinGame = (
             ...player,
             name: event.payload.playerName,
             type: "human",
+            presence: {
+              connected: true,
+              lastSeenAt: Date.now(),
+              away: false,
+            },
+            controller: "human",
           }
         : player,
     ),

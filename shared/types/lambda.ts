@@ -9,8 +9,11 @@ export type LambdaAction =
   | 'dealCards'
   | 'submitBid'
   | 'playCard'
+  | 'returnFromAway'
+  | 'coverAwayPlayerTurn'
   | 'sortCards'
   | 'movePlayer'
+  | 'setPlayerAway'
   | 'removePlayer'
   | 'renamePlayer'
   | 'sendReaction'
@@ -30,6 +33,7 @@ type ActionPayloadMap = {
   }
   checkState: {
     gameId: string
+    associateConnection?: boolean
   }
   startGame: {
     gameId: string
@@ -52,6 +56,13 @@ type ActionPayloadMap = {
     gameId: string
     card: Card
   }
+  returnFromAway: {
+    gameId: string
+  }
+  coverAwayPlayerTurn: {
+    gameId: string
+    playerId: string
+  }
   sortCards: {
     gameId: string
     mode: SortMode
@@ -60,6 +71,10 @@ type ActionPayloadMap = {
     gameId: string
     playerId: string
     direction: string
+  }
+  setPlayerAway: {
+    gameId: string
+    playerId: string
   }
   removePlayer: {
     gameId: string
@@ -81,6 +96,7 @@ type ActionPayloadMap = {
   getGameState: {
     gameId: string
     version: number
+    associateConnection?: boolean
   }
 }
 

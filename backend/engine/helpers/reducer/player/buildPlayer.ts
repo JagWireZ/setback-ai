@@ -5,5 +5,10 @@ export const buildPlayer = (name: string): Player => ({
   id: generatePlayerId(),
   name,
   type: "human",
-  connected: true,
+  presence: {
+    connected: true,
+    lastSeenAt: Date.now(),
+    away: false,
+  },
+  controller: "human",
 });

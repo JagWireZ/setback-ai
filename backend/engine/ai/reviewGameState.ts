@@ -2,6 +2,7 @@ import type { AIDifficulty, Card, Game, Trick, TrickPlay } from "@shared/types/g
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
+import { getPlayerController, getPlayerPresence } from "../helpers/reducer/player/presence";
 import { dealCards } from "../reducer/dealCards";
 import { playCard } from "../reducer/playCard";
 import { submitBid } from "../reducer/submitBid";
@@ -17,14 +18,29 @@ const getPlayerTokenById = (game: Game, playerId: string): string => {
   return tokenEntry.token;
 };
 
-const getAiTurnPlayer = (game: Game): { playerId: string; token: string } | undefined => {
+const getAutomatedTurnPlayer = (
+  game: Game,
+  controlledPlayerId?: string,
+): { playerId: string; token: string } | undefined => {
   if (!("turnPlayerId" in game.phase)) {
     return undefined;
   }
 
   const turnPlayerId = game.phase.turnPlayerId;
+  if (controlledPlayerId && turnPlayerId !== controlledPlayerId) {
+    return undefined;
+  }
+
   const turnPlayer = game.players.find((player) => player.id === turnPlayerId);
-  if (!turnPlayer || turnPlayer.type !== "ai") {
+  if (!turnPlayer) {
+    return undefined;
+  }
+
+  const isAiPlayer = turnPlayer.type === "ai";
+  const isAiTemporaryController = getPlayerController(turnPlayer) === "ai-temporary";
+  const isAwayHumanOverride =
+    Boolean(controlledPlayerId) && turnPlayer.type === "human" && getPlayerPresence(turnPlayer).away;
+  if (!isAiPlayer && !isAiTemporaryController && !isAwayHumanOverride) {
     return undefined;
   }
 
@@ -897,6 +913,13 @@ const chooseAiPlayableCard = (game: Game, aiPlayerId: string, token: string): Ca
 };
 
 export const applyAutomationStep = (game: Game): Game | undefined => {
+  return applyAutomationStepForPlayer(game);
+};
+
+export const applyAutomationStepForPlayer = (
+  game: Game,
+  controlledPlayerId?: string,
+): Game | undefined => {
   if (game.phase.stage === "Scoring") {
     return withNextVersion(game, {
       phase: advancePhase(game),
@@ -913,7 +936,7 @@ export const applyAutomationStep = (game: Game): Game | undefined => {
     });
   }
 
-  const aiTurn = getAiTurnPlayer(game);
+  const aiTurn = getAutomatedTurnPlayer(game, controlledPlayerId);
   if (!aiTurn) {
     return undefined;
   }

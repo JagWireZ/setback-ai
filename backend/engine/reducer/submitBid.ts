@@ -73,6 +73,7 @@ export const submitBid = (
         ...existingGame.phase,
         bids: nextBids,
         turnPlayerId: getNextPlayerId(existingGame.playerOrder, playerId),
+        turnStartedAt: Date.now(),
       },
     });
   }

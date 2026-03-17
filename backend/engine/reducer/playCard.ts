@@ -220,6 +220,7 @@ export const playCard = (
       phase: {
         ...phase,
         turnPlayerId: getNextPlayerId(existingGame.playerOrder, turnPlayerId),
+        turnStartedAt: Date.now(),
         cards: {
           ...phase.cards,
           trumpBroken: nextTrumpBroken,
@@ -273,6 +274,7 @@ export const playCard = (
       ...phase,
       trickIndex: nextTrickIndex,
       turnPlayerId: nextTurnPlayerId,
+      turnStartedAt: Date.now(),
       cards: {
         ...phase.cards,
         trumpBroken: nextTrumpBroken,
