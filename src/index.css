@@ -198,6 +198,21 @@
     box-shadow: 0 0 18px rgba(199, 67, 67, 0.45);
   }
 
+  .btn-install {
+    border-color: rgba(34, 130, 88, 0.7);
+    background:
+      linear-gradient(180deg, rgba(34,130,88,0.22), rgba(22,101,52,0.18)),
+      rgba(34, 130, 88, 0.08);
+    color: var(--accent-green-soft);
+    box-shadow: 0 10px 24px rgba(22, 101, 52, 0.18);
+  }
+
+  .btn-install:hover {
+    background:
+      linear-gradient(180deg, rgba(34,130,88,0.32), rgba(22,101,52,0.24)),
+      rgba(34, 130, 88, 0.14);
+  }
+
   .btn-danger {
     @apply rounded-md border font-medium transition;
     border-color: rgba(199, 67, 67, 0.7);

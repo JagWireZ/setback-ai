@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
-    "@aws-sdk/client-cognito-identity": "^3.1005.0",
     "@aws-sdk/client-cloudfront": "^3.1005.0",
+    "@aws-sdk/client-cognito-identity": "^3.1005.0",
     "@aws-sdk/client-s3": "^3.1005.0",
     "@aws-sdk/credential-provider-cognito-identity": "^3.972.11",
     "@aws-sdk/protocol-http": "^3.370.0",
@@ -28,6 +28,7 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }

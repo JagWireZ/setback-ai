@@ -51,6 +51,7 @@ import {
   truncateLabel,
   validatePlayerName,
 } from './utils/playerName'
+import { usePwaInstall } from './utils/pwa'
 
 const AI_DIFFICULTY_OPTIONS = [
   { value: 'easy', label: 'Easy' },
@@ -84,6 +85,8 @@ function GameTablePage({
   onOpenHelp,
   onOpenNewGame,
   onOpenJoinGame,
+  onInstallApp,
+  canInstallApp = false,
   isDealingCards,
   isStartingOver,
   isSubmittingBid,
@@ -569,7 +572,11 @@ function GameTablePage({
     } else if (completedTricks.length > previousCompletedTrickCount && latestTrick?.winnerPlayerId) {
       isHoldingTurnPlayerRef.current = true
       setRevealedCompletedTrick(latestTrick)
-      setBookWinnerMessage(`${getPlayerName(game, latestTrick.winnerPlayerId)} won the book!`)
+      setBookWinnerMessage(
+        latestTrick.winnerPlayerId === viewerPlayerId
+          ? 'You won the book!'
+          : `${getPlayerName(game, latestTrick.winnerPlayerId)} won the book.`,
+      )
       if (bookWinnerTimeoutRef.current) {
         clearTimeout(bookWinnerTimeoutRef.current)
       }
@@ -1398,6 +1405,18 @@ function GameTablePage({
               >
                 Help
               </button>
+              {canInstallApp ? (
+                <button
+                  type="button"
+                  className="btn-secondary w-[90%] px-4 py-3 text-left"
+                  onClick={async () => {
+                    setIsMenuModalOpen(false)
+                    await onInstallApp?.()
+                  }}
+                >
+                  Install App
+                </button>
+              ) : null}
             </div>
             <div className="mt-5 flex justify-end">
               <button
@@ -1535,6 +1554,7 @@ function GameTablePage({
 }
 
 export default function App() {
+  const { canInstall: canInstallApp, promptToInstall } = usePwaInstall()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
@@ -3131,6 +3151,8 @@ export default function App() {
             setIsCreateModalOpen(false)
             setIsJoinModalOpen(true)
           }}
+          onInstallApp={promptToInstall}
+          canInstallApp={canInstallApp}
           isDealingCards={isDealingCards}
           isStartingOver={isStartingOver}
           isSubmittingBid={isSubmittingBid}
@@ -3557,6 +3579,17 @@ export default function App() {
           >
             Help
           </button>
+          {canInstallApp ? (
+            <button
+              type="button"
+              className="btn-secondary btn-install px-4 py-2"
+              onClick={() => {
+                void promptToInstall()
+              }}
+            >
+              Install App
+            </button>
+          ) : null}
         </div>
         </div>
       </section>
