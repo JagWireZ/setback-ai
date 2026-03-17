@@ -49,6 +49,7 @@ export function ScoreSummary({
         const playerDisplayName = truncateLabel(player.name, 22)
         const isWinner = isGameOver && highestTotalScore !== Number.NEGATIVE_INFINITY && (score?.total ?? 0) === highestTotalScore
         const isViewerPlayer = Boolean(viewerPlayerId && player.id === viewerPlayerId)
+        const canSelectPlayer = typeof onSelectPlayer === 'function' && (isOwner || isViewerPlayer)
         const playerPresence = getPlayerPresence(player)
         const isAway = player.type === 'human' && playerPresence.away
         const turnIdleSince = Math.max(playerPresence.lastSeenAt ?? 0, 'turnPlayerId' in (game.phase ?? {}) ? game.phase.turnStartedAt ?? 0 : 0)
@@ -74,13 +75,13 @@ export function ScoreSummary({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  {isOwner && typeof onSelectPlayer === 'function' ? (
+                  {canSelectPlayer ? (
                     <button
                       type="button"
                       className="block w-full min-w-0 cursor-pointer truncate text-left font-medium text-white transition hover:[color:var(--accent-green-soft)]"
                       title={player.name}
                       onClick={() => onSelectPlayer(player)}
-                      aria-label={`Manage ${player.name}`}
+                      aria-label={`${isOwner ? 'Manage' : 'Edit'} ${player.name}`}
                     >
                       {`${getPlayerRoleIcon(player)} ${playerDisplayName}`}
                     </button>
