@@ -328,7 +328,7 @@ const handleAction = async (
     }
     case "removePlayer": {
       assertRemovePlayerPayload(event);
-      return { response: await reduceLoadedGame(event) };
+      return reduceLoadedGameAndPrepareAi(context, event);
     }
     case "renamePlayer": {
       assertRenamePlayerPayload(event);
