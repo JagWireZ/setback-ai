@@ -183,9 +183,13 @@ function GameTablePage({
   const [revealedCompletedTrick, setRevealedCompletedTrick] = useState(null)
   const [displayedTurnPlayerId, setDisplayedTurnPlayerId] = useState(actualTurnPlayerId)
   const [selectedTrickLabelStyle, setSelectedTrickLabelStyle] = useState(null)
+  const [passiveTrickLabelStyles, setPassiveTrickLabelStyles] = useState([])
+  const [returningTrickLabel, setReturningTrickLabel] = useState(null)
   const previousCompletedTrickCountRef = useRef(0)
   const bookWinnerTimeoutRef = useRef(null)
   const selectedTrickCardTimeoutRef = useRef(null)
+  const returningTrickLabelTimeoutRef = useRef(null)
+  const returningTrickLabelFrameRef = useRef(null)
   const mobileActionBarRef = useRef(null)
   const reactionPickerRef = useRef(null)
   const hasAutoOpenedGameOverScoreRef = useRef(false)
@@ -467,6 +471,43 @@ function GameTablePage({
   }, [selectedTrickCardIndex, selectedTrickPlay, selectedTrickPlayerName, viewportWidth])
 
   useEffect(() => {
+    const surfaceElement = trickSurfaceRef.current
+
+    if (!surfaceElement || displayedTrickPlays.length === 0) {
+      setPassiveTrickLabelStyles([])
+      return
+    }
+
+    let settleTimeoutId = null
+
+    const updatePassiveTrickLabelStyles = () => {
+      setPassiveTrickLabelStyles(
+        displayedTrickPlays.map((_, index) =>
+          selectedTrickCardIndex === index ? null : getPassiveTrickLabelStyle(surfaceElement, index),
+        ),
+      )
+    }
+
+    updatePassiveTrickLabelStyles()
+    settleTimeoutId = window.setTimeout(updatePassiveTrickLabelStyles, 180)
+
+    window.addEventListener('resize', updatePassiveTrickLabelStyles)
+    surfaceElement.addEventListener('scroll', updatePassiveTrickLabelStyles, { passive: true })
+
+    return () => {
+      if (settleTimeoutId !== null) {
+        clearTimeout(settleTimeoutId)
+      }
+      window.removeEventListener('resize', updatePassiveTrickLabelStyles)
+      surfaceElement.removeEventListener('scroll', updatePassiveTrickLabelStyles)
+    }
+  }, [displayedTrickPlays, isMobileViewport, selectedTrickCardIndex, viewportWidth])
+
+  useEffect(() => () => {
+    clearReturningTrickLabelAnimation()
+  }, [])
+
+  useEffect(() => {
     if (!isMenuModalOpen) {
       setIsEditingPlayerName(false)
       setEditedPlayerName(currentPlayerName)
@@ -479,6 +520,125 @@ function GameTablePage({
   }, [currentPlayerName, isEditingPlayerName, isMenuModalOpen])
 
   const shortenedMenuPlayerName = truncateLabel(currentPlayerName, 18)
+  const getPassiveTrickPlayerLabel = (playerName, index, playCount) => {
+    const isOverlappedFromLeft = index > 0
+    const isOverlappedFromRight = index < playCount - 1
+    const maxLength =
+      isMobileViewport
+        ? playCount >= 4
+          ? isOverlappedFromLeft && isOverlappedFromRight
+            ? 7
+            : 9
+          : isOverlappedFromLeft && isOverlappedFromRight
+            ? 8
+            : isOverlappedFromLeft || isOverlappedFromRight
+              ? 10
+              : 12
+        : isOverlappedFromLeft && isOverlappedFromRight
+          ? 10
+          : isOverlappedFromLeft || isOverlappedFromRight
+            ? 13
+            : 18
+
+    return truncateLabel(playerName, maxLength)
+  }
+
+  const getPassiveTrickLabelStyle = (surfaceElement, index) => {
+    const cardButtonElement = trickCardButtonRefs.current[index]
+    if (!surfaceElement || !cardButtonElement) {
+      return null
+    }
+
+    const surfaceRect = surfaceElement.getBoundingClientRect()
+    const cardRect = cardButtonElement.getBoundingClientRect()
+    const labelWidth = isMobileViewport ? 48 : 96
+
+    return {
+      left: `${cardRect.left - surfaceRect.left + (isMobileViewport ? 8 : 4)}px`,
+      top: `${Math.max(cardRect.top - surfaceRect.top - 18, 0)}px`,
+      width: `${labelWidth}px`,
+    }
+  }
+
+  const clearReturningTrickLabelAnimation = () => {
+    if (returningTrickLabelFrameRef.current) {
+      cancelAnimationFrame(returningTrickLabelFrameRef.current)
+      returningTrickLabelFrameRef.current = null
+    }
+
+    if (returningTrickLabelTimeoutRef.current) {
+      clearTimeout(returningTrickLabelTimeoutRef.current)
+      returningTrickLabelTimeoutRef.current = null
+    }
+  }
+
+  const animateReturningTrickLabel = (fromIndex) => {
+    const surfaceElement = trickSurfaceRef.current
+    const selectedLabelElement = selectedTrickLabelRef.current
+    const trickPlay = displayedTrickPlays[fromIndex]
+    const targetStyle = getPassiveTrickLabelStyle(surfaceElement, fromIndex)
+
+    if (!surfaceElement || !selectedLabelElement || !trickPlay || !targetStyle) {
+      setReturningTrickLabel(null)
+      return
+    }
+
+    const surfaceRect = surfaceElement.getBoundingClientRect()
+    const labelRect = selectedLabelElement.getBoundingClientRect()
+    const text = getPassiveTrickPlayerLabel(
+      getPlayerName(game, trickPlay.playerId),
+      fromIndex,
+      displayedTrickPlays.length,
+    )
+    const key = `${trickPlay.playerId}-${fromIndex}-${Date.now()}`
+
+    clearReturningTrickLabelAnimation()
+    setReturningTrickLabel({
+      key,
+      text,
+      style: {
+        left: `${labelRect.left - surfaceRect.left}px`,
+        top: `${labelRect.top - surfaceRect.top}px`,
+        width: `${labelRect.width}px`,
+      },
+    })
+
+    returningTrickLabelFrameRef.current = requestAnimationFrame(() => {
+      returningTrickLabelFrameRef.current = null
+      setReturningTrickLabel({
+        key,
+        text,
+        style: {
+          ...targetStyle,
+          transition: 'left 180ms ease, top 180ms ease, width 180ms ease',
+        },
+      })
+    })
+
+    returningTrickLabelTimeoutRef.current = setTimeout(() => {
+      setReturningTrickLabel(null)
+      returningTrickLabelTimeoutRef.current = null
+    }, 220)
+  }
+
+  const handleSelectTrickCard = (index) => {
+    if (bookWinnerMessage) {
+      return
+    }
+
+    setSelectedTrickCardIndex((currentIndex) => {
+      const nextIndex = currentIndex === index ? null : index
+
+      if (currentIndex !== null && currentIndex !== nextIndex) {
+        animateReturningTrickLabel(currentIndex)
+      } else {
+        clearReturningTrickLabelAnimation()
+        setReturningTrickLabel(null)
+      }
+
+      return nextIndex
+    })
+  }
 
   useEffect(() => {
     if (!selectedScorePlayerId) {
@@ -983,6 +1143,39 @@ function GameTablePage({
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
               <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
+                {selectedTrickCardIndex !== null ? (
+                  <div className="pointer-events-none absolute inset-0 z-20">
+                    {returningTrickLabel ? (
+                      <p
+                        key={returningTrickLabel.key}
+                        className="trick-card-player-label absolute truncate text-left"
+                        style={returningTrickLabel.style}
+                      >
+                        {returningTrickLabel.text}
+                      </p>
+                    ) : null}
+                    {displayedTrickPlays.map((play, index) => {
+                      const labelStyle = passiveTrickLabelStyles[index]
+                      if (!labelStyle || selectedTrickCardIndex === index) {
+                        return null
+                      }
+
+                      return (
+                        <p
+                          key={`passive-trick-label-${play.playerId}-${index}`}
+                          className="trick-card-player-label absolute truncate text-left"
+                          style={labelStyle}
+                        >
+                          {getPassiveTrickPlayerLabel(
+                            getPlayerName(game, play.playerId),
+                            index,
+                            displayedTrickPlays.length,
+                          )}
+                        </p>
+                      )
+                    })}
+                  </div>
+                ) : null}
                 <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2">
                   {displayedTrickPlays.length > 0 ? (
                     displayedTrickPlays.map((play, index) => (
@@ -999,14 +1192,18 @@ function GameTablePage({
                           className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
                             selectedTrickCardIndex === index ? '-translate-y-4' : 'translate-y-0'
                           }`}
-                          onClick={() => {
-                            if (bookWinnerMessage) {
-                              return
-                            }
-                            setSelectedTrickCardIndex((currentIndex) => (currentIndex === index ? null : index))
-                          }}
+                          onClick={() => handleSelectTrickCard(index)}
                           aria-label={getPlayerName(game, play.playerId)}
                         >
+                          {selectedTrickCardIndex === null ? (
+                            <p className="trick-card-player-label pointer-events-none absolute bottom-full left-2 mb-1.5 w-12 truncate text-left sm:left-1 sm:w-24">
+                              {getPassiveTrickPlayerLabel(
+                                getPlayerName(game, play.playerId),
+                                index,
+                                displayedTrickPlays.length,
+                              )}
+                            </p>
+                          ) : null}
                           {selectedTrickCardIndex === index && selectedTrickLabelStyle ? (
                             <p
                               ref={selectedTrickLabelRef}
