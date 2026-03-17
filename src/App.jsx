@@ -1988,6 +1988,8 @@ export default function App() {
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const [pendingLobbyRemovePlayer, setPendingLobbyRemovePlayer] = useState(null)
+  const [pendingLobbyRenamePlayer, setPendingLobbyRenamePlayer] = useState(null)
+  const [lobbyRenameDraft, setLobbyRenameDraft] = useState('')
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
   const [helpSection, setHelpSection] = useState('how-to-play')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
@@ -2021,6 +2023,25 @@ export default function App() {
 
   const closeLobbyRemovePlayerConfirm = () => {
     setPendingLobbyRemovePlayer(null)
+  }
+
+  const openLobbyRenamePlayerModal = (player) => {
+    if (!player) {
+      return
+    }
+
+    window.setTimeout(() => {
+      setPendingLobbyRenamePlayer({
+        id: player.id,
+        name: player.name,
+      })
+      setLobbyRenameDraft(player.name)
+    }, 0)
+  }
+
+  const closeLobbyRenamePlayerModal = () => {
+    setPendingLobbyRenamePlayer(null)
+    setLobbyRenameDraft('')
   }
 
   const getRestoredPlayerName = (restoredSession, fallbackName = '') => {
@@ -3368,6 +3389,24 @@ export default function App() {
         setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
       }
 
+      if (activeSession?.gameId) {
+        const storedSession = getStoredGameSession(activeSession.gameId)
+        const renamedPlayerId = playerId ?? activeLobbyPlayerId
+        const shouldUpdateStoredName =
+          storedSession?.playerToken === activeSession.playerToken &&
+          renamedPlayerId &&
+          renamedPlayerId === activeLobbyPlayerId
+
+        if (shouldUpdateStoredName) {
+          saveStoredGameSession(
+            activeSession.gameId,
+            activeSession.playerToken,
+            ownerSession ? 'owner' : 'player',
+            playerName.trim(),
+          )
+        }
+      }
+
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to update player name'
@@ -3890,6 +3929,7 @@ export default function App() {
                     const isDealer = player.id === currentDealerPlayerId
                     const isActiveLobbyPlayer = player.id === activeLobbyPlayerId
                     const isAway = player.type === 'human' && getPlayerPresence(player).away
+                    const canRenamePlayer = isOwnerLobby || player.id === activeLobbyPlayerId
                     return (
                       <li
                         key={player.id}
@@ -3907,7 +3947,20 @@ export default function App() {
                           ) : (
                             <span aria-hidden="true" className="text-sm text-muted">👤</span>
                           )}
-                          <span className="truncate font-medium">{player.name}</span>
+                          {canRenamePlayer ? (
+                            <button
+                              type="button"
+                              className="truncate text-left font-medium text-white transition hover:[color:var(--accent-green-soft)] disabled:opacity-50"
+                              onClick={() => openLobbyRenamePlayerModal(player)}
+                              disabled={isRenamingPlayer || isPending || isStartingGame}
+                              aria-label={`Rename ${player.name}`}
+                              title={player.name}
+                            >
+                              {player.name}
+                            </button>
+                          ) : (
+                            <span className="truncate font-medium">{player.name}</span>
+                          )}
                         </div>
                         <div className="flex items-center justify-end gap-2">
                           {isAway ? (
@@ -4071,6 +4124,68 @@ export default function App() {
                   {pendingPlayerActionId === pendingLobbyRemovePlayer.id ? 'Removing...' : 'Remove Player'}
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+        {pendingLobbyRenamePlayer ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+            onClick={closeLobbyRenamePlayerModal}
+          >
+            <div
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold text-white">Edit Player Name</h2>
+              <p className="mt-3 text-sm text-muted">
+                {pendingLobbyRenamePlayer.name}
+              </p>
+              <form
+                className="mt-5 flex flex-col gap-4"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  const nextName = lobbyRenameDraft.trim()
+                  if (!nextName || nextName === pendingLobbyRenamePlayer.name) {
+                    closeLobbyRenamePlayerModal()
+                    return
+                  }
+
+                  const didRename = await handleRenamePlayer(
+                    nextName,
+                    pendingLobbyRenamePlayer.id,
+                  )
+                  if (didRename) {
+                    closeLobbyRenamePlayerModal()
+                  }
+                }}
+              >
+                <input
+                  type="text"
+                  value={lobbyRenameDraft}
+                  onChange={(event) => setLobbyRenameDraft(event.target.value)}
+                  className="input-surface"
+                  placeholder="Player name"
+                  maxLength={MAX_PLAYER_NAME_LENGTH}
+                  autoFocus
+                />
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2"
+                    onClick={closeLobbyRenamePlayerModal}
+                    disabled={isRenamingPlayer}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-primary px-4 py-2 disabled:opacity-50"
+                    disabled={isRenamingPlayer || !lobbyRenameDraft.trim()}
+                  >
+                    {isRenamingPlayer ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         ) : null}
