@@ -73,7 +73,7 @@ export const BOT_NAMES: readonly string[] = [
   "Sneak-Attack Snack",
   "Goof Gambler",
   "Pocket-Sized Menace",
-  "Tiny Titan",
+  "Mighty Titan",
   "Card Bard",
   "Mild Menace",
   "Sassy Shuffler",

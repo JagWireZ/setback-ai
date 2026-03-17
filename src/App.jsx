@@ -33,6 +33,7 @@ import {
   getInvalidPlayMessage,
   getPlayerName,
   getRoundDirectionArrow,
+  sortHandCards,
   getViewerHand,
   hashString,
   toUserFacingActionError,
@@ -129,7 +130,18 @@ function GameTablePage({
   menuCloseRequestKey = 0,
   isJoinModalOpen = false,
 }) {
-  const viewerHand = getViewerHand(game)
+  const rawViewerHand = getViewerHand(game)
+  const trumpSuit = game?.phase && 'cards' in game.phase ? game.phase.cards.trump?.suit : undefined
+  const viewerHand = useMemo(() => {
+    if (!rawViewerHand) {
+      return rawViewerHand
+    }
+
+    return {
+      ...rawViewerHand,
+      cards: sortHandCards(rawViewerHand.cards ?? [], sortMode, trumpSuit),
+    }
+  }, [rawViewerHand, sortMode, trumpSuit])
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window === 'undefined' ? 1024 : window.innerWidth,
   )
@@ -219,7 +231,9 @@ function GameTablePage({
   const [selectedTrickLabelStyle, setSelectedTrickLabelStyle] = useState(null)
   const [passiveTrickLabelStyles, setPassiveTrickLabelStyles] = useState([])
   const [returningTrickLabel, setReturningTrickLabel] = useState(null)
+  const [floatingCelebrations, setFloatingCelebrations] = useState([])
   const previousCompletedTrickCountRef = useRef(0)
+  const floatingCelebrationTimeoutsRef = useRef([])
   const bookWinnerTimeoutRef = useRef(null)
   const selectedTrickCardTimeoutRef = useRef(null)
   const returningTrickLabelTimeoutRef = useRef(null)
@@ -232,6 +246,9 @@ function GameTablePage({
   const trickCardButtonRefs = useRef([])
   const selectedTrickLabelRef = useRef(null)
   const previousTrickIndexRef = useRef(game?.phase?.trickIndex)
+  const previousTrumpBrokenRef = useRef(
+    game?.phase && 'cards' in game.phase ? Boolean(game.phase.cards.trumpBroken) : null,
+  )
   const shouldClearSelectedTrickCardAfterRevealRef = useRef(false)
   const isHoldingTurnPlayerRef = useRef(false)
   const latestActualTurnPlayerIdRef = useRef(actualTurnPlayerId)
@@ -356,6 +373,13 @@ function GameTablePage({
     }
   }, [])
 
+  useEffect(() => () => {
+    floatingCelebrationTimeoutsRef.current.forEach((timeoutId) => {
+      window.clearTimeout(timeoutId)
+    })
+    floatingCelebrationTimeoutsRef.current = []
+  }, [])
+
   useEffect(() => {
     if (!canSelectCards) {
       setSelectedCardIndex(null)
@@ -409,6 +433,49 @@ function GameTablePage({
 
     previousTrickIndexRef.current = currentTrickIndex
   }, [game?.phase?.trickIndex])
+
+  useEffect(() => {
+    const currentTrumpBroken =
+      game?.phase && 'cards' in game.phase ? Boolean(game.phase.cards.trumpBroken) : null
+    const previousTrumpBroken = previousTrumpBrokenRef.current
+
+    if (previousTrumpBroken === false && currentTrumpBroken === true) {
+      const celebrationId = `trump-broken-${game.id}-${Date.now()}`
+      const hash = hashString(celebrationId)
+      const driftDirection = hash % 2 === 0 ? 1 : -1
+      const driftA = driftDirection * (20 + ((hash >> 3) % 12))
+      const driftB = driftDirection * -1 * (16 + ((hash >> 6) % 16))
+      const driftC = driftDirection * (28 + ((hash >> 9) % 16))
+
+      setFloatingCelebrations((current) => [
+        ...current,
+        {
+          id: celebrationId,
+          message: 'Trump has been broken!',
+          style: {
+            left: '50%',
+            bottom: `${mobileActionBarHeight + 48}px`,
+            '--reaction-sway-a': `${driftA}px`,
+            '--reaction-sway-b': `${driftB}px`,
+            '--reaction-sway-c': `${driftC}px`,
+          },
+        },
+      ])
+
+      const timeoutId = window.setTimeout(() => {
+        setFloatingCelebrations((current) =>
+          current.filter((celebration) => celebration.id !== celebrationId),
+        )
+        floatingCelebrationTimeoutsRef.current = floatingCelebrationTimeoutsRef.current.filter(
+          (currentTimeoutId) => currentTimeoutId !== timeoutId,
+        )
+      }, 7000)
+
+      floatingCelebrationTimeoutsRef.current.push(timeoutId)
+    }
+
+    previousTrumpBrokenRef.current = currentTrumpBroken
+  }, [game.id, game?.phase, mobileActionBarHeight])
 
   useEffect(() => {
     if (bookWinnerMessage || revealedCompletedTrick || !shouldClearSelectedTrickCardAfterRevealRef.current) {
@@ -1043,6 +1110,19 @@ function GameTablePage({
             <div className="reaction-badge">
               <span className="truncate">{getPlayerName(game, reaction.playerId)}</span>
               <span className="text-xl leading-none">{reaction.emoji}</span>
+            </div>
+          </div>
+        ))}
+        {floatingCelebrations.map(({ id, message, style }) => (
+          <div
+            key={id}
+            className="celebration-float"
+            style={style}
+          >
+            <div className="celebration-badge">
+              <span className="celebration-spark" aria-hidden="true">✦</span>
+              <span>{message}</span>
+              <span className="celebration-spark" aria-hidden="true">✦</span>
             </div>
           </div>
         ))}

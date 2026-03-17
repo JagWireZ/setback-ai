@@ -202,3 +202,55 @@ export const getViewerHand = (game) => {
 
   return game.phase.cards.hands?.[0] ?? null
 }
+
+const RANK_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', 'LJ', 'BJ']
+const SUIT_ORDER = ['Clubs', 'Diamonds', 'Hearts', 'Spades']
+
+const getRankValue = (rank) => RANK_ORDER.indexOf(rank)
+
+export const sortHandCards = (cards = [], mode = 'bySuit', trumpSuit) => {
+  const normalizedCards = Array.isArray(cards) ? [...cards] : []
+
+  if (mode === 'byRank') {
+    return normalizedCards.sort((left, right) => {
+      const rankDiff = getRankValue(left.rank) - getRankValue(right.rank)
+      if (rankDiff !== 0) {
+        return rankDiff
+      }
+
+      const leftSuit = left.suit === 'Joker' ? 99 : SUIT_ORDER.indexOf(left.suit)
+      const rightSuit = right.suit === 'Joker' ? 99 : SUIT_ORDER.indexOf(right.suit)
+      return leftSuit - rightSuit
+    })
+  }
+
+  return normalizedCards.sort((left, right) => {
+    const normalizedSuit = (card) => {
+      if (card.suit === 'Joker') {
+        return trumpSuit && trumpSuit !== 'Joker' ? SUIT_ORDER.length : SUIT_ORDER.length + 1
+      }
+
+      const suitIndex = SUIT_ORDER.indexOf(card.suit)
+      if (trumpSuit && trumpSuit !== 'Joker' && card.suit === trumpSuit) {
+        return SUIT_ORDER.length
+      }
+
+      return suitIndex
+    }
+
+    const suitDiff = normalizedSuit(left) - normalizedSuit(right)
+    if (suitDiff !== 0) {
+      return suitDiff
+    }
+
+    if (left.suit === 'Joker' && right.suit !== 'Joker') {
+      return 1
+    }
+
+    if (left.suit !== 'Joker' && right.suit === 'Joker') {
+      return -1
+    }
+
+    return getRankValue(left.rank) - getRankValue(right.rank)
+  })
+}

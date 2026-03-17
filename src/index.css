@@ -482,6 +482,13 @@
     will-change: transform, opacity;
   }
 
+  .celebration-float {
+    position: absolute;
+    transform: translateX(-50%);
+    animation: celebration-float-up 6.9s linear forwards;
+    will-change: transform, opacity;
+  }
+
   .reaction-badge {
     display: inline-flex;
     align-items: center;
@@ -499,6 +506,41 @@
     white-space: nowrap;
     animation: reaction-sway 5.1s ease-in-out forwards;
     will-change: transform;
+  }
+
+  .celebration-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    max-width: min(22rem, 82vw);
+    padding: 0.85rem 1.25rem;
+    border: 1px solid rgba(255, 232, 168, 0.4);
+    border-radius: 9999px;
+    background:
+      radial-gradient(circle at top, rgba(255, 242, 186, 0.32), transparent 56%),
+      linear-gradient(180deg, rgba(255, 245, 204, 0.18), rgba(116, 58, 14, 0.14)),
+      rgba(54, 34, 12, 0.82);
+    color: #fff7db;
+    box-shadow:
+      0 0 0 1px rgba(255, 235, 173, 0.08) inset,
+      0 16px 32px rgba(0, 0, 0, 0.3),
+      0 0 28px rgba(255, 207, 92, 0.18);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    animation:
+      celebration-sway 6.9s ease-in-out forwards,
+      celebration-pulse 1.4s ease-in-out 0.15s 2;
+    will-change: transform;
+  }
+
+  .celebration-spark {
+    color: #ffd76a;
+    font-size: 1rem;
+    text-shadow: 0 0 14px rgba(255, 208, 97, 0.6);
   }
 }
 
@@ -529,6 +571,33 @@
   }
 }
 
+@keyframes celebration-float-up {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.9);
+  }
+
+  10% {
+    opacity: 1;
+    transform: translate(-50%, -2.4rem) scale(1);
+  }
+
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -42rem) scale(1);
+  }
+
+  90% {
+    opacity: 0.76;
+    transform: translate(-50%, -52rem) scale(0.98);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -60rem) scale(0.96);
+  }
+}
+
 @keyframes reaction-sway {
   0% {
     transform: translateX(0);
@@ -552,5 +621,54 @@
 
   100% {
     transform: translateX(calc(var(--reaction-sway-a, 0px) * 0.2));
+  }
+}
+
+@keyframes celebration-sway {
+  0% {
+    transform: translateX(0);
+  }
+
+  22% {
+    transform: translateX(calc(var(--reaction-sway-a, 0px) * 0.32));
+  }
+
+  45% {
+    transform: translateX(calc(var(--reaction-sway-b, 0px) * 0.7));
+  }
+
+  68% {
+    transform: translateX(calc(var(--reaction-sway-c, 0px) * 0.5));
+  }
+
+  84% {
+    transform: translateX(calc(var(--reaction-sway-b, 0px) * 0.28));
+  }
+
+  100% {
+    transform: translateX(calc(var(--reaction-sway-a, 0px) * 0.12));
+  }
+}
+
+@keyframes celebration-pulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(255, 235, 173, 0.08) inset,
+      0 16px 32px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(255, 207, 92, 0.14);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 242, 201, 0.18) inset,
+      0 18px 36px rgba(0, 0, 0, 0.32),
+      0 0 40px rgba(255, 211, 102, 0.28);
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 235, 173, 0.08) inset,
+      0 16px 32px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(255, 207, 92, 0.14);
   }
 }
