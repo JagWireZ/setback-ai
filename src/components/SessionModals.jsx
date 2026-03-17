@@ -126,7 +126,7 @@ export function JoinGameModal({
               </div>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm text-muted">Choose a Saved Session</span>
+                <span className="text-sm text-muted">Continue a Saved Game</span>
                 <select
                   value={selectedRejoinGameId}
                   onChange={onSelectedRejoinGameIdChange}
