@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import {
   addSeat,
   checkState,
@@ -94,6 +95,28 @@ function DownloadIcon(props) {
   )
 }
 
+function ShareIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <circle cx="7" cy="12" r="2.1" />
+      <circle cx="16.5" cy="6.5" r="2.1" />
+      <circle cx="16.5" cy="17.5" r="2.1" />
+      <path d="M8.9 10.9 14.5 7.7" strokeLinecap="round" />
+      <path d="m8.9 13.1 5.6 3.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function LinkIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M10.5 13.5 13.5 10.5" strokeLinecap="round" />
+      <path d="M8.25 14.25 6.5 16a3 3 0 1 0 4.24 4.24l1.75-1.74" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.75 9.75 17.5 8a3 3 0 0 0-4.24-4.24L11.5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function GameTablePage({
   game,
   isOwner,
@@ -151,12 +174,48 @@ function GameTablePage({
   )
   const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
+  const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('')
 
   useEffect(() => {
     if (menuCloseRequestKey > 0) {
       setIsMenuModalOpen(false)
     }
   }, [menuCloseRequestKey])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    if (!isShareModalOpen || !shareLink) {
+      setShareQrCodeDataUrl('')
+      return undefined
+    }
+
+    QRCode.toDataURL(shareLink, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 320,
+      color: {
+        dark: '#0f172a',
+        light: '#f8fafc',
+      },
+    })
+      .then((url) => {
+        if (!isCancelled) {
+          setShareQrCodeDataUrl(url)
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setShareQrCodeDataUrl('')
+          onSetGameError?.('Unable to generate QR code.')
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isShareModalOpen, onSetGameError, shareLink])
 
   const viewerPlayerId = viewerHand?.playerId
   const actualTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
@@ -1817,11 +1876,15 @@ function GameTablePage({
               <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
                 <button
                   type="button"
-                  className="badge-subtle w-full truncate rounded-full border px-3 py-1 text-sm font-medium text-muted transition hover:text-white sm:w-auto"
-                  onClick={onCopyShareLink}
-                  title="Copy game link"
+                  className="badge-subtle inline-flex w-full items-center justify-center gap-2 truncate rounded-full border px-3 py-1 text-sm font-medium text-muted transition hover:border-white/20 hover:text-white sm:w-auto"
+                  onClick={() => setIsShareModalOpen(true)}
+                  aria-label={`Share game ${game.id}`}
+                  title="Share game"
                 >
-                  {isShareLinkCopied ? '🔗 Copied!' : '🔗 ' + game.id}
+                  <span className="text-accent font-medium [text-shadow:0_0_12px_rgba(158,211,180,0.35)]">
+                    {game.id}
+                  </span>
+                  <ShareIcon className="h-5 w-5" />
                 </button>
               </div>
             </div>
@@ -1963,6 +2026,69 @@ function GameTablePage({
           </div>
         </div>
       )}
+      {isShareModalOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+          onClick={() => setIsShareModalOpen(false)}
+        >
+          <div
+            className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Share Game</h2>
+              </div>
+              <div className="divider mt-3 border-t" />
+            </div>
+            <div className="mt-5 flex flex-col gap-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dim">Game ID</p>
+                <div className="mt-2 rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
+                  <p className="text-center text-lg font-semibold text-white">{game.id}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dim">Game URL</p>
+                <button
+                  type="button"
+                  className="input-surface mt-2 flex w-full cursor-pointer items-center gap-2 truncate whitespace-nowrap text-left text-sm transition hover:border-white/20"
+                  onClick={onCopyShareLink}
+                  aria-label={isShareLinkCopied ? 'Share link copied' : 'Copy share link'}
+                  title={isShareLinkCopied ? 'Copied' : 'Copy link'}
+                >
+                  <LinkIcon className="h-4 w-4 shrink-0 text-dim" />
+                  <span className="min-w-0 truncate">
+                    {isShareLinkCopied ? 'Copied!' : shareLink}
+                  </span>
+                </button>
+              </div>
+              <div className="flex w-fit self-center flex-col items-center rounded-xl border border-white/10 bg-white/95 p-2">
+                {shareQrCodeDataUrl ? (
+                  <img
+                    src={shareQrCodeDataUrl}
+                    alt={`QR code for joining game ${game.id}`}
+                    className="h-48 w-48 max-w-full rounded-md"
+                  />
+                ) : (
+                  <div className="flex h-48 w-48 max-w-full items-center justify-center rounded-md bg-slate-100 text-sm text-slate-500">
+                    Generating QR code...
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn-secondary px-3 py-1.5"
+                  onClick={() => setIsShareModalOpen(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {isResetConfirmModalOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
@@ -2129,6 +2255,8 @@ export default function App() {
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
+  const [isLobbyShareModalOpen, setIsLobbyShareModalOpen] = useState(false)
+  const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('')
   const [pendingLobbyRemovePlayer, setPendingLobbyRemovePlayer] = useState(null)
   const [pendingLobbyRemoveSeat, setPendingLobbyRemoveSeat] = useState(null)
   const [pendingLobbyRenamePlayer, setPendingLobbyRenamePlayer] = useState(null)
@@ -2996,13 +3124,11 @@ export default function App() {
         currentSelectedMaxCards === previousLobbyMaxCards
       ) {
         setSelectedMaxCards(String(maxCardsForLobbySeatCount))
-        setLobbyInfo(`Max Cards adjusted to ${maxCardsForLobbySeatCount} for ${orderedPlayers.length} seats.`)
       }
       return
     }
 
     setSelectedMaxCards(String(maxCardsForLobbySeatCount))
-    setLobbyInfo(`Max Cards adjusted to ${maxCardsForLobbySeatCount} for ${orderedPlayers.length} seats.`)
   }, [
     isOwnerLobby,
     maxCardsForLobbySeatCount,
@@ -3049,6 +3175,40 @@ export default function App() {
     url.searchParams.delete('gameId')
     return url.toString()
   }, [activeLobbySession?.gameId])
+
+  useEffect(() => {
+    let isCancelled = false
+
+    if (!isLobbyShareModalOpen || !shareLink) {
+      setShareQrCodeDataUrl('')
+      return undefined
+    }
+
+    QRCode.toDataURL(shareLink, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 320,
+      color: {
+        dark: '#0f172a',
+        light: '#f8fafc',
+      },
+    })
+      .then((url) => {
+        if (!isCancelled) {
+          setShareQrCodeDataUrl(url)
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setShareQrCodeDataUrl('')
+          setLobbyInfo('Unable to generate QR code.')
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isLobbyShareModalOpen, shareLink])
 
   useEffect(() => {
     return () => {
@@ -4124,17 +4284,25 @@ export default function App() {
       <main className="theme-shell min-h-screen px-4 py-4 sm:py-6">
         <section className="mx-auto flex w-full max-w-5xl flex-col">
           <div className="table-surface rounded-[2rem] border px-4 py-5 shadow-[0_20px_60px_rgba(0,0,0,0.28)] sm:px-6 sm:py-6">
-            <header className="divider flex flex-col gap-2 border-b pb-5">
-              <h1 className="text-3xl font-bold tracking-tight">
-                {isOwnerLobby ? 'Game Owner Lobby' : 'Game Lobby'}
-              </h1>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <p className="badge-subtle rounded-full border px-3 py-1 text-muted">
-                  Game ID:{' '}
+            <header className="divider border-b pb-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-3xl font-bold tracking-tight">
+                    Lobby
+                  </h1>
+                </div>
+                <button
+                  type="button"
+                  className="badge-subtle inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-muted transition hover:border-white/20 hover:text-white"
+                  onClick={() => setIsLobbyShareModalOpen(true)}
+                  aria-label={`Share game ${activeLobbySession.gameId}`}
+                  title="Share game"
+                >
                   <span className="text-accent font-medium [text-shadow:0_0_12px_rgba(158,211,180,0.35)]">
                     {activeLobbySession.gameId}
                   </span>
-                </p>
+                  <ShareIcon className="h-5 w-5" />
+                </button>
               </div>
             </header>
 
@@ -4149,23 +4317,6 @@ export default function App() {
                   {lobbyInfo}
                 </p>
               )}
-
-              <section className="lobby-panel rounded-2xl border p-4">
-                <div className="divider border-b pb-3">
-                  <h2 className="text-lg font-semibold">Share Link</h2>
-                </div>
-                <div className="mt-3">
-                  <button
-                    type="button"
-                    className="input-surface w-full cursor-pointer truncate whitespace-nowrap text-left text-sm transition hover:border-white/20"
-                    onClick={handleCopyShareLink}
-                    aria-label={isShareLinkCopied ? 'Share link copied' : 'Copy share link'}
-                    title={isShareLinkCopied ? 'Copied' : 'Copy link'}
-                  >
-                    {isShareLinkCopied ? 'Copied!' : shareLink}
-                  </button>
-                </div>
-              </section>
 
               <section className="lobby-panel rounded-2xl border p-4">
                 <div className="divider flex items-center justify-between gap-4 border-b pb-3">
@@ -4365,6 +4516,69 @@ export default function App() {
             </div>
           </div>
         </section>
+        {isLobbyShareModalOpen ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+            onClick={() => setIsLobbyShareModalOpen(false)}
+          >
+            <div
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div>
+                <div>
+                  <h2 className="text-xl font-semibold text-white">Share Game</h2>
+                </div>
+                <div className="divider mt-3 border-t" />
+              </div>
+              <div className="mt-5 flex flex-col gap-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dim">Game ID</p>
+                  <div className="mt-2 rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
+                    <p className="text-center text-lg font-semibold text-white">{activeLobbySession.gameId}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-dim">Game URL</p>
+                  <button
+                    type="button"
+                    className="input-surface mt-2 flex w-full cursor-pointer items-center gap-2 truncate whitespace-nowrap text-left text-sm transition hover:border-white/20"
+                    onClick={handleCopyShareLink}
+                    aria-label={isShareLinkCopied ? 'Share link copied' : 'Copy share link'}
+                    title={isShareLinkCopied ? 'Copied' : 'Copy link'}
+                  >
+                    <LinkIcon className="h-4 w-4 shrink-0 text-dim" />
+                    <span className="min-w-0 truncate">
+                      {isShareLinkCopied ? 'Copied!' : shareLink}
+                    </span>
+                  </button>
+                </div>
+                <div className="flex w-fit self-center flex-col items-center rounded-xl border border-white/10 bg-white/95 p-2">
+                  {shareQrCodeDataUrl ? (
+                    <img
+                      src={shareQrCodeDataUrl}
+                      alt={`QR code for joining game ${activeLobbySession.gameId}`}
+                      className="h-48 w-48 max-w-full rounded-md"
+                    />
+                  ) : (
+                    <div className="flex h-48 w-48 max-w-full items-center justify-center rounded-md bg-slate-100 text-sm text-slate-500">
+                      Generating QR code...
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-secondary px-3 py-1.5"
+                    onClick={() => setIsLobbyShareModalOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {pendingLobbyRemovePlayer ? (
           <div
             className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
