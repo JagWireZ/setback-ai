@@ -358,14 +358,6 @@ function GameTablePage({
   }, [handCardCount, isMobileViewport, viewportWidth])
 
   const trickLayout = useMemo(() => {
-    if (!isMobileViewport) {
-      return {
-        cardWidth: '6rem',
-        overlapOffset: '-3.25rem',
-        useCompactSizing: false,
-      }
-    }
-
     const availableWidthPx = Math.max(viewportWidth - 40, 220)
     const visibleFraction = 0.45
     const factor = 1 + Math.max(trickPlayCount - 1, 0) * visibleFraction
@@ -377,7 +369,7 @@ function GameTablePage({
       overlapOffset: `${overlapOffsetPx / 16}rem`,
       useCompactSizing: true,
     }
-  }, [isMobileViewport, trickPlayCount, viewportWidth])
+  }, [trickPlayCount, viewportWidth])
   const useScatterTrickLayout = true
   const scatterTrickPositionsByPlayerId = useMemo(() => {
     if (!useScatterTrickLayout || totalTrickPlayers === 0) {
