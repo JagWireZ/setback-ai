@@ -3,9 +3,18 @@ export const REACTION_COOLDOWN_MS = 5000
 export const AI_ACTION_DELAY_MS = 1500
 export const TRICK_COMPLETE_DELAY_MS = 5000
 export const RATE_LIMIT_BACKOFF_MS = 5000
+const MAX_SUPPORTED_CARD_COUNT = 10
 
 export const getPlayerName = (game, playerId) =>
   game?.players?.find((player) => player.id === playerId)?.name ?? 'Unknown'
+
+export const getMaxCardsForSeatCount = (seatCount) => {
+  if (!Number.isInteger(seatCount) || seatCount < 1) {
+    return 1
+  }
+
+  return Math.min(MAX_SUPPORTED_CARD_COUNT, Math.floor(53 / seatCount))
+}
 
 export const getBidDisplay = (bidEntry) => {
   if (bidEntry?.trip === true) {

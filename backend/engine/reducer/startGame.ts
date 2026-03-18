@@ -4,6 +4,7 @@ import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { generateRounds } from "../helpers/generateRounds";
+import { getMaxCardsForSeatCount } from "../helpers/getMaxCardsForSeatCount";
 
 export const startGame = (
   game: Game | undefined,
@@ -16,6 +17,11 @@ export const startGame = (
 
   if (existingGame.phase.stage !== "Lobby") {
     throw new Error("Game can only be started from Lobby phase");
+  }
+
+  const maxCardsForSeatCount = getMaxCardsForSeatCount(existingGame.playerOrder.length);
+  if (event.payload.maxCards > maxCardsForSeatCount) {
+    throw new Error(`Max Cards cannot exceed ${maxCardsForSeatCount} with ${existingGame.playerOrder.length} seats`);
   }
 
   const selectedDealerPlayerId = event.payload.dealerPlayerId;

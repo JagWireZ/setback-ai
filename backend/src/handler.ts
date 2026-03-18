@@ -19,6 +19,7 @@ import { putGame } from "../engine/helpers/reducer/storage/putGame";
 import { putConnection } from "../engine/helpers/reducer/storage/putConnection";
 import { shouldRunAiAfterCompletedTrick } from "./shouldRunAiAfterCompletedTrick";
 import {
+  assertAddSeatPayload,
   assertCheckStatePayload,
   assertCoverAwayPlayerTurnPayload,
   assertCreateGamePayload,
@@ -26,6 +27,7 @@ import {
   assertGetGameStatePayload,
   assertJoinGamePayload,
   assertMovePlayerPayload,
+  assertRemoveSeatPayload,
   assertReturnFromAwayPayload,
   assertRenamePlayerPayload,
   assertSendReactionPayload,
@@ -49,6 +51,8 @@ const BROADCAST_ACTIONS = new Set<LambdaEventPayload["action"]>([
   "createGame",
   "joinGame",
   "checkState",
+  "addSeat",
+  "removeSeat",
   "dealCards",
   "startGame",
   "startOver",
@@ -309,6 +313,14 @@ const handleAction = async (
     }
     case "checkState": {
       assertCheckStatePayload(event);
+      return { response: await reduceLoadedGame(event) };
+    }
+    case "addSeat": {
+      assertAddSeatPayload(event);
+      return { response: await reduceLoadedGame(event) };
+    }
+    case "removeSeat": {
+      assertRemoveSeatPayload(event);
       return { response: await reduceLoadedGame(event) };
     }
     case "dealCards": {

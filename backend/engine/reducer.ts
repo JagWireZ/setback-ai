@@ -3,6 +3,8 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import { createGame } from "./reducer/createGame";
 import { joinGame } from "./reducer/joinGame";
 import { checkState } from "./reducer/checkState";
+import { addSeat } from "./reducer/addSeat";
+import { removeSeat } from "./reducer/removeSeat";
 import { startGame } from "./reducer/startGame";
 import { startOver } from "./reducer/startOver";
 import { movePlayer } from "./reducer/movePlayer";
@@ -35,7 +37,7 @@ export type EngineReducerResult = {
 };
 
 type OwnerActionEvent = LambdaEventPayload<
-  "startGame" | "startOver" | "movePlayer" | "setPlayerAway" | "coverAwayPlayerTurn"
+  "addSeat" | "removeSeat" | "startGame" | "startOver" | "movePlayer" | "setPlayerAway" | "coverAwayPlayerTurn"
 >;
 type PlayerActionEvent = LambdaEventPayload<
   "dealCards" | "submitBid" | "playCard" | "sortCards" | "renamePlayer" | "sendReaction" | "returnFromAway"
@@ -121,6 +123,10 @@ export const engineReducer = (
 
       return Promise.resolve(toResult(updatedGame, undefined, event.payload.playerToken));
     }
+    case "addSeat":
+      return runOwnerAction(game, event, addSeat);
+    case "removeSeat":
+      return runOwnerAction(game, event, removeSeat);
     case "startGame":
       return runOwnerAction(game, event, startGame);
     case "startOver":

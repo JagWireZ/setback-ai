@@ -287,6 +287,19 @@ export const movePlayer = ({ gameId, playerToken, playerId, direction }) =>
     direction,
   })
 
+export const addSeat = ({ gameId, playerToken }) =>
+  invoke('addSeat', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+  })
+
+export const removeSeat = ({ gameId, playerToken, playerId }) =>
+  invoke('removeSeat', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+    playerId,
+  })
+
 export const setPlayerAway = ({ gameId, playerToken, playerId }) =>
   invoke('setPlayerAway', {
     gameId: normalizeGameId(gameId),

@@ -4,6 +4,8 @@ export type LambdaAction =
   | 'createGame'
   | 'joinGame'
   | 'checkState'
+  | 'addSeat'
+  | 'removeSeat'
   | 'startGame'
   | 'startOver'
   | 'dealCards'
@@ -34,6 +36,13 @@ type ActionPayloadMap = {
   checkState: {
     gameId: string
     associateConnection?: boolean
+  }
+  addSeat: {
+    gameId: string
+  }
+  removeSeat: {
+    gameId: string
+    playerId: string
   }
   startGame: {
     gameId: string

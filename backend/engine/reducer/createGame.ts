@@ -2,6 +2,7 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game, Player } from "@shared/types/game";
 import { generateGameId } from "../helpers/generateGameId";
 import { buildPlayer } from "../helpers/reducer/player/buildPlayer";
+import { buildAiPlayer } from "../helpers/reducer/player/buildAiPlayer";
 import { getBotName } from "../helpers/reducer/player/getBotName";
 import { buildPlayerToken } from "../helpers/reducer/player/buildPlayerToken";
 import { buildScore } from "../helpers/reducer/player/buildScore";
@@ -19,10 +20,7 @@ export const createGame = (event: LambdaEventPayload<"createGame">): CreateGameR
   const allPlayers: Player[] = [hostPlayer];
 
   for (let playerIndex = 1; playerIndex < 5; playerIndex += 1) {
-    allPlayers.push({
-      ...buildPlayer(getBotName(allPlayers.map((player) => player.name))),
-      type: "ai" as const,
-    });
+    allPlayers.push(buildAiPlayer(getBotName(allPlayers.map((player) => player.name))));
   }
 
   const playerTokens = allPlayers.map((player) => buildPlayerToken(player.id));

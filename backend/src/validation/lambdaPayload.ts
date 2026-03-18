@@ -90,6 +90,27 @@ export function assertCheckStatePayload(
   requireOptionalBoolean(associateConnection, typedEvent.action, "associateConnection");
 }
 
+export function assertAddSeatPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"addSeat"> {
+  const typedEvent = expectAction(event, "addSeat");
+  const { gameId, playerToken } = typedEvent.payload;
+
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+}
+
+export function assertRemoveSeatPayload(
+  event: LambdaEventPayload,
+): asserts event is LambdaEventPayload<"removeSeat"> {
+  const typedEvent = expectAction(event, "removeSeat");
+  const { gameId, playerToken, playerId } = typedEvent.payload;
+
+  requireGameId(gameId, typedEvent.action);
+  requirePlayerToken(playerToken, typedEvent.action);
+  requireNonEmptyString(playerId, typedEvent.action, "playerId");
+}
+
 export function assertDealCardsPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"dealCards"> {

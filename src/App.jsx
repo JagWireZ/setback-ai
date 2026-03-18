@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  addSeat,
   checkState,
   createGame,
   dealCards,
@@ -7,6 +8,7 @@ import {
   joinGame,
   movePlayer,
   playCard,
+  removeSeat,
   returnFromAway,
   coverAwayPlayerTurn,
   renamePlayer,
@@ -31,6 +33,7 @@ import {
   getCardLabel,
   getCompletedRoundCount,
   getInvalidPlayMessage,
+  getMaxCardsForSeatCount,
   getPlayerName,
   getRoundDirectionArrow,
   sortHandCards,
@@ -281,6 +284,9 @@ function GameTablePage({
   const canSelectCards = game.phase?.stage === 'Playing' && isViewerActualTurn && !isTrickWinnerRevealVisible
   const displayedTrick = revealedCompletedTrick ?? currentTrick
   const displayedTrickPlays = displayedTrick?.plays ?? []
+  const trickPlayCount = displayedTrickPlays.length
+  const totalTrickPlayers = orderedPlayers.length > 0 ? orderedPlayers.length : (game.playerOrder?.length ?? game.players?.length ?? 0)
+  const leadTrickPlayerId = displayedTrick?.leadPlayerId ?? displayedTrickPlays[0]?.playerId ?? ''
   const winningDisplayedTrickCardIndex =
     revealedCompletedTrick?.winnerPlayerId
       ? revealedCompletedTrick.plays.findIndex((play) => play.playerId === revealedCompletedTrick.winnerPlayerId)
@@ -349,6 +355,75 @@ function GameTablePage({
       useCompactSizing: true,
     }
   }, [handCardCount, isMobileViewport, viewportWidth])
+
+  const trickLayout = useMemo(() => {
+    if (!isMobileViewport) {
+      return {
+        cardWidth: '6rem',
+        overlapOffset: '-3.25rem',
+        useCompactSizing: false,
+      }
+    }
+
+    const availableWidthPx = Math.max(viewportWidth - 40, 220)
+    const visibleFraction = 0.45
+    const factor = 1 + Math.max(trickPlayCount - 1, 0) * visibleFraction
+    const cardWidthPx = Math.min(72, Math.max(38, availableWidthPx / factor))
+    const overlapOffsetPx = -(cardWidthPx * (1 - visibleFraction))
+
+    return {
+      cardWidth: `${cardWidthPx / 16}rem`,
+      overlapOffset: `${overlapOffsetPx / 16}rem`,
+      useCompactSizing: true,
+    }
+  }, [isMobileViewport, trickPlayCount, viewportWidth])
+  const useScatterTrickLayout = true
+  const scatterTrickPositionsByPlayerId = useMemo(() => {
+    if (!useScatterTrickLayout || totalTrickPlayers === 0) {
+      return new Map()
+    }
+
+    const basePlayerIds = orderedPlayers.length > 0
+      ? orderedPlayers.map((player) => player.id)
+      : ((game.playerOrder ?? game.players?.map((player) => player.id) ?? []))
+    const leadPlayerIndex = basePlayerIds.indexOf(leadTrickPlayerId)
+    const playerIds = leadPlayerIndex >= 0
+      ? [
+          ...basePlayerIds.slice(leadPlayerIndex),
+          ...basePlayerIds.slice(0, leadPlayerIndex),
+        ]
+      : basePlayerIds
+    const angleStep = (Math.PI * 2) / totalTrickPlayers
+    const startAngle = -Math.PI / 2
+    const radiusX = isMobileViewport
+      ? totalTrickPlayers >= 7 ? 37 : 34
+      : totalTrickPlayers >= 7 ? 40 : 36
+    const radiusY = isMobileViewport
+      ? totalTrickPlayers >= 7 ? 30 : 27
+      : totalTrickPlayers >= 7 ? 32 : 28
+    const nextPositions = new Map()
+
+    playerIds.forEach((playerId, index) => {
+      const angle = startAngle + index * angleStep
+      const x = 50 + Math.cos(angle) * radiusX
+      const y = 48 + Math.sin(angle) * radiusY
+
+      nextPositions.set(playerId, {
+        left: `${x}%`,
+        top: `${y}%`,
+      })
+    })
+
+    return nextPositions
+  }, [
+    game.playerOrder,
+    game.players,
+    isMobileViewport,
+    leadTrickPlayerId,
+    orderedPlayers,
+    totalTrickPlayers,
+    useScatterTrickLayout,
+  ])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -584,7 +659,7 @@ function GameTablePage({
   useEffect(() => {
     const surfaceElement = trickSurfaceRef.current
 
-    if (!surfaceElement || displayedTrickPlays.length === 0) {
+    if (!surfaceElement || displayedTrickPlays.length === 0 || useScatterTrickLayout) {
       setPassiveTrickLabelStyles([])
       return
     }
@@ -612,7 +687,7 @@ function GameTablePage({
       window.removeEventListener('resize', updatePassiveTrickLabelStyles)
       surfaceElement.removeEventListener('scroll', updatePassiveTrickLabelStyles)
     }
-  }, [displayedTrickPlays, isMobileViewport, selectedTrickCardIndex, viewportWidth])
+  }, [displayedTrickPlays, isMobileViewport, selectedTrickCardIndex, useScatterTrickLayout, viewportWidth])
 
   useEffect(() => () => {
     clearReturningTrickLabelAnimation()
@@ -1267,8 +1342,8 @@ function GameTablePage({
               </section>
             ) : null}
             {game.phase?.stage === 'Bidding' ? null : (
-              <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1">
-                {selectedTrickCardIndex !== null ? (
+              <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1 overflow-visible">
+                {selectedTrickCardIndex !== null && !useScatterTrickLayout ? (
                   <div className="pointer-events-none absolute inset-0 z-20">
                     {returningTrickLabel ? (
                       <p
@@ -1301,13 +1376,41 @@ function GameTablePage({
                     })}
                   </div>
                 ) : null}
-                <ul className="flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2">
+                <ul
+                  className={
+                    useScatterTrickLayout
+                      ? 'relative min-h-[220px] flex-1 overflow-visible pt-8'
+                      : 'flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2'
+                  }
+                >
                   {displayedTrickPlays.length > 0 ? (
                     displayedTrickPlays.map((play, index) => (
                       <li
                         key={`${play.playerId}-${index}`}
-                        className="flex w-fit shrink-0 flex-col items-center text-sm"
-                        style={{ marginLeft: index === 0 ? '0' : '-3.25rem', zIndex: index + 1 }}
+                        className={
+                          useScatterTrickLayout
+                            ? 'absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-sm'
+                            : 'flex w-fit shrink-0 flex-col items-center text-sm'
+                        }
+                        style={
+                          useScatterTrickLayout
+                            ? {
+                                ...(scatterTrickPositionsByPlayerId.get(play.playerId) ?? {
+                                  left: '50%',
+                                  top: '48%',
+                                }),
+                                zIndex:
+                                  selectedTrickCardIndex === index
+                                    ? trickPlayCount + 20
+                                    : play.playerId === leadTrickPlayerId
+                                      ? trickPlayCount + 10
+                                      : index + 1,
+                              }
+                            : {
+                                marginLeft: index === 0 ? '0' : trickLayout.overlapOffset,
+                                zIndex: index + 1,
+                              }
+                        }
                       >
                         <button
                           ref={(node) => {
@@ -1315,12 +1418,16 @@ function GameTablePage({
                           }}
                           type="button"
                           className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
-                            selectedTrickCardIndex === index ? '-translate-y-4' : 'translate-y-0'
+                            selectedTrickCardIndex === index
+                              ? useScatterTrickLayout
+                                ? 'z-20 scale-110'
+                                : '-translate-y-4'
+                              : 'translate-y-0'
                           }`}
                           onClick={() => handleSelectTrickCard(index)}
                           aria-label={getPlayerName(game, play.playerId)}
                         >
-                          {selectedTrickCardIndex === null ? (
+                          {selectedTrickCardIndex === null && !useScatterTrickLayout ? (
                             <p className="trick-card-player-label pointer-events-none absolute bottom-full left-2 mb-1.5 w-12 truncate text-left sm:left-1 sm:w-24">
                               {getPassiveTrickPlayerLabel(
                                 getPlayerName(game, play.playerId),
@@ -1329,22 +1436,50 @@ function GameTablePage({
                               )}
                             </p>
                           ) : null}
-                          {selectedTrickCardIndex === index && selectedTrickLabelStyle ? (
-                            <p
-                              ref={selectedTrickLabelRef}
-                              className="pointer-events-none absolute bottom-full left-1/2 mb-2 truncate text-center text-lg text-white"
-                              style={selectedTrickLabelStyle}
-                            >
-                              {selectedTrickPlayerName}
-                            </p>
-                          ) : null}
-                          <div className="aspect-[2.5/3.5] w-24 sm:w-28">
+                          <div
+                            className={`aspect-[2.5/3.5] ${trickLayout.useCompactSizing ? '' : 'w-24 sm:w-28'}`}
+                            style={trickLayout.useCompactSizing ? { width: trickLayout.cardWidth } : undefined}
+                          >
                             <CardAsset
                               card={play.card}
+                              showCenterSymbol={!trickLayout.useCompactSizing}
+                              centerSymbolClassName="text-[104%] leading-none sm:text-[132%]"
                               jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
                             />
                           </div>
                         </button>
+                        {useScatterTrickLayout ? (
+                          <div className="pointer-events-none mt-1 flex flex-col items-center">
+                            <p
+                              className={`rounded-full px-2 py-0.5 text-center text-[0.62rem] transition ${
+                                selectedTrickCardIndex === index
+                                  ? 'border border-white/30 bg-slate-950/95 text-white shadow-[0_4px_14px_rgba(15,23,42,0.45)]'
+                                  : 'border border-white/10 bg-black/35 text-white/70'
+                              }`}
+                            >
+                              <span
+                                className={
+                                  selectedTrickCardIndex === index
+                                    ? 'block max-w-[8.5rem] whitespace-nowrap text-sm font-medium'
+                                    : 'block max-w-[4.75rem] truncate'
+                                }
+                              >
+                                {selectedTrickCardIndex === index
+                                  ? getPlayerName(game, play.playerId)
+                                  : getPassiveTrickPlayerLabel(
+                                      getPlayerName(game, play.playerId),
+                                      index,
+                                      displayedTrickPlays.length,
+                                    )}
+                              </span>
+                            </p>
+                            {play.playerId === leadTrickPlayerId ? (
+                              <p className="mt-0.5 text-[0.65rem] font-medium tracking-[0.18em] text-dim">
+                                LEAD
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </li>
                     ))
                   ) : (
@@ -1988,6 +2123,7 @@ export default function App() {
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
   const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
   const [pendingLobbyRemovePlayer, setPendingLobbyRemovePlayer] = useState(null)
+  const [pendingLobbyRemoveSeat, setPendingLobbyRemoveSeat] = useState(null)
   const [pendingLobbyRenamePlayer, setPendingLobbyRenamePlayer] = useState(null)
   const [lobbyRenameDraft, setLobbyRenameDraft] = useState('')
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
@@ -2023,6 +2159,23 @@ export default function App() {
 
   const closeLobbyRemovePlayerConfirm = () => {
     setPendingLobbyRemovePlayer(null)
+  }
+
+  const openLobbyRemoveSeatConfirm = (player) => {
+    if (!player) {
+      return
+    }
+
+    window.setTimeout(() => {
+      setPendingLobbyRemoveSeat({
+        id: player.id,
+        name: player.name,
+      })
+    }, 0)
+  }
+
+  const closeLobbyRemoveSeatConfirm = () => {
+    setPendingLobbyRemoveSeat(null)
   }
 
   const openLobbyRenamePlayerModal = (player) => {
@@ -2784,6 +2937,10 @@ export default function App() {
       .map((playerId) => playersById.get(playerId))
       .filter(Boolean)
   }, [activeLobbySession?.game])
+  const maxCardsForLobbySeatCount = useMemo(
+    () => getMaxCardsForSeatCount(orderedPlayers.length || 1),
+    [orderedPlayers.length],
+  )
   const activeLobbyPlayerId = useMemo(() => {
     if (!activeLobbySession?.game) {
       return ''
@@ -2813,6 +2970,26 @@ export default function App() {
     !ownerSession &&
     activeLobbyPlayer?.type === 'human' &&
     getPlayerPresence(activeLobbyPlayer).away
+
+  useEffect(() => {
+    if (!isOwnerLobby || ownerSession?.game?.phase?.stage !== 'Lobby') {
+      return
+    }
+
+    const currentSelectedMaxCards = Number(selectedMaxCards)
+    if (currentSelectedMaxCards <= maxCardsForLobbySeatCount) {
+      return
+    }
+
+    setSelectedMaxCards(String(maxCardsForLobbySeatCount))
+    setLobbyInfo(`Max Cards adjusted to ${maxCardsForLobbySeatCount} for ${orderedPlayers.length} seats.`)
+  }, [
+    isOwnerLobby,
+    maxCardsForLobbySeatCount,
+    orderedPlayers.length,
+    ownerSession?.game?.phase?.stage,
+    selectedMaxCards,
+  ])
   const activeSessionKey = ownerSession
     ? `owner:${ownerSession.gameId}:${ownerSession.playerToken}`
     : playerSession
@@ -2985,6 +3162,59 @@ export default function App() {
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to remove player'
+      setGameError(message)
+      return false
+    } finally {
+      setPendingPlayerActionId('')
+    }
+  }
+
+  const handleAddSeat = async () => {
+    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
+      return false
+    }
+
+    setGameError('')
+    setLobbyInfo('')
+    setPendingPlayerActionId('add-seat')
+
+    try {
+      const result = await addSeat({
+        gameId: ownerSession.gameId,
+        playerToken: ownerSession.playerToken,
+      })
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
+      setLobbyInfo('Seat added.')
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to add seat'
+      setGameError(message)
+      return false
+    } finally {
+      setPendingPlayerActionId('')
+    }
+  }
+
+  const handleRemoveSeat = async (playerId) => {
+    if (!ownerSession?.gameId || !ownerSession?.playerToken) {
+      return false
+    }
+
+    setGameError('')
+    setLobbyInfo('')
+    setPendingPlayerActionId(playerId)
+
+    try {
+      const result = await removeSeat({
+        gameId: ownerSession.gameId,
+        playerToken: ownerSession.playerToken,
+        playerId,
+      })
+      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
+      setLobbyInfo('Seat removed.')
+      return true
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to remove seat'
       setGameError(message)
       return false
     } finally {
@@ -3514,12 +3744,13 @@ export default function App() {
                 <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-dim">The Lobby</h4>
                 <p className="mt-2">
                   The lobby is where players gather before the game begins. The owner can share the game link or game ID with others so
-                  more players can join in. The game will always have a full amount of players by filling empty seats with AI players. When
-                  someone else joins, that player will take the seat of an AI player.
+                  more players can join in. Any open seat is represented by an AI player, and when someone joins they take over one of
+                  those AI seats.
                 </p>
                 <div className="mt-2">
                   <p>Game owners can do the following before the game starts:</p>
                   <ul className="mt-2 ml-4 list-disc space-y-1 pl-5">
+                    <li>Add AI seats to expand the lobby or remove AI seats to shrink it.</li>
                     <li>Adjust the seating order to control turn order and dealer rotation.</li>
                     <li>Remove human players from the game, which returns their seat to an AI player.</li>
                     <li>Choose Max Cards, which sets the largest hand size used in the round sequence.</li>
@@ -3528,7 +3759,8 @@ export default function App() {
                 </div>
                 <p className="mt-2">
                   For other players, the lobby is mainly a waiting area. They can watch other players join. As others join, they will take
-                  the seat of any AI players in the game. Players remain in the Lobby until the game owner starts the game.
+                  the seat of any AI players in the game. Seat count changes only happen in the lobby. After the game starts, player
+                  removal only converts between human and AI control for an existing seat.
                 </p>
               </section>
               <section className="mt-4">
@@ -3922,6 +4154,16 @@ export default function App() {
               <section className="lobby-panel rounded-2xl border p-4">
                 <div className="divider flex items-center justify-between gap-4 border-b pb-3">
                   <h2 className="text-lg font-semibold">Players</h2>
+                  {isOwnerLobby ? (
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+                      onClick={handleAddSeat}
+                      disabled={pendingPlayerActionId === 'add-seat' || isStartingGame}
+                    >
+                      {pendingPlayerActionId === 'add-seat' ? 'Adding...' : 'Add Seat'}
+                    </button>
+                  ) : null}
                 </div>
                 <ul className="mt-3 flex flex-col gap-2">
                   {orderedPlayers.map((player) => {
@@ -4007,6 +4249,20 @@ export default function App() {
                               >
                                 ×
                               </button>
+                              <button
+                                type="button"
+                                className="btn-secondary px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
+                                onClick={() => openLobbyRemoveSeatConfirm(player)}
+                                disabled={
+                                  player.type !== 'ai' ||
+                                  orderedPlayers.length <= 2 ||
+                                  isPending ||
+                                  isStartingGame
+                                }
+                                aria-label={`Remove ${player.name} seat`}
+                              >
+                                Seat
+                              </button>
                             </>
                           )}
                         </div>
@@ -4022,6 +4278,9 @@ export default function App() {
                     <div className="divider border-b pb-3">
                       <h2 className="text-lg font-semibold">Options</h2>
                     </div>
+                    <p className="text-sm text-muted">
+                      {`${orderedPlayers.length} seats. Max Cards available: ${maxCardsForLobbySeatCount}.`}
+                    </p>
                     <label className="flex items-center justify-end gap-2 text-sm text-muted">
                       <span>Max Cards</span>
                       <select
@@ -4031,8 +4290,8 @@ export default function App() {
                         className="input-surface px-3 py-1.5 text-sm disabled:opacity-50"
                         aria-label="Select max cards"
                       >
-                        {Array.from({ length: 10 }, (_, index) => {
-                          const value = String(10 - index)
+                        {Array.from({ length: maxCardsForLobbySeatCount }, (_, index) => {
+                          const value = String(maxCardsForLobbySeatCount - index)
                           return (
                             <option key={value} value={value}>
                               {value}
@@ -4098,7 +4357,7 @@ export default function App() {
             >
               <h2 className="text-xl font-semibold text-white">Remove Player?</h2>
               <p className="mt-3 text-sm text-muted">
-                {`Remove ${pendingLobbyRemovePlayer.name} from this game?`}
+                {`Remove ${pendingLobbyRemovePlayer.name} from this game and return that seat to AI control?`}
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
@@ -4122,6 +4381,46 @@ export default function App() {
                   disabled={pendingPlayerActionId === pendingLobbyRemovePlayer.id}
                 >
                   {pendingPlayerActionId === pendingLobbyRemovePlayer.id ? 'Removing...' : 'Remove Player'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {pendingLobbyRemoveSeat ? (
+          <div
+            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-4"
+            onClick={closeLobbyRemoveSeatConfirm}
+          >
+            <div
+              className="dialog-surface max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-6 text-left"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h2 className="text-xl font-semibold text-white">Remove Seat?</h2>
+              <p className="mt-3 text-sm text-muted">
+                {`Remove the ${pendingLobbyRemoveSeat.name} seat from this lobby?`}
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2"
+                  onClick={closeLobbyRemoveSeatConfirm}
+                  disabled={pendingPlayerActionId === pendingLobbyRemoveSeat.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
+                  onClick={async () => {
+                    const playerId = pendingLobbyRemoveSeat.id
+                    const didRemove = await handleRemoveSeat(playerId)
+                    if (didRemove) {
+                      closeLobbyRemoveSeatConfirm()
+                    }
+                  }}
+                  disabled={pendingPlayerActionId === pendingLobbyRemoveSeat.id}
+                >
+                  {pendingPlayerActionId === pendingLobbyRemoveSeat.id ? 'Removing...' : 'Remove Seat'}
                 </button>
               </div>
             </div>

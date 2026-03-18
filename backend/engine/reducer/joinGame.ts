@@ -17,14 +17,9 @@ export const joinGame = (
     throw new Error("Game ID mismatch");
   }
 
-  const humanPlayerCount = existingGame.players.filter((player) => player.type === "human").length;
-  if (humanPlayerCount >= 5) {
-    throw new Error("Game is full");
-  }
-
   const aiPlayerToJoin = existingGame.players.find((player) => player.type === "ai");
   if (!aiPlayerToJoin) {
-    throw new Error("No available AI player slot");
+    throw new Error("Game is full");
   }
 
   const nextPlayerToken = existingGame.playerTokens.find(

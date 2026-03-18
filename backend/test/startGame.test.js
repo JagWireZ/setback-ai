@@ -51,3 +51,40 @@ test("startGame applies maxCards and generates rounds when leaving the lobby", (
   assert.equal(updated.phase.stage, "Dealing");
   assert.equal(updated.phase.dealerPlayerId, "p2");
 });
+
+test("startGame rejects maxCards values that exceed the current seat-count limit", () => {
+  assert.throws(
+    () =>
+      startGame(
+        {
+          ...createLobbyGame(),
+          players: [
+            { id: "p1", name: "Casey", type: "human", connected: true },
+            { id: "p2", name: "Robin", type: "human", connected: true },
+            { id: "p3", name: "Jordan", type: "human", connected: true },
+            { id: "p4", name: "Morgan", type: "human", connected: true },
+            { id: "p5", name: "Taylor", type: "human", connected: true },
+            { id: "p6", name: "Parker", type: "ai", connected: true },
+          ],
+          playerTokens: [
+            { playerId: "p1", token: "owner-token" },
+            { playerId: "p2", token: "token-2" },
+            { playerId: "p3", token: "token-3" },
+            { playerId: "p4", token: "token-4" },
+            { playerId: "p5", token: "token-5" },
+            { playerId: "p6", token: "token-6" },
+          ],
+          playerOrder: ["p1", "p2", "p3", "p4", "p5", "p6"],
+        },
+        {
+          action: "startGame",
+          payload: {
+            gameId: "game-1",
+            playerToken: "owner-token",
+            maxCards: 10,
+          },
+        },
+      ),
+    /cannot exceed 8 with 6 seats/i,
+  );
+});
