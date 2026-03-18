@@ -52,6 +52,41 @@ test("addSeat appends a new AI seat with token, score, and turn order entry", ()
   assert.equal(updated.scores.some((score) => score.playerId === addedPlayer.id), true);
 });
 
+test("addSeat rejects growing beyond eight seats", () => {
+  assert.throws(
+    () =>
+      addSeat(
+        {
+          ...createLobbyGame(),
+          players: Array.from({ length: 8 }, (_, index) => ({
+            id: `p${index + 1}`,
+            name: `Player ${index + 1}`,
+            type: index < 2 ? "human" : "ai",
+            connected: true,
+          })),
+          playerTokens: Array.from({ length: 8 }, (_, index) => ({
+            playerId: `p${index + 1}`,
+            token: `token-${index + 1}`,
+          })),
+          playerOrder: ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"],
+          scores: Array.from({ length: 8 }, (_, index) => ({
+            playerId: `p${index + 1}`,
+            total: 0,
+            possible: 0,
+            rounds: [],
+          })),
+        },
+        {
+          action: "addSeat",
+          payload: {
+            gameId: "game-1",
+          },
+        },
+      ),
+    /cannot exceed 8 seats/i,
+  );
+});
+
 test("removeSeat deletes an AI seat from all seat-indexed collections", () => {
   const updated = removeSeat(createLobbyGame(), {
     action: "removeSeat",

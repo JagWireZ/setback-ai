@@ -7,6 +7,8 @@ import { getBotName } from "../helpers/reducer/player/getBotName";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 
+const MAX_SEATS = 8;
+
 export const addSeat = (
   game: Game | undefined,
   event: LambdaEventPayload<"addSeat">,
@@ -18,6 +20,10 @@ export const addSeat = (
 
   if (existingGame.phase.stage !== "Lobby") {
     throw new Error("Seats can only be added in the lobby");
+  }
+
+  if (existingGame.playerOrder.length >= MAX_SEATS) {
+    throw new Error(`Game cannot exceed ${MAX_SEATS} seats`);
   }
 
   const nextPlayer = buildAiPlayer(getBotName(existingGame.players.map((player) => player.name)));

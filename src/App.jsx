@@ -67,6 +67,7 @@ const AI_DIFFICULTY_OPTIONS = [
 ]
 
 const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
+const MAX_SEATS = 8
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
 
@@ -406,7 +407,16 @@ function GameTablePage({
     playerIds.forEach((playerId, index) => {
       const angle = startAngle + index * angleStep
       const x = 50 + Math.cos(angle) * radiusX
-      const y = 48 + Math.sin(angle) * radiusY
+      const baseY = 48 + Math.sin(angle) * radiusY
+      const yAdjustment =
+        totalTrickPlayers === 6
+          ? index === 1 || index === 5
+            ? -6
+            : index === 2 || index === 4
+              ? 6
+              : 0
+          : 0
+      const y = baseY + yAdjustment
 
       nextPositions.set(playerId, {
         left: `${x}%`,
@@ -1438,7 +1448,12 @@ function GameTablePage({
                           ) : null}
                           <div
                             className={`aspect-[2.5/3.5] ${trickLayout.useCompactSizing ? '' : 'w-24 sm:w-28'}`}
-                            style={trickLayout.useCompactSizing ? { width: trickLayout.cardWidth } : undefined}
+                            style={{
+                              ...(trickLayout.useCompactSizing ? { width: trickLayout.cardWidth } : {}),
+                              ...(selectedTrickCardIndex === index
+                                ? { filter: 'drop-shadow(0 0 16px rgba(255,255,255,0.55))' }
+                                : {}),
+                            }}
                           >
                             <CardAsset
                               card={play.card}
@@ -2142,6 +2157,7 @@ export default function App() {
   const reactionCooldownTimeoutRef = useRef(null)
   const endOfRoundSummaryTimeoutRef = useRef(null)
   const gameOverScoreTimeoutRef = useRef(null)
+  const previousLobbyMaxCardsRef = useRef(null)
   const isReactionOnCooldown = reactionCooldownUntil > Date.now()
 
   const openLobbyRemovePlayerConfirm = (player) => {
@@ -2973,11 +2989,23 @@ export default function App() {
 
   useEffect(() => {
     if (!isOwnerLobby || ownerSession?.game?.phase?.stage !== 'Lobby') {
+      previousLobbyMaxCardsRef.current = null
       return
     }
 
     const currentSelectedMaxCards = Number(selectedMaxCards)
+    const previousLobbyMaxCards = previousLobbyMaxCardsRef.current
+    previousLobbyMaxCardsRef.current = maxCardsForLobbySeatCount
+
     if (currentSelectedMaxCards <= maxCardsForLobbySeatCount) {
+      if (
+        previousLobbyMaxCards !== null &&
+        maxCardsForLobbySeatCount > previousLobbyMaxCards &&
+        currentSelectedMaxCards === previousLobbyMaxCards
+      ) {
+        setSelectedMaxCards(String(maxCardsForLobbySeatCount))
+        setLobbyInfo(`Max Cards adjusted to ${maxCardsForLobbySeatCount} for ${orderedPlayers.length} seats.`)
+      }
       return
     }
 
@@ -4116,9 +4144,6 @@ export default function App() {
                     {activeLobbySession.gameId}
                   </span>
                 </p>
-                <p className="badge-subtle rounded-full border px-3 py-1 text-muted">
-                  Phase: {activeLobbySession.game.phase?.stage}
-                </p>
               </div>
             </header>
 
@@ -4153,17 +4178,7 @@ export default function App() {
 
               <section className="lobby-panel rounded-2xl border p-4">
                 <div className="divider flex items-center justify-between gap-4 border-b pb-3">
-                  <h2 className="text-lg font-semibold">Players</h2>
-                  {isOwnerLobby ? (
-                    <button
-                      type="button"
-                      className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
-                      onClick={handleAddSeat}
-                      disabled={pendingPlayerActionId === 'add-seat' || isStartingGame}
-                    >
-                      {pendingPlayerActionId === 'add-seat' ? 'Adding...' : 'Add Seat'}
-                    </button>
-                  ) : null}
+                  <h2 className="text-lg font-semibold">{`Players (${orderedPlayers.length})`}</h2>
                 </div>
                 <ul className="mt-3 flex flex-col gap-2">
                   {orderedPlayers.map((player) => {
@@ -4238,30 +4253,23 @@ export default function App() {
                               <button
                                 type="button"
                                 className="btn-danger btn-danger-soft px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                                onClick={() => openLobbyRemovePlayerConfirm(player)}
+                                onClick={() => {
+                                  if (player.type === 'ai') {
+                                    openLobbyRemoveSeatConfirm(player)
+                                    return
+                                  }
+
+                                  openLobbyRemovePlayerConfirm(player)
+                                }}
                                 disabled={
-                                  player.type === 'ai' ||
-                                  player.id === ownerSession?.ownerPlayerId ||
+                                  (player.type === 'human' && player.id === ownerSession?.ownerPlayerId) ||
+                                  (player.type === 'ai' && orderedPlayers.length <= 2) ||
                                   isPending ||
                                   isStartingGame
                                 }
                                 aria-label={`Remove ${player.name}`}
                               >
                                 ×
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-secondary px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
-                                onClick={() => openLobbyRemoveSeatConfirm(player)}
-                                disabled={
-                                  player.type !== 'ai' ||
-                                  orderedPlayers.length <= 2 ||
-                                  isPending ||
-                                  isStartingGame
-                                }
-                                aria-label={`Remove ${player.name} seat`}
-                              >
-                                Seat
                               </button>
                             </>
                           )}
@@ -4270,6 +4278,18 @@ export default function App() {
                     )
                   })}
                 </ul>
+                {isOwnerLobby ? (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      className="btn-secondary px-4 py-2 text-sm disabled:opacity-50"
+                      onClick={handleAddSeat}
+                      disabled={pendingPlayerActionId === 'add-seat' || isStartingGame || orderedPlayers.length >= MAX_SEATS}
+                    >
+                      {pendingPlayerActionId === 'add-seat' ? 'Adding...' : 'Add Seat'}
+                    </button>
+                  </div>
+                ) : null}
               </section>
 
               {isOwnerLobby && (
