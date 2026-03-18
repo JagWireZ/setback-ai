@@ -3,6 +3,7 @@ import type { LambdaEventPayload } from "@shared/types/lambda";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { getPlayerController, getPlayerPresence } from "../helpers/reducer/player/presence";
+import { getAutomationDueAt, isTurnPhase, isAutomatedTurnPlayer, normalizeTurnDueAt, withTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
 import { dealCards } from "../reducer/dealCards";
 import { playCard } from "../reducer/playCard";
 import { submitBid } from "../reducer/submitBid";
@@ -982,15 +983,47 @@ export const applyAutomationStepForPlayer = (
   return undefined;
 };
 
+export const advanceDueAutomation = (
+  game: Game,
+  now: number = Date.now(),
+): Game | undefined => {
+  if (game.phase.stage === "Scoring") {
+    return withNextVersion(game, {
+      phase: withTurnDueAt(game, advancePhase(game)),
+    });
+  }
+
+  if (game.phase.stage === "EndOfRound") {
+    if (now < game.phase.advanceAfter) {
+      return undefined;
+    }
+
+    return withNextVersion(game, {
+      phase: withTurnDueAt(game, advancePhase(game)),
+    });
+  }
+
+  if (!isTurnPhase(game.phase) || !isAutomatedTurnPlayer(game, game.phase.turnPlayerId)) {
+    return undefined;
+  }
+
+  const dueAt = getAutomationDueAt(game);
+  if (typeof dueAt === "number" && now < dueAt) {
+    return undefined;
+  }
+
+  return applyAutomationStepForPlayer(game, game.phase.turnPlayerId);
+};
+
 export const reviewGameState = (game: Game): Game => {
-  let current = game;
+  let current = normalizeTurnDueAt(game);
 
   for (let step = 0; step < MAX_REVIEW_STEPS; step += 1) {
-    const updatedGame = applyAutomationStep(current);
+    const updatedGame = advanceDueAutomation(current, Number.POSITIVE_INFINITY) ?? applyAutomationStep(current);
     if (!updatedGame) {
       return current;
     }
-    current = updatedGame;
+    current = normalizeTurnDueAt(updatedGame);
   }
 
   throw new Error("Game state review exceeded step limit");

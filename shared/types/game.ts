@@ -73,6 +73,7 @@ type RoundPhaseBase = {
   roundIndex: number
   trickIndex: number
   turnStartedAt?: number
+  turnDueAt?: number
   bids: Bid[]
   cards: PhaseCards
 }

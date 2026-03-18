@@ -1,6 +1,7 @@
 import type { DealingPhase, Game, Phase } from "@shared/types/game";
 import { shuffleCards } from "../../shuffleCards";
 import { assertNever } from "../core/assertNever";
+import { withTurnDueAt } from "./turnTiming";
 
 const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
   if (game.playerOrder.length === 0) {
@@ -9,7 +10,7 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
 
   const deck = shuffleCards();
   const dealerPlayerId = game.playerOrder[roundIndex % game.playerOrder.length];
-  return {
+  return withTurnDueAt(game, {
     stage: "Dealing",
     dealerPlayerId,
     turnPlayerId: dealerPlayerId,
@@ -27,7 +28,7 @@ const buildDealingPhase = (game: Game, roundIndex: number): DealingPhase => {
       })),
       completedTricks: [],
     },
-  };
+  });
 };
 
 const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
@@ -76,14 +77,14 @@ export const advancePhase = (game: Game): Phase => {
       }
       return buildDealingPhase(game, 0);
     case "Dealing":
-      return {
+      return withTurnDueAt(game, {
         ...game.phase,
         stage: "Bidding",
         turnPlayerId: getNextPlayerId(game.playerOrder, game.phase.dealerPlayerId),
         turnStartedAt: Date.now(),
-      };
+      });
     case "Bidding":
-      return {
+      return withTurnDueAt(game, {
         ...game.phase,
         stage: "Playing",
         turnPlayerId: getFirstPlayerAfterDealerWithHighestBid(
@@ -92,7 +93,7 @@ export const advancePhase = (game: Game): Phase => {
           game.phase.bids,
         ),
         turnStartedAt: Date.now(),
-      };
+      });
     case "Playing": {
       const { turnPlayerId: _turnPlayerId, ...scoringPhase } = game.phase;
       return {

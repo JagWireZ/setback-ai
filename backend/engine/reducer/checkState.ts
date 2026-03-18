@@ -1,7 +1,8 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
-import { reviewGameState } from "../ai/reviewGameState";
+import { advanceDueAutomation } from "../ai/reviewGameState";
+import { normalizeTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
 
 export const checkState = (
   game: Game | undefined,
@@ -12,5 +13,6 @@ export const checkState = (
     throw new Error("Game ID mismatch");
   }
 
-  return reviewGameState(existingGame);
+  const normalizedGame = normalizeTurnDueAt(existingGame);
+  return advanceDueAutomation(normalizedGame) ?? normalizedGame;
 };

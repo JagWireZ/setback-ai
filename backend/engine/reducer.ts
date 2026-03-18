@@ -26,6 +26,7 @@ import { requirePlayerToken } from "./helpers/reducer/validation/requirePlayerTo
 import { requireGame } from "./helpers/reducer/validation/requireGame";
 import { putGame } from "./helpers/reducer/storage/putGame";
 import { toResult } from "./helpers/reducer/gameState/toResult";
+import { normalizeTurnDueAt } from "./helpers/reducer/gameState/turnTiming";
 import { assertNever } from "./helpers/reducer/core/assertNever";
 
 export type PublicGameState = Omit<Game, "playerTokens" | "ownerToken">;
@@ -47,7 +48,9 @@ const persistAndReturn = (
   updatedGame: Game,
   viewerPlayerToken: string,
 ): Promise<EngineReducerResult> =>
-  putGame(updatedGame).then(() => toResult(updatedGame, undefined, viewerPlayerToken));
+  putGame(normalizeTurnDueAt(updatedGame)).then(() =>
+    toResult(normalizeTurnDueAt(updatedGame), undefined, viewerPlayerToken),
+  );
 
 const runOwnerAction = <TEvent extends OwnerActionEvent>(
   game: Game | undefined,
@@ -102,14 +105,16 @@ export const engineReducer = (
   switch (event.action) {
     case "createGame": {
       const created = createGame(event);
-      return putGame(created.game).then(() =>
-        toResult(created.game, created.playerToken, created.playerToken),
+      const normalizedGame = normalizeTurnDueAt(created.game);
+      return putGame(normalizedGame).then(() =>
+        toResult(normalizedGame, created.playerToken, created.playerToken),
       );
     }
     case "joinGame": {
       const joined = joinGame(game, event);
-      return putGame(joined.game).then(() =>
-        toResult(joined.game, joined.playerToken, joined.playerToken),
+      const normalizedGame = normalizeTurnDueAt(joined.game);
+      return putGame(normalizedGame).then(() =>
+        toResult(normalizedGame, joined.playerToken, joined.playerToken),
       );
     }
     case "checkState": {
@@ -117,7 +122,7 @@ export const engineReducer = (
       const existingGame = requireGame(game);
       const updatedGame = checkState(game, event);
 
-      if (updatedGame.version !== existingGame.version) {
+      if (updatedGame.version !== existingGame.version || updatedGame !== existingGame) {
         return persistAndReturn(updatedGame, event.payload.playerToken);
       }
 

@@ -3122,7 +3122,6 @@ export default function App() {
     aiPauseTimeoutRef.current = setTimeout(() => {
       aiPauseUntilRef.current = 0
       aiPauseTimeoutRef.current = null
-      void requestActiveStateReview()
     }, TRICK_COMPLETE_DELAY_MS)
   }, [activeGame, activeLobbySession?.gameId, ownerSession, playerSession])
 

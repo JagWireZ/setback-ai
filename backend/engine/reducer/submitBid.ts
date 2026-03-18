@@ -3,6 +3,7 @@ import type { Game } from "@shared/types/game";
 import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
+import { withTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
 
 const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -69,12 +70,12 @@ export const submitBid = (
 
   if (nextBids.length < existingGame.playerOrder.length) {
     return withNextVersion(existingGame, {
-      phase: {
+      phase: withTurnDueAt(existingGame, {
         ...existingGame.phase,
         bids: nextBids,
         turnPlayerId: getNextPlayerId(existingGame.playerOrder, playerId),
         turnStartedAt: Date.now(),
-      },
+      }),
     });
   }
 

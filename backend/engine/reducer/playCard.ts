@@ -4,6 +4,7 @@ import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { scoreRound } from "../helpers/reducer/gameState/scoreRound";
+import { withTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
 
 const END_OF_ROUND_DELAY_MS = 10000;
 
@@ -217,7 +218,7 @@ export const playCard = (
   const trickComplete = nextTrick.plays.length >= existingGame.playerOrder.length;
   if (!trickComplete) {
     return withNextVersion(existingGame, {
-      phase: {
+      phase: withTurnDueAt(existingGame, {
         ...phase,
         turnPlayerId: getNextPlayerId(existingGame.playerOrder, turnPlayerId),
         turnStartedAt: Date.now(),
@@ -227,7 +228,7 @@ export const playCard = (
           hands: nextHands,
           currentTrick: nextTrick,
         },
-      },
+      }),
     });
   }
 
@@ -270,7 +271,7 @@ export const playCard = (
   const nextTrickIndex = phase.trickIndex + 1;
   const nextTurnPlayerId = winnerPlayerId;
   return withNextVersion(existingGame, {
-    phase: {
+    phase: withTurnDueAt(existingGame, {
       ...phase,
       trickIndex: nextTrickIndex,
       turnPlayerId: nextTurnPlayerId,
@@ -282,6 +283,6 @@ export const playCard = (
         currentTrick: undefined,
         completedTricks: [...phase.cards.completedTricks, completedTrick],
       },
-    },
+    }),
   });
 };

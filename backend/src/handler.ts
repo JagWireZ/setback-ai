@@ -3,6 +3,7 @@ import {
   APIGatewayProxyWebsocketHandlerV2,
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
+import type { Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
 import { runAiTurnsForGame } from "../engine/ai/runAiTurnsForGame";
@@ -11,6 +12,7 @@ import { setPlayerPresence } from "../engine/helpers/reducer/player/presence";
 import { touchPlayerActivity } from "../engine/helpers/reducer/player/touchPlayerActivity";
 import { normalizeGameId } from "../engine/helpers/reducer/gameId/normalizeGameId";
 import { toResult } from "../engine/helpers/reducer/gameState/toResult";
+import { isAutomatedTurnPlayer, isTurnPhase, setCurrentTurnDueAt } from "../engine/helpers/reducer/gameState/turnTiming";
 import { deleteConnectionById } from "../engine/helpers/reducer/storage/deleteConnectionById";
 import { getConnectionById } from "../engine/helpers/reducer/storage/getConnectionById";
 import { getConnectionsByGameId } from "../engine/helpers/reducer/storage/getConnectionsByGameId";
@@ -43,7 +45,6 @@ import {
 import { broadcastGameState, filterLiveConnections, sendSocketResponse } from "./websocket";
 
 const NO_CONTENT_RESPONSE: APIGatewayProxyStructuredResultV2 = { statusCode: 200, body: "" };
-const DEFAULT_AI_TURN_DELAY_MS = 1500;
 const DEFAULT_TRICK_REVEAL_DELAY_MS = 5000;
 const DISCONNECT_GRACE_PERIOD_MS = 5000;
 
@@ -206,16 +207,21 @@ const handleDefaultRoute = async (
     const result = await handleAction(context, request);
     const association = await maybeAssociateConnection(context.connectionId, request, result.response);
 
-    await sendSocketResponse(context.domainName, context.stage, context.connectionId, {
-      type: "response",
-      requestId,
-      ok: true,
-      result: result.response,
-    });
-    await maybeBroadcast(context, request, result.response);
-    if (association.presenceChanged && association.gameId && !BROADCAST_ACTIONS.has(request.action)) {
-      await broadcastGameState(context.domainName, context.stage, association.gameId);
+    try {
+      await sendSocketResponse(context.domainName, context.stage, context.connectionId, {
+        type: "response",
+        requestId,
+        ok: true,
+        result: result.response,
+      });
+      await maybeBroadcast(context, request, result.response);
+      if (association.presenceChanged && association.gameId && !BROADCAST_ACTIONS.has(request.action)) {
+        await broadcastGameState(context.domainName, context.stage, association.gameId);
+      }
+    } catch (deliveryError) {
+      console.error("WebSocket delivery failed after successful action", deliveryError);
     }
+
     await result.afterResponse?.();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unhandled error";
@@ -294,6 +300,22 @@ const reduceLoadedGameAndPrepareAi = async (
   };
 };
 
+const withCurrentAiTurnDelay = async (
+  game: Game,
+  delayMs: number,
+): Promise<Game> => {
+  if (!isTurnPhase(game.phase) || !isAutomatedTurnPlayer(game, game.phase.turnPlayerId)) {
+    return game;
+  }
+
+  const delayedGame = setCurrentTurnDueAt(game, Date.now() + delayMs);
+  if (delayedGame !== game) {
+    await putGame(delayedGame);
+  }
+
+  return delayedGame;
+};
+
 const handleAction = async (
   context: ReturnType<typeof getSocketContext>,
   event: LambdaEventPayload,
@@ -343,12 +365,10 @@ const handleAction = async (
       assertPlayCardPayload(event);
       const game = await getGameById(event.payload.gameId);
       await engineReducer(game, event);
-      const latestGame = await getGameById(event.payload.gameId);
+      let latestGame = await getGameById(event.payload.gameId);
       if (!latestGame) {
         throw new Error("Game not found");
       }
-
-      const response = toResult(latestGame, undefined, event.payload.playerToken);
 
       const previousCompletedTrickCount =
         game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
@@ -364,22 +384,22 @@ const handleAction = async (
             "TRICK_REVEAL_DELAY_MS",
             DEFAULT_TRICK_REVEAL_DELAY_MS,
           );
+          latestGame = await withCurrentAiTurnDelay(latestGame, trickRevealDelayMs);
+          const response = toResult(latestGame, undefined, event.payload.playerToken);
 
           return {
             response,
             afterResponse: async () => {
-              await runAiForGame(context, event.payload.gameId, {
-                initialDelayMs: trickRevealDelayMs,
-              });
+              await runAiForGame(context, event.payload.gameId);
             },
           };
         }
 
-        return { response };
+        return { response: toResult(latestGame, undefined, event.payload.playerToken) };
       }
 
       return {
-        response,
+        response: toResult(latestGame, undefined, event.payload.playerToken),
         afterResponse: async () => {
           await runAiForGame(context, event.payload.gameId);
         },
@@ -393,7 +413,7 @@ const handleAction = async (
       assertCoverAwayPlayerTurnPayload(event);
       const game = await getGameById(event.payload.gameId);
       const response = await engineReducer(game, event);
-      const latestGame = await getGameById(event.payload.gameId);
+      let latestGame = await getGameById(event.payload.gameId);
       const previousCompletedTrickCount =
         game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
       const latestCompletedTrickCount =
@@ -407,13 +427,16 @@ const handleAction = async (
           "TRICK_REVEAL_DELAY_MS",
           DEFAULT_TRICK_REVEAL_DELAY_MS,
         );
+        if (latestGame) {
+          latestGame = await withCurrentAiTurnDelay(latestGame, trickRevealDelayMs);
+        }
 
         return {
-          response,
+          response: latestGame
+            ? toResult(latestGame, undefined, event.payload.playerToken)
+            : response,
           afterResponse: async () => {
-            await runAiForGame(context, event.payload.gameId, {
-              initialDelayMs: trickRevealDelayMs,
-            });
+            await runAiForGame(context, event.payload.gameId);
           },
         };
       }
@@ -523,13 +546,8 @@ const handleDisconnect = async (
 const runAiForGame = async (
   context: ReturnType<typeof getSocketContext>,
   gameId: string,
-  options: { initialDelayMs?: number } = {},
 ): Promise<void> => {
-  const aiTurnDelayMs = getConfiguredDelayMs("AI_TURN_DELAY_MS", DEFAULT_AI_TURN_DELAY_MS);
-
   await runAiTurnsForGame(gameId, {
-    delayMs: aiTurnDelayMs,
-    initialDelayMs: options.initialDelayMs,
     onStep: async () => {
       await broadcastGameState(context.domainName, context.stage, gameId);
     },
