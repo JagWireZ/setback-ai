@@ -4223,24 +4223,32 @@ export default function App() {
                           ) : null}
                           {isOwnerLobby && (
                             <>
-                              <button
-                                type="button"
-                                className="badge-subtle btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                                onClick={() => handleMovePlayer(player.id, 'left')}
-                                disabled={isPending || isStartingGame}
-                                aria-label={`Move ${player.name} up`}
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                className="badge-subtle btn-secondary px-3 py-1.5 text-xl font-black disabled:opacity-50"
-                                onClick={() => handleMovePlayer(player.id, 'right')}
-                                disabled={isPending || isStartingGame}
-                                aria-label={`Move ${player.name} down`}
-                              >
-                                ↓
-                              </button>
+                              <div className="overflow-hidden rounded-md border border-white/10 bg-black/15">
+                                <button
+                                  type="button"
+                                  className="flex h-6 w-8 items-center justify-center rounded-none text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                  onClick={() => handleMovePlayer(player.id, 'left')}
+                                  disabled={isPending || isStartingGame}
+                                  aria-label={`Move ${player.name} up`}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className="block h-2.5 w-2.5 translate-y-0.5 rotate-45 border-l-2 border-t-2 border-current"
+                                  />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="flex h-6 w-8 items-center justify-center rounded-none border-t border-white/10 text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                  onClick={() => handleMovePlayer(player.id, 'right')}
+                                  disabled={isPending || isStartingGame}
+                                  aria-label={`Move ${player.name} down`}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className="block h-2.5 w-2.5 -translate-y-0.5 -rotate-[135deg] border-l-2 border-t-2 border-current"
+                                  />
+                                </button>
+                              </div>
                               <button
                                 type="button"
                                 className="btn-danger btn-danger-soft px-3 py-1.5 text-xl font-black disabled:opacity-50"
