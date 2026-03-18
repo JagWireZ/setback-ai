@@ -4223,10 +4223,10 @@ export default function App() {
                           ) : null}
                           {isOwnerLobby && (
                             <>
-                              <div className="overflow-hidden rounded-md border border-white/10 bg-black/15">
+                              <div className="-my-2 flex w-10 self-stretch flex-col overflow-hidden rounded-md border border-white/10 bg-black/15">
                                 <button
                                   type="button"
-                                  className="flex h-6 w-8 items-center justify-center rounded-none text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                  className="flex min-h-0 flex-1 items-center justify-center rounded-none text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
                                   onClick={() => handleMovePlayer(player.id, 'left')}
                                   disabled={isPending || isStartingGame}
                                   aria-label={`Move ${player.name} up`}
@@ -4238,7 +4238,7 @@ export default function App() {
                                 </button>
                                 <button
                                   type="button"
-                                  className="flex h-6 w-8 items-center justify-center rounded-none border-t border-white/10 text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
+                                  className="flex min-h-0 flex-1 items-center justify-center rounded-none border-t border-white/10 text-white/80 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
                                   onClick={() => handleMovePlayer(player.id, 'right')}
                                   disabled={isPending || isStartingGame}
                                   aria-label={`Move ${player.name} down`}
