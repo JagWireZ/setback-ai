@@ -372,9 +372,13 @@ function GameTablePage({
     game.players?.find((player) => player.id === selectedScorePlayerId) ??
     null
   const activeReactions = game?.reactions ?? []
+  const trickPhraseSeed =
+    typeof game?.phase?.trickIndex === 'number'
+      ? game.phase.trickIndex
+      : -1
   const reactionPhraseCategories = useMemo(
-    () => getReactionPhraseCategories(game, viewerPlayerId),
-    [game?.phase?.stage, game?.phase?.turnPlayerId, viewerPlayerId],
+    () => getReactionPhraseCategories(),
+    [],
   )
   const emojiReactionLayouts = useMemo(
     () =>
@@ -442,7 +446,7 @@ function GameTablePage({
     const activeCategoryId = hasActiveCategory
       ? selectedReactionPhraseCategoryId
       : (reactionPhraseCategories[0]?.id ?? '')
-    const nextOptions = getRandomReactionPhrases(activeCategoryId, 3)
+    const nextOptions = getRandomReactionPhrases(activeCategoryId, 3, hashString(`${activeCategoryId}:${trickPhraseSeed}`))
 
     if (selectedReactionPhraseCategoryId !== activeCategoryId) {
       setSelectedReactionPhraseCategoryId(activeCategoryId)
@@ -458,7 +462,7 @@ function GameTablePage({
 
       return nextOptions
     })
-  }, [isReactionModalOpen, reactionPhraseCategories, selectedReactionPhraseCategoryId, reactionPhraseOptions.length])
+  }, [isReactionModalOpen, reactionPhraseCategories, selectedReactionPhraseCategoryId, reactionPhraseOptions.length, trickPhraseSeed])
 
   useEffect(() => {
     if (!isReactionModalOpen || typeof window === 'undefined') {
@@ -1313,7 +1317,7 @@ function GameTablePage({
             }}
           >
             {reactionPhraseCategories.length > 0 ? (
-              <div className="mb-3 flex flex-wrap gap-2">
+              <div className="mb-3 grid grid-cols-3 gap-2">
                 {reactionPhraseCategories.map((category) => {
                   const isActive = category.id === selectedReactionPhraseCategoryId
 
@@ -1321,14 +1325,16 @@ function GameTablePage({
                     <button
                       key={category.id}
                       type="button"
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                      className={`min-h-10 rounded-2xl border px-2 py-1.5 text-center text-[0.65rem] font-semibold uppercase tracking-[0.12em] transition ${
                         isActive
                           ? 'border-amber-300/80 bg-amber-200/20 text-amber-50'
                           : 'border-white/15 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10'
                       }`}
                       onClick={() => {
                         setSelectedReactionPhraseCategoryId(category.id)
-                        setReactionPhraseOptions(getRandomReactionPhrases(category.id, 3))
+                        setReactionPhraseOptions(
+                          getRandomReactionPhrases(category.id, 3, hashString(`${category.id}:${trickPhraseSeed}`)),
+                        )
                       }}
                       disabled={isSendingReaction || isReactionOnCooldown}
                     >
