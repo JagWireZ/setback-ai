@@ -3245,6 +3245,7 @@ export default function App() {
     orderedPlayers,
     currentRoundCardCount,
     sortMode,
+    selectedBid,
     isReactionOnCooldown,
     activeLobbyPlayerId,
     requestActiveStateReview,

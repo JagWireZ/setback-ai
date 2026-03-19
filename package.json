@@ -8,6 +8,7 @@
     "build": "npm run build:frontend && npm run build:backend",
     "build:frontend": "vite build",
     "build:backend": "npm --prefix ./backend run build",
+    "test:frontend": "node --test test/**/*.test.js",
     "preview": "vite preview",
     "deploy:staging": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
     "deploy:prod": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select prod || tf -chdir=./infrastructure workspace new prod) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
