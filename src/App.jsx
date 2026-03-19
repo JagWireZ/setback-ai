@@ -61,6 +61,13 @@ import {
 } from './utils/playerName'
 import { getPlayerPresence } from './utils/playerPresence'
 import { usePwaInstall } from './utils/pwa'
+import {
+  getActiveSession,
+  getActiveSessionRole,
+  isConcurrentUpdateError,
+  mergeOwnerSessionResult,
+  mergePlayerSessionResult,
+} from './utils/sessionState'
 
 const AI_DIFFICULTY_OPTIONS = [
   { value: 'easy', label: 'Easy' },
@@ -2560,11 +2567,7 @@ export default function App() {
     }
   }, [])
 
-  const handleRemovedFromGame = (gameId, message = "You have been removed from game " + gameId + ".") => {
-    if (gameId) {
-      clearStoredGameSession(gameId)
-    }
-
+  const clearGameplayTimers = () => {
     if (aiPauseTimeoutRef.current) {
       clearTimeout(aiPauseTimeoutRef.current)
       aiPauseTimeoutRef.current = null
@@ -2582,11 +2585,19 @@ export default function App() {
       clearTimeout(gameOverScoreTimeoutRef.current)
       gameOverScoreTimeoutRef.current = null
     }
+  }
+
+  const resetRealtimeState = () => {
+    clearGameplayTimers()
 
     aiPauseUntilRef.current = 0
     previousCompletedTrickCountRef.current = 0
     latestShownRoundIndexRef.current = -1
     hydratedRoundSummaryGameIdRef.current = ''
+  }
+
+  const clearActiveSessionState = () => {
+    resetRealtimeState()
     setOwnerSession(null)
     setPlayerSession(null)
     setGameError('')
@@ -2594,56 +2605,23 @@ export default function App() {
     setPersistedEndOfRoundSummary(null)
     setIsEndOfRoundModalDismissed(false)
     setIsBidModalOpen(false)
+  }
+
+  const handleRemovedFromGame = (gameId, message = "You have been removed from game " + gameId + ".") => {
+    if (gameId) {
+      clearStoredGameSession(gameId)
+    }
+
+    clearActiveSessionState()
     setSessionInfo(null)
     setRequestError(message)
     clearGameIdInUrl()
   }
 
-  const getResultVersion = (result) => result?.version ?? result?.game?.version ?? 0
-  const isConcurrentUpdateError = (error) => {
-    const message = error instanceof Error ? error.message : String(error ?? '')
-    return message.includes('TransactionConflict') || message.includes('Transaction cancelled')
-  }
-
-  const shouldApplyGameVersion = (currentVersion, nextVersion) =>
-    typeof nextVersion !== 'number' || nextVersion >= currentVersion
-
-  const mergeOwnerSessionResult = (previousSession, result) => {
-    if (!previousSession || !result?.game) {
-      return previousSession
-    }
-
-    const currentVersion = previousSession.game?.version ?? 0
-    const nextVersion = getResultVersion(result)
-    if (!shouldApplyGameVersion(currentVersion, nextVersion)) {
-      return previousSession
-    }
-
-    return {
-      ...previousSession,
-      game: result.game,
-    }
-  }
-
-  const mergePlayerSessionResult = (previousSession, result) => {
-    if (!previousSession || !result?.game) {
-      return previousSession
-    }
-
-    const currentVersion = previousSession.version ?? previousSession.game?.version ?? 0
-    const nextVersion = getResultVersion(result)
-    if (!shouldApplyGameVersion(currentVersion, nextVersion)) {
-      return previousSession
-    }
-
-    return {
-      ...previousSession,
-      game: result.game,
-      version: nextVersion,
-    }
-  }
-
-  const applyRealtimeResult = (result, role = ownerSession ? 'owner' : 'player') => {
+  const applyRealtimeResult = (
+    result,
+    role = getActiveSessionRole({ ownerSession, playerSession }) ?? 'player',
+  ) => {
     if (!result?.game) {
       return
     }
@@ -2657,7 +2635,7 @@ export default function App() {
   }
 
   const requestActiveStateReview = async ({ associateConnection = false } = {}) => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -3690,34 +3668,8 @@ export default function App() {
   }
 
   const resetActiveSessionState = () => {
-    if (aiPauseTimeoutRef.current) {
-      clearTimeout(aiPauseTimeoutRef.current)
-      aiPauseTimeoutRef.current = null
-    }
-
-    aiPauseUntilRef.current = 0
-    previousCompletedTrickCountRef.current = 0
-    latestShownRoundIndexRef.current = -1
-    hydratedRoundSummaryGameIdRef.current = ''
-    if (gameErrorTimeoutRef.current) {
-      clearTimeout(gameErrorTimeoutRef.current)
-      gameErrorTimeoutRef.current = null
-    }
-    if (endOfRoundSummaryTimeoutRef.current) {
-      clearTimeout(endOfRoundSummaryTimeoutRef.current)
-      endOfRoundSummaryTimeoutRef.current = null
-    }
-    if (gameOverScoreTimeoutRef.current) {
-      clearTimeout(gameOverScoreTimeoutRef.current)
-      gameOverScoreTimeoutRef.current = null
-    }
-    setOwnerSession(null)
-    setPlayerSession(null)
-    setGameError('')
-    setLobbyInfo('')
+    clearActiveSessionState()
     setSessionInfo(null)
-    setPersistedEndOfRoundSummary(null)
-    setIsEndOfRoundModalDismissed(false)
     clearGameIdInUrl()
   }
 
@@ -3765,7 +3717,8 @@ export default function App() {
   }
 
   const handleDealCards = async () => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -3780,12 +3733,7 @@ export default function App() {
         playerToken: activeSession.playerToken,
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
-
+      applyRealtimeResult(result, activeRole ?? 'player')
       setSortMode('byRank')
     } catch (error) {
       if (isConcurrentUpdateError(error)) {
@@ -3813,7 +3761,8 @@ export default function App() {
   const handleSubmitBid = async (event) => {
     event.preventDefault()
 
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -3831,12 +3780,7 @@ export default function App() {
         ...(isTripBid ? { trip: true } : {}),
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
-
+      applyRealtimeResult(result, activeRole ?? 'player')
       closeSubmitBidModal()
     } catch (error) {
       if (isConcurrentUpdateError(error)) {
@@ -3852,7 +3796,8 @@ export default function App() {
   }
 
   const handleSortCards = async (mode) => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     const activeGame = activeSession?.game
     if (!activeSession?.gameId || !activeSession?.playerToken || activeGame?.phase?.stage === 'Dealing') {
       return
@@ -3869,12 +3814,7 @@ export default function App() {
         mode,
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
-
+      applyRealtimeResult(result, activeRole ?? 'player')
       setSortMode(mode)
     } catch (error) {
       if (isConcurrentUpdateError(error)) {
@@ -3894,7 +3834,8 @@ export default function App() {
   }
 
   const handleContinueGame = async () => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -3909,18 +3850,15 @@ export default function App() {
       })
       setShowAwayContinueModal(false)
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
+      applyRealtimeResult(result, activeRole ?? 'player')
     } finally {
       setIsContinuingGame(false)
     }
   }
 
   const handleSendReaction = async (reactionInput) => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken || isReactionOnCooldown) {
       return
     }
@@ -3948,12 +3886,7 @@ export default function App() {
         ...reactionPayload,
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
-
+      applyRealtimeResult(result, activeRole ?? 'player')
       const nextCooldownUntil = Date.now() + REACTION_COOLDOWN_MS
       setReactionCooldownUntil(nextCooldownUntil)
       if (reactionCooldownTimeoutRef.current) {
@@ -3978,7 +3911,8 @@ export default function App() {
   }
 
   const handleRenamePlayer = async (playerName, playerId) => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return false
     }
@@ -3995,11 +3929,7 @@ export default function App() {
         playerId,
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
+      applyRealtimeResult(result, activeRole ?? 'player')
 
       if (activeSession?.gameId) {
         const storedSession = getStoredGameSession(activeSession.gameId)
@@ -4013,7 +3943,7 @@ export default function App() {
           saveStoredGameSession(
             activeSession.gameId,
             activeSession.playerToken,
-            ownerSession ? 'owner' : 'player',
+            activeRole ?? 'player',
             playerName.trim(),
           )
         }
@@ -4030,7 +3960,8 @@ export default function App() {
   }
 
   const handlePlayCard = async (card) => {
-    const activeSession = ownerSession ?? playerSession
+    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
     const activeGame = activeSession?.game
     if (!activeSession?.gameId || !activeSession?.playerToken || !activeGame) {
       return
@@ -4047,11 +3978,7 @@ export default function App() {
         card,
       })
 
-      if (ownerSession) {
-        setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      } else {
-        setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
-      }
+      applyRealtimeResult(result, activeRole ?? 'player')
     } catch (error) {
       if (isConcurrentUpdateError(error)) {
         void requestActiveStateReview()
