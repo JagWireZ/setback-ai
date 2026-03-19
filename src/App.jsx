@@ -72,6 +72,7 @@ const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
 const MAX_SEATS = 8
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
+const buildTimestampLabel = typeof __BUILD_TIMESTAMP__ === 'string' ? __BUILD_TIMESTAMP__ : ''
 
 function HelpIcon(props) {
   return (
@@ -4933,7 +4934,7 @@ export default function App() {
     <main className="theme-shell h-[100dvh] overflow-hidden px-4 py-4">
       {isStagingBuild ? (
         <p className="build-badge fixed left-4 top-4 z-10 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.18em]">
-          Build: Staging
+          Build: Staging {buildTimestampLabel}
         </p>
       ) : null}
       <section className="mx-auto flex h-full max-w-xl flex-col items-center justify-center px-2 py-4 text-center sm:py-6">

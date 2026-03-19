@@ -2,7 +2,7 @@ import type { Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { applyAutomationStepForPlayer } from "../ai/reviewGameState";
 import { getPlayerPresence, mapPlayerState } from "../helpers/reducer/player/presence";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { requireGameForAction } from "../helpers/reducer/validation/actionContext";
 
 const IDLE_TURN_TIMEOUT_MS = 60_000;
 
@@ -10,10 +10,7 @@ export const coverAwayPlayerTurn = (
   game: Game | undefined,
   event: LambdaEventPayload<"coverAwayPlayerTurn">,
 ): Game => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const existingGame = requireGameForAction(game, event);
 
   if (!("turnPlayerId" in existingGame.phase)) {
     throw new Error("There is no active turn to cover");

@@ -1,16 +1,13 @@
 import type { Game } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import { setPlayerPresence } from "../helpers/reducer/player/presence";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { requireGameForAction } from "../helpers/reducer/validation/actionContext";
 
 export const setPlayerAway = (
   game: Game | undefined,
   event: LambdaEventPayload<"setPlayerAway">,
 ): Game => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const existingGame = requireGameForAction(game, event);
 
   const player = existingGame.players.find((entry) => entry.id === event.payload.playerId);
   if (!player) {

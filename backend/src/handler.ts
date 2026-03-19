@@ -4,7 +4,7 @@ import {
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
 import type { Game } from "@shared/types/game";
-import type { LambdaEventPayload } from "@shared/types/lambda";
+import type { LambdaAction, LambdaEventPayload } from "@shared/types/lambda";
 import { engineReducer } from "../engine";
 import { runAiTurnsForGame } from "../engine/ai/runAiTurnsForGame";
 import { setPlayerConnectedState } from "../engine/helpers/reducer/player/setPlayerConnectedState";
@@ -20,28 +20,7 @@ import { getGameById } from "../engine/helpers/reducer/storage/getGameById";
 import { putGame } from "../engine/helpers/reducer/storage/putGame";
 import { putConnection } from "../engine/helpers/reducer/storage/putConnection";
 import { shouldRunAiAfterCompletedTrick } from "./shouldRunAiAfterCompletedTrick";
-import {
-  assertAddSeatPayload,
-  assertCheckStatePayload,
-  assertCoverAwayPlayerTurnPayload,
-  assertCreateGamePayload,
-  assertDealCardsPayload,
-  assertGetGameStatePayload,
-  assertJoinGamePayload,
-  assertMovePlayerPayload,
-  assertRemoveSeatPayload,
-  assertReturnFromAwayPayload,
-  assertRenamePlayerPayload,
-  assertSendReactionPayload,
-  assertSetPlayerAwayPayload,
-  assertRemovePlayerPayload,
-  assertPlayCardPayload,
-  assertRemoveGamePayload,
-  assertStartGamePayload,
-  assertStartOverPayload,
-  assertSubmitBidPayload,
-  assertSortCardsPayload,
-} from "./validation/lambdaPayload";
+import { validateLambdaPayload } from "./validation/lambdaPayload";
 import { broadcastGameState, filterLiveConnections, sendSocketResponse } from "./websocket";
 
 const NO_CONTENT_RESPONSE: APIGatewayProxyStructuredResultV2 = { statusCode: 200, body: "" };
@@ -84,6 +63,18 @@ type ActionResult = {
 type ConnectionAssociationResult = {
   gameId?: string;
   presenceChanged: boolean;
+};
+
+type SocketContext = ReturnType<typeof getSocketContext>;
+type ActionExecutor = (
+  context: SocketContext,
+  event: LambdaEventPayload,
+) => Promise<ActionResult>;
+type TurnActionEvent = LambdaEventPayload<"playCard" | "coverAwayPlayerTurn">;
+type TurnActionOptions = {
+  responseMode: "reducer" | "latestGame";
+  completedTrickResponseMode?: "reducer" | "latestGame";
+  shouldRunAiAfterCompletedTrick?: (game: Game) => boolean;
 };
 
 const getSocketContext = (event: APIGatewayProxyWebsocketEventV2) => {
@@ -168,7 +159,7 @@ const maybeAssociateConnection = async (
 };
 
 const maybeBroadcast = async (
-  context: ReturnType<typeof getSocketContext>,
+  context: SocketContext,
   request: LambdaEventPayload,
   result: unknown,
 ): Promise<void> => {
@@ -240,7 +231,7 @@ export const handler: APIGatewayProxyWebsocketHandlerV2 = async (
   event,
 ): Promise<APIGatewayProxyStructuredResultV2> => {
   const context = getSocketContext(event);
-  const { routeKey, connectionId } = context;
+  const { routeKey } = context;
 
   switch (routeKey) {
     case "$connect":
@@ -287,11 +278,10 @@ const reduceLoadedGame = async (event: LoadedGameEvent): Promise<unknown> => {
 };
 
 const reduceLoadedGameAndPrepareAi = async (
-  context: ReturnType<typeof getSocketContext>,
+  context: SocketContext,
   event: AiFollowUpEvent,
 ): Promise<ActionResult> => {
-  const game = await getGameById(event.payload.gameId);
-  const response = await engineReducer(game, event);
+  const response = await reduceLoadedGame(event);
   return {
     response,
     afterResponse: async () => {
@@ -316,173 +306,139 @@ const withCurrentAiTurnDelay = async (
   return delayedGame;
 };
 
-const handleAction = async (
-  context: ReturnType<typeof getSocketContext>,
-  event: LambdaEventPayload,
+const getCompletedTrickCount = (game: Game | undefined): number =>
+  game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
+
+const toViewerResponse = (
+  game: Game | undefined,
+  playerToken: string,
+  fallbackResponse: unknown,
+): unknown => (game ? toResult(game, undefined, playerToken) : fallbackResponse);
+
+const executeTurnAction = async (
+  context: SocketContext,
+  event: TurnActionEvent,
+  options: TurnActionOptions,
 ): Promise<ActionResult> => {
-  switch (event.action) {
-    case "createGame": {
-      assertCreateGamePayload(event);
-      return { response: await engineReducer(undefined, event) };
-    }
-    case "removeGame": {
-      assertRemoveGamePayload(event);
-      return { response: await engineReducer(undefined, event) };
-    }
-    case "joinGame": {
-      assertJoinGamePayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "checkState": {
-      assertCheckStatePayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "addSeat": {
-      assertAddSeatPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "removeSeat": {
-      assertRemoveSeatPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "dealCards": {
-      assertDealCardsPayload(event);
-      return reduceLoadedGameAndPrepareAi(context, event);
-    }
-    case "startGame": {
-      assertStartGamePayload(event);
-      return reduceLoadedGameAndPrepareAi(context, event);
-    }
-    case "startOver": {
-      assertStartOverPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "submitBid": {
-      assertSubmitBidPayload(event);
-      return reduceLoadedGameAndPrepareAi(context, event);
-    }
-    case "playCard": {
-      assertPlayCardPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      await engineReducer(game, event);
-      let latestGame = await getGameById(event.payload.gameId);
-      if (!latestGame) {
-        throw new Error("Game not found");
-      }
+  const game = await getGameById(event.payload.gameId);
+  const response = await engineReducer(game, event);
+  let latestGame = await getGameById(event.payload.gameId);
+  const trickJustCompleted =
+    getCompletedTrickCount(latestGame) > getCompletedTrickCount(game);
+  const responseMode = trickJustCompleted
+    ? (options.completedTrickResponseMode ?? options.responseMode)
+    : options.responseMode;
 
-      const previousCompletedTrickCount =
-        game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
-      const latestCompletedTrickCount =
-        latestGame.phase && "cards" in latestGame.phase
-          ? latestGame.phase.cards.completedTricks.length
-          : 0;
-      const trickJustCompleted = latestCompletedTrickCount > previousCompletedTrickCount;
+  if (trickJustCompleted) {
+    const shouldRunAi = latestGame
+      ? (options.shouldRunAiAfterCompletedTrick?.(latestGame) ?? true)
+      : true;
 
-      if (trickJustCompleted) {
-        if (shouldRunAiAfterCompletedTrick(latestGame)) {
-          const trickRevealDelayMs = getConfiguredDelayMs(
-            "TRICK_REVEAL_DELAY_MS",
-            DEFAULT_TRICK_REVEAL_DELAY_MS,
-          );
-          latestGame = await withCurrentAiTurnDelay(latestGame, trickRevealDelayMs);
-          const response = toResult(latestGame, undefined, event.payload.playerToken);
-
-          return {
-            response,
-            afterResponse: async () => {
-              await runAiForGame(context, event.payload.gameId);
-            },
-          };
-        }
-
-        return { response: toResult(latestGame, undefined, event.payload.playerToken) };
-      }
-
+    if (!shouldRunAi) {
       return {
-        response: toResult(latestGame, undefined, event.payload.playerToken),
-        afterResponse: async () => {
-          await runAiForGame(context, event.payload.gameId);
-        },
+        response: responseMode === "latestGame"
+          ? toViewerResponse(latestGame, event.payload.playerToken, response)
+          : response,
       };
     }
-    case "returnFromAway": {
-      assertReturnFromAwayPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "coverAwayPlayerTurn": {
-      assertCoverAwayPlayerTurnPayload(event);
-      const game = await getGameById(event.payload.gameId);
-      const response = await engineReducer(game, event);
-      let latestGame = await getGameById(event.payload.gameId);
-      const previousCompletedTrickCount =
-        game?.phase && "cards" in game.phase ? game.phase.cards.completedTricks.length : 0;
-      const latestCompletedTrickCount =
-        latestGame?.phase && "cards" in latestGame.phase
-          ? latestGame.phase.cards.completedTricks.length
-          : 0;
-      const trickJustCompleted = latestCompletedTrickCount > previousCompletedTrickCount;
 
-      if (trickJustCompleted) {
-        const trickRevealDelayMs = getConfiguredDelayMs(
-          "TRICK_REVEAL_DELAY_MS",
-          DEFAULT_TRICK_REVEAL_DELAY_MS,
-        );
-        if (latestGame) {
-          latestGame = await withCurrentAiTurnDelay(latestGame, trickRevealDelayMs);
-        }
+    const trickRevealDelayMs = getConfiguredDelayMs(
+      "TRICK_REVEAL_DELAY_MS",
+      DEFAULT_TRICK_REVEAL_DELAY_MS,
+    );
+    if (latestGame) {
+      latestGame = await withCurrentAiTurnDelay(latestGame, trickRevealDelayMs);
+    }
 
-        return {
-          response: latestGame
-            ? toResult(latestGame, undefined, event.payload.playerToken)
-            : response,
-          afterResponse: async () => {
-            await runAiForGame(context, event.payload.gameId);
-          },
-        };
-      }
-
-      return {
-        response,
-        afterResponse: async () => {
-          await runAiForGame(context, event.payload.gameId);
-        },
-      };
-    }
-    case "sortCards": {
-      assertSortCardsPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "movePlayer": {
-      assertMovePlayerPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "setPlayerAway": {
-      assertSetPlayerAwayPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "removePlayer": {
-      assertRemovePlayerPayload(event);
-      return reduceLoadedGameAndPrepareAi(context, event);
-    }
-    case "renamePlayer": {
-      assertRenamePlayerPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "sendReaction": {
-      assertSendReactionPayload(event);
-      return { response: await reduceLoadedGame(event) };
-    }
-    case "getGameState": {
-      assertGetGameStatePayload(event);
-      return { response: await engineReducer(undefined, event) };
-    }
-    default:
-      return assertNever(event);
+    return {
+      response: responseMode === "latestGame"
+        ? toViewerResponse(latestGame, event.payload.playerToken, response)
+        : response,
+      afterResponse: async () => {
+        await runAiForGame(context, event.payload.gameId);
+      },
+    };
   }
+
+  return {
+    response: options.responseMode === "latestGame"
+      ? toViewerResponse(latestGame, event.payload.playerToken, response)
+      : response,
+    afterResponse: async () => {
+      await runAiForGame(context, event.payload.gameId);
+    },
+  };
 };
 
-const assertNever = (value: never): never => {
-  throw new Error(`Unhandled action: ${JSON.stringify(value)}`);
+const ACTION_EXECUTORS: Record<LambdaAction, ActionExecutor> = {
+  createGame: async (_context, event) => ({
+    response: await engineReducer(undefined, event as LambdaEventPayload<"createGame">),
+  }),
+  joinGame: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  checkState: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  addSeat: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  removeSeat: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  startGame: async (context, event) =>
+    reduceLoadedGameAndPrepareAi(context, event as AiFollowUpEvent),
+  startOver: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  dealCards: async (context, event) =>
+    reduceLoadedGameAndPrepareAi(context, event as AiFollowUpEvent),
+  submitBid: async (context, event) =>
+    reduceLoadedGameAndPrepareAi(context, event as AiFollowUpEvent),
+  playCard: async (context, event) =>
+    executeTurnAction(context, event as TurnActionEvent, {
+      responseMode: "latestGame",
+      shouldRunAiAfterCompletedTrick: shouldRunAiAfterCompletedTrick,
+    }),
+  returnFromAway: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  coverAwayPlayerTurn: async (context, event) =>
+    executeTurnAction(context, event as TurnActionEvent, {
+      responseMode: "reducer",
+      completedTrickResponseMode: "latestGame",
+    }),
+  sortCards: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  movePlayer: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  setPlayerAway: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  removePlayer: async (context, event) =>
+    reduceLoadedGameAndPrepareAi(context, event as AiFollowUpEvent),
+  renamePlayer: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  sendReaction: async (_context, event) => ({
+    response: await reduceLoadedGame(event as LoadedGameEvent),
+  }),
+  removeGame: async (_context, event) => ({
+    response: await engineReducer(undefined, event as LambdaEventPayload<"removeGame">),
+  }),
+  getGameState: async (_context, event) => ({
+    response: await engineReducer(undefined, event as LambdaEventPayload<"getGameState">),
+  }),
+};
+
+const handleAction = async (
+  context: SocketContext,
+  event: LambdaEventPayload,
+): Promise<ActionResult> => {
+  const validatedEvent = validateLambdaPayload(event);
+  return ACTION_EXECUTORS[validatedEvent.action](context, validatedEvent);
 };
 
 const getConfiguredDelayMs = (envName: string, fallbackMs: number): number => {
@@ -497,7 +453,7 @@ const getConfiguredDelayMs = (envName: string, fallbackMs: number): number => {
 };
 
 const handleDisconnect = async (
-  context: ReturnType<typeof getSocketContext>,
+  context: SocketContext,
 ): Promise<void> => {
   const connection = await getConnectionById(context.connectionId);
   await deleteConnectionById(context.connectionId);
@@ -544,7 +500,7 @@ const handleDisconnect = async (
 };
 
 const runAiForGame = async (
-  context: ReturnType<typeof getSocketContext>,
+  context: SocketContext,
   gameId: string,
 ): Promise<void> => {
   await runAiTurnsForGame(gameId, {

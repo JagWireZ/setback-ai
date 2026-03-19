@@ -1,9 +1,9 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { withTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
+import { requirePlayerActionContext } from "../helpers/reducer/validation/actionContext";
 
 const getNextPlayerId = (playerOrder: string[], playerId: string): string => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -18,23 +18,12 @@ export const submitBid = (
   game: Game | undefined,
   event: LambdaEventPayload<"submitBid">,
 ): Game => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const { game: existingGame, playerId } = requirePlayerActionContext(game, event);
 
   if (existingGame.phase.stage !== "Bidding") {
     throw new Error("Bids can only be submitted during Bidding phase");
   }
 
-  const playerToken = existingGame.playerTokens.find(
-    (entry) => entry.token === event.payload.playerToken,
-  );
-  if (!playerToken) {
-    throw new Error("Invalid player token");
-  }
-
-  const playerId = playerToken.playerId;
   if (playerId !== existingGame.phase.turnPlayerId) {
     throw new Error("It is not this player's turn to bid");
   }

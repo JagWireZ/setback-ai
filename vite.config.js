@@ -9,6 +9,20 @@ const baseManifest = JSON.parse(
 
 export default defineConfig(() => {
   const isStagingBuild = process.env.VITE_APP_ENV === 'staging'
+  const buildTimestamp = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+    .format(new Date())
+    .replace(',', '')
+    .replace(/\//g, '-')
+    + ' ET'
   const manifest = {
     ...baseManifest,
     name: isStagingBuild ? 'Setback (Staging)' : baseManifest.name,
@@ -28,5 +42,8 @@ export default defineConfig(() => {
         ],
       }),
     ],
+    define: {
+      __BUILD_TIMESTAMP__: JSON.stringify(buildTimestamp),
+    },
   }
 })

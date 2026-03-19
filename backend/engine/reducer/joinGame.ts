@@ -1,7 +1,7 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Game } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
+import { requireGameForAction } from "../helpers/reducer/validation/actionContext";
 
 type JoinGameResult = {
   game: Game;
@@ -12,10 +12,7 @@ export const joinGame = (
   game: Game | undefined,
   event: LambdaEventPayload<"joinGame">,
 ): JoinGameResult => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const existingGame = requireGameForAction(game, event);
 
   const aiPlayerToJoin = existingGame.players.find((player) => player.type === "ai");
   if (!aiPlayerToJoin) {

@@ -1,6 +1,6 @@
 import type { Card, Game, Hand, Rank, Suit } from "@shared/types/game";
 import type { LambdaEventPayload } from "@shared/types/lambda";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
+import { requirePlayerActionContext } from "../helpers/reducer/validation/actionContext";
 
 const RANK_ORDER: Rank[] = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "LJ", "BJ"];
 const SUIT_ORDER: Exclude<Suit, "Joker">[] = ["Clubs", "Diamonds", "Hearts", "Spades"];
@@ -57,18 +57,13 @@ export const sortCards = (
   game: Game | undefined,
   event: LambdaEventPayload<"sortCards">,
 ): Game => {
-  const existingGame = requireGame(game);
+  const { game: existingGame, playerId } = requirePlayerActionContext(game, event);
   if (!("cards" in existingGame.phase)) {
     throw new Error("Cards cannot be sorted in the current phase");
   }
 
   if (existingGame.phase.stage === "Dealing") {
     throw new Error("Cards cannot be sorted during Dealing");
-  }
-
-  const playerId = existingGame.playerTokens.find((entry) => entry.token === event.payload.playerToken)?.playerId;
-  if (!playerId) {
-    throw new Error("Invalid player token");
   }
 
   const playerHand = existingGame.phase.cards.hands.find((hand) => hand.playerId === playerId);

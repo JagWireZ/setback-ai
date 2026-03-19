@@ -1,10 +1,10 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Card, Game, Hand, Suit, Trick, TrickPlay } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { scoreRound } from "../helpers/reducer/gameState/scoreRound";
 import { withTurnDueAt } from "../helpers/reducer/gameState/turnTiming";
+import { requirePlayerActionContext } from "../helpers/reducer/validation/actionContext";
 
 const END_OF_ROUND_DELAY_MS = 10000;
 
@@ -124,10 +124,7 @@ export const playCard = (
   game: Game | undefined,
   event: LambdaEventPayload<"playCard">,
 ): Game => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const { game: existingGame, playerId } = requirePlayerActionContext(game, event);
 
   if (existingGame.phase.stage !== "Playing") {
     throw new Error("Cards can only be played during Playing phase");
@@ -135,13 +132,7 @@ export const playCard = (
 
   const phase = existingGame.phase;
   const turnPlayerId = phase.turnPlayerId;
-  const playerToken = existingGame.playerTokens.find(
-    (entry) => entry.token === event.payload.playerToken,
-  );
-  if (!playerToken) {
-    throw new Error("Invalid player token");
-  }
-  if (playerToken.playerId !== turnPlayerId) {
+  if (playerId !== turnPlayerId) {
     throw new Error("It is not this player's turn to play");
   }
 

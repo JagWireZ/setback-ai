@@ -1,10 +1,10 @@
 import type { LambdaEventPayload } from "@shared/types/lambda";
 import type { Card, Game } from "@shared/types/game";
-import { requireGame } from "../helpers/reducer/validation/requireGame";
 import { shuffleCards } from "../helpers/shuffleCards";
 import { withNextVersion } from "../helpers/reducer/gameState/withNextVersion";
 import { advancePhase } from "../helpers/reducer/gameState/advancePhase";
 import { applyRainbowPreviewToScores } from "../helpers/reducer/gameState/rainbow";
+import { requirePlayerActionContext } from "../helpers/reducer/validation/actionContext";
 
 const getNextPlayerIndex = (playerOrder: string[], playerId: string): number => {
   const currentIndex = playerOrder.indexOf(playerId);
@@ -19,27 +19,17 @@ export const dealCards = (
   game: Game | undefined,
   event: LambdaEventPayload<"dealCards">,
 ): Game => {
-  const existingGame = requireGame(game);
-  if (existingGame.id !== event.payload.gameId) {
-    throw new Error("Game ID mismatch");
-  }
+  const { game: existingGame, playerId } = requirePlayerActionContext(game, event);
 
   if (existingGame.phase.stage !== "Dealing") {
     throw new Error("Cards can only be dealt during Dealing phase");
   }
 
-  const playerToken = existingGame.playerTokens.find(
-    (entry) => entry.token === event.payload.playerToken,
-  );
-  if (!playerToken) {
-    throw new Error("Invalid player token");
-  }
-
-  if (playerToken.playerId !== existingGame.phase.dealerPlayerId) {
+  if (playerId !== existingGame.phase.dealerPlayerId) {
     throw new Error("Only the dealer can deal cards");
   }
 
-  if (playerToken.playerId !== existingGame.phase.turnPlayerId) {
+  if (playerId !== existingGame.phase.turnPlayerId) {
     throw new Error("Only the active turn player can deal cards");
   }
 
