@@ -36,7 +36,58 @@ export const sendReaction = (
   const nextReaction = {
     id: `${playerToken.playerId}-${now}`,
     playerId: playerToken.playerId,
-    emoji: event.payload.emoji,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    ...(event.payload.emoji ? { emoji: event.payload.emoji } : {}),
+    ...(event.payload.phrase ? { phrase: event.payload.phrase } : {}),
     createdAt: now,
   };
 

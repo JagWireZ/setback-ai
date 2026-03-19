@@ -322,11 +322,12 @@ export const renamePlayer = ({ gameId, playerToken, playerName, playerId }) =>
     ...(playerId ? { playerId } : {}),
   })
 
-export const sendReaction = ({ gameId, playerToken, emoji }) =>
+export const sendReaction = ({ gameId, playerToken, emoji, phrase }) =>
   invoke('sendReaction', {
     gameId: normalizeGameId(gameId),
     playerToken,
-    emoji,
+    ...(emoji ? { emoji } : {}),
+    ...(phrase ? { phrase } : {}),
   })
 
 export const startGame = ({ gameId, playerToken, maxCards, dealerPlayerId, aiDifficulty }) =>

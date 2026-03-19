@@ -1,3 +1,5 @@
+import type { ReactionEmoji, ReactionPhrase } from './reactions'
+
 // Card types
 export type Suit = 'Clubs' | 'Diamonds' | 'Hearts' | 'Spades' | 'Joker'
 
@@ -147,12 +149,11 @@ export type PlayerToken = {
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
-export type ReactionEmoji = '😀' | '😂' | '😮' | '😢' | '😡' | '👏' | '🔥' | '🎉'
-
 export type Reaction = {
   id: string
   playerId: string
-  emoji: ReactionEmoji
+  emoji?: ReactionEmoji
+  phrase?: ReactionPhrase
   createdAt: number
 }
 

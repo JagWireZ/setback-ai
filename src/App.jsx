@@ -42,6 +42,7 @@ import {
   hashString,
   toUserFacingActionError,
 } from './utils/gameUi'
+import { getRandomReactionPhrases, getReactionPhraseCategories } from './utils/reactionPhrases'
 import {
   clearGameIdInUrl,
   clearStoredGameSession,
@@ -282,6 +283,9 @@ function GameTablePage({
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
   const [isLeaveConfirmModalOpen, setIsLeaveConfirmModalOpen] = useState(false)
   const [isReactionModalOpen, setIsReactionModalOpen] = useState(false)
+  const [selectedReactionPhraseCategoryId, setSelectedReactionPhraseCategoryId] = useState('')
+  const [reactionPhraseOptions, setReactionPhraseOptions] = useState([])
+  const [reactionModalPosition, setReactionModalPosition] = useState({ right: 16, bottom: 16 })
   const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
   const [selectedScorePlayerId, setSelectedScorePlayerId] = useState('')
   const [pendingRemovePlayer, setPendingRemovePlayer] = useState(null)
@@ -368,31 +372,124 @@ function GameTablePage({
     game.players?.find((player) => player.id === selectedScorePlayerId) ??
     null
   const activeReactions = game?.reactions ?? []
-  const reactionLayouts = useMemo(
+  const reactionPhraseCategories = useMemo(
+    () => getReactionPhraseCategories(game, viewerPlayerId),
+    [game?.phase?.stage, game?.phase?.turnPlayerId, viewerPlayerId],
+  )
+  const emojiReactionLayouts = useMemo(
     () =>
-      activeReactions.map((reaction, index) => {
+      activeReactions
+        .filter((reaction) => reaction.emoji)
+        .map((reaction, index) => {
+          const hash = hashString(reaction.id)
+          const left = 38 + (hash % 25)
+          const driftDirection = hash % 2 === 0 ? 1 : -1
+          const driftA = driftDirection * (18 + ((hash >> 3) % 10))
+          const driftB = driftDirection * -1 * (14 + ((hash >> 6) % 12))
+          const driftC = driftDirection * (24 + ((hash >> 9) % 14))
+          const delay = (index % 3) * 0.08
+
+          return {
+            reaction,
+            style: {
+              left: `${left}%`,
+              bottom: `${mobileActionBarHeight + 24 + (hash % 3) * 6}px`,
+              animationDelay: `${delay}s`,
+              '--reaction-sway-a': `${driftA}px`,
+              '--reaction-sway-b': `${driftB}px`,
+              '--reaction-sway-c': `${driftC}px`,
+            },
+          }
+        }),
+    [activeReactions, mobileActionBarHeight],
+  )
+  const phraseReactionLayouts = useMemo(
+    () =>
+      activeReactions
+        .filter((reaction) => reaction.phrase)
+        .slice(-3)
+        .map((reaction, index) => {
         const hash = hashString(reaction.id)
-        const left = 38 + (hash % 25)
         const driftDirection = hash % 2 === 0 ? 1 : -1
-        const driftA = driftDirection * (18 + ((hash >> 3) % 10))
-        const driftB = driftDirection * -1 * (14 + ((hash >> 6) % 12))
-        const driftC = driftDirection * (24 + ((hash >> 9) % 14))
-        const delay = (index % 3) * 0.08
+        const driftA = driftDirection * (16 + ((hash >> 3) % 10))
+        const driftB = driftDirection * -1 * (10 + ((hash >> 6) % 10))
+        const delay = index * 0.06
 
         return {
           reaction,
           style: {
-            left: `${left}%`,
-            bottom: `${mobileActionBarHeight + 24 + (hash % 3) * 6}px`,
+            left: '50%',
+            top: `${28 + index * 84}px`,
             animationDelay: `${delay}s`,
             '--reaction-sway-a': `${driftA}px`,
             '--reaction-sway-b': `${driftB}px`,
-            '--reaction-sway-c': `${driftC}px`,
           },
         }
       }),
     [activeReactions, mobileActionBarHeight],
   )
+
+  useEffect(() => {
+    if (!isReactionModalOpen) {
+      return
+    }
+
+    const hasActiveCategory = reactionPhraseCategories.some((category) => category.id === selectedReactionPhraseCategoryId)
+    if (hasActiveCategory && reactionPhraseOptions.length > 0) {
+      return
+    }
+
+    const activeCategoryId = hasActiveCategory
+      ? selectedReactionPhraseCategoryId
+      : (reactionPhraseCategories[0]?.id ?? '')
+    const nextOptions = getRandomReactionPhrases(activeCategoryId, 3)
+
+    if (selectedReactionPhraseCategoryId !== activeCategoryId) {
+      setSelectedReactionPhraseCategoryId(activeCategoryId)
+    }
+
+    setReactionPhraseOptions((current) => {
+      if (
+        current.length === nextOptions.length &&
+        current.every((phrase, index) => phrase === nextOptions[index])
+      ) {
+        return current
+      }
+
+      return nextOptions
+    })
+  }, [isReactionModalOpen, reactionPhraseCategories, selectedReactionPhraseCategoryId, reactionPhraseOptions.length])
+
+  useEffect(() => {
+    if (!isReactionModalOpen || typeof window === 'undefined') {
+      return
+    }
+
+    const updateReactionModalPosition = () => {
+      const pickerBounds = reactionPickerRef.current?.getBoundingClientRect()
+      if (!pickerBounds) {
+        return
+      }
+
+      const nextPosition = {
+        right: Math.max(16, window.innerWidth - pickerBounds.right),
+        bottom: Math.max(16, window.innerHeight - pickerBounds.top + 12),
+      }
+
+      setReactionModalPosition((current) =>
+        current.right === nextPosition.right && current.bottom === nextPosition.bottom
+          ? current
+          : nextPosition,
+      )
+    }
+
+    updateReactionModalPosition()
+    window.addEventListener('resize', updateReactionModalPosition)
+
+    return () => {
+      window.removeEventListener('resize', updateReactionModalPosition)
+    }
+  }, [isReactionModalOpen, isMobileViewport])
 
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
@@ -546,11 +643,13 @@ function GameTablePage({
 
   useEffect(() => {
     if (winningDisplayedTrickCardIndex !== null && winningDisplayedTrickCardIndex >= 0) {
-      setSelectedTrickCardIndex(winningDisplayedTrickCardIndex)
+      if (selectedTrickCardIndex !== winningDisplayedTrickCardIndex) {
+        setSelectedTrickCardIndex(winningDisplayedTrickCardIndex)
+      }
       return
     }
 
-    if (!displayedTrickPlays[selectedTrickCardIndex ?? -1]) {
+    if (selectedTrickCardIndex !== null && !displayedTrickPlays[selectedTrickCardIndex]) {
       setSelectedTrickCardIndex(null)
     }
   }, [displayedTrickPlays, selectedTrickCardIndex, winningDisplayedTrickCardIndex])
@@ -721,18 +820,27 @@ function GameTablePage({
     const surfaceElement = trickSurfaceRef.current
 
     if (!surfaceElement || displayedTrickPlays.length === 0 || useScatterTrickLayout) {
-      setPassiveTrickLabelStyles([])
+      setPassiveTrickLabelStyles((current) => (current.length === 0 ? current : []))
       return
     }
 
     let settleTimeoutId = null
 
     const updatePassiveTrickLabelStyles = () => {
-      setPassiveTrickLabelStyles(
-        displayedTrickPlays.map((_, index) =>
-          selectedTrickCardIndex === index ? null : getPassiveTrickLabelStyle(surfaceElement, index),
-        ),
+      const nextStyles = displayedTrickPlays.map((_, index) =>
+        selectedTrickCardIndex === index ? null : getPassiveTrickLabelStyle(surfaceElement, index),
       )
+
+      setPassiveTrickLabelStyles((current) => {
+        if (
+          current.length === nextStyles.length &&
+          current.every((style, index) => JSON.stringify(style) === JSON.stringify(nextStyles[index]))
+        ) {
+          return current
+        }
+
+        return nextStyles
+      })
     }
 
     updatePassiveTrickLabelStyles()
@@ -1197,16 +1305,70 @@ function GameTablePage({
         ref={isMobileBar === isMobileViewport ? reactionPickerRef : undefined}
       >
         {isReactionModalOpen && isMobileBar === isMobileViewport ? (
-          <div className="floating-panel absolute bottom-full right-0 z-50 mb-3 w-[13rem] rounded-2xl p-3">
+          <div
+            className="floating-panel fixed right-4 z-50 w-[20rem] max-w-[calc(100vw-2rem)] rounded-2xl p-3"
+            style={{
+              right: `${reactionModalPosition.right}px`,
+              bottom: `${reactionModalPosition.bottom}px`,
+            }}
+          >
+            {reactionPhraseCategories.length > 0 ? (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {reactionPhraseCategories.map((category) => {
+                  const isActive = category.id === selectedReactionPhraseCategoryId
+
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                        isActive
+                          ? 'border-amber-300/80 bg-amber-200/20 text-amber-50'
+                          : 'border-white/15 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10'
+                      }`}
+                      onClick={() => {
+                        setSelectedReactionPhraseCategoryId(category.id)
+                        setReactionPhraseOptions(getRandomReactionPhrases(category.id, 3))
+                      }}
+                      disabled={isSendingReaction || isReactionOnCooldown}
+                    >
+                      {category.label}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : null}
+            {reactionPhraseOptions.length > 0 ? (
+              <div className="mb-3 grid gap-2">
+                {reactionPhraseOptions.map((phrase) => (
+                  <button
+                    key={phrase}
+                    type="button"
+                    className="rounded-2xl border border-white/12 bg-white/6 px-3 py-2 text-left text-sm text-white transition hover:border-white/25 hover:bg-white/10 disabled:opacity-50"
+                    onClick={async () => {
+                      try {
+                        await onSendReaction?.({ phrase })
+                        setIsReactionModalOpen(false)
+                      } catch {
+                        // Keep the picker open so the user can retry.
+                      }
+                    }}
+                    disabled={isSendingReaction || isReactionOnCooldown}
+                  >
+                    {phrase}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="grid grid-cols-4 gap-2">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
-                  className="flex h-11 items-center justify-center rounded-xl bg-transparent text-2xl transition hover:scale-110 disabled:opacity-50"
+                  className="flex h-11 items-center justify-center rounded-xl bg-transparent text-[1.8rem] transition hover:scale-110 disabled:opacity-50"
                   onClick={async () => {
                     try {
-                      await onSendReaction?.(emoji)
+                      await onSendReaction?.({ emoji })
                       setIsReactionModalOpen(false)
                     } catch {
                       // Keep the picker open so the user can retry.
@@ -1237,15 +1399,36 @@ function GameTablePage({
   return (
     <div className="contents">
       <div className="pointer-events-none fixed inset-0 z-[100] overflow-hidden">
-        {reactionLayouts.map(({ reaction, style }) => (
+        {emojiReactionLayouts.map(({ reaction, style }) => (
           <div
             key={reaction.id}
             className="reaction-float"
             style={style}
           >
-            <div className="reaction-badge">
-              <span className="truncate">{getPlayerName(game, reaction.playerId)}</span>
-              <span className="text-xl leading-none">{reaction.emoji}</span>
+            <div className={`reaction-badge ${reaction.phrase ? 'reaction-badge-phrase' : ''}`}>
+              {reaction.phrase ? (
+                <>
+                  <span className="reaction-speaker truncate">{getPlayerName(game, reaction.playerId)}</span>
+                  <span className="reaction-text">{reaction.phrase}</span>
+                </>
+              ) : (
+                <>
+                  <span className="truncate">{getPlayerName(game, reaction.playerId)}</span>
+                  <span className="text-2xl leading-none">{reaction.emoji ?? ''}</span>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+        {phraseReactionLayouts.map(({ reaction, style }) => (
+          <div
+            key={reaction.id}
+            className="reaction-float-phrase"
+            style={style}
+          >
+            <div className="reaction-badge reaction-badge-phrase">
+              <span className="reaction-speaker truncate">{getPlayerName(game, reaction.playerId)}</span>
+              <span className="reaction-text">{reaction.phrase ?? ''}</span>
             </div>
           </div>
         ))}
@@ -3729,9 +3912,22 @@ export default function App() {
     }
   }
 
-  const handleSendReaction = async (emoji) => {
+  const handleSendReaction = async (reactionInput) => {
     const activeSession = ownerSession ?? playerSession
     if (!activeSession?.gameId || !activeSession?.playerToken || isReactionOnCooldown) {
+      return
+    }
+
+    const reactionPayload =
+      typeof reactionInput === 'string'
+        ? { emoji: reactionInput }
+        : reactionInput?.emoji
+          ? { emoji: reactionInput.emoji }
+          : reactionInput?.phrase
+            ? { phrase: reactionInput.phrase }
+            : null
+
+    if (!reactionPayload) {
       return
     }
 
@@ -3742,7 +3938,7 @@ export default function App() {
       const result = await sendReaction({
         gameId: activeSession.gameId,
         playerToken: activeSession.playerToken,
-        emoji,
+        ...reactionPayload,
       })
 
       if (ownerSession) {

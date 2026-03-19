@@ -1,7 +1,9 @@
 import type { AIDifficulty, CardCount } from "@shared/types/game";
 import type { LambdaAction, LambdaEventPayload } from "@shared/types/lambda";
+import { REACTION_EMOJIS, REACTION_PHRASES } from "../../../shared/types/reactions";
 
-const REACTION_EMOJIS = new Set(["😀", "😂", "😮", "😢", "😡", "👏", "🔥", "🎉"]);
+const REACTION_EMOJI_SET = new Set(REACTION_EMOJIS);
+const REACTION_PHRASE_SET = new Set(REACTION_PHRASES);
 const CARD_SUITS = new Set(["Clubs", "Diamonds", "Hearts", "Spades", "Joker"]);
 const CARD_RANKS = new Set(["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "LJ", "BJ"]);
 const AI_DIFFICULTIES = new Set<AIDifficulty>(["easy", "medium", "hard"]);
@@ -272,13 +274,16 @@ export function assertSendReactionPayload(
   event: LambdaEventPayload,
 ): asserts event is LambdaEventPayload<"sendReaction"> {
   const typedEvent = expectAction(event, "sendReaction");
-  const { gameId, playerToken, emoji } = typedEvent.payload;
+  const { gameId, playerToken, emoji, phrase } = typedEvent.payload;
 
   requireGameId(gameId, typedEvent.action);
   requirePlayerToken(playerToken, typedEvent.action);
 
-  if (typeof emoji !== "string" || !REACTION_EMOJIS.has(emoji)) {
-    throw new Error("sendReaction requires payload.emoji");
+  const hasEmoji = typeof emoji === "string" && REACTION_EMOJI_SET.has(emoji);
+  const hasPhrase = typeof phrase === "string" && REACTION_PHRASE_SET.has(phrase);
+
+  if (hasEmoji === hasPhrase) {
+    throw new Error("sendReaction requires exactly one of payload.emoji or payload.phrase");
   }
 }
 

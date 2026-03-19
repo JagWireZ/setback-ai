@@ -1,4 +1,5 @@
-import type { AIDifficulty, Card, CardCount, ReactionEmoji, SortMode } from './game'
+import type { AIDifficulty, Card, CardCount, SortMode } from './game'
+import type { ReactionEmoji, ReactionPhrase } from './reactions'
 
 export type LambdaAction =
   | 'createGame'
@@ -96,7 +97,8 @@ type ActionPayloadMap = {
   }
   sendReaction: {
     gameId: string
-    emoji: ReactionEmoji
+    emoji?: ReactionEmoji
+    phrase?: ReactionPhrase
   }
   removeGame: {
     gameId: string

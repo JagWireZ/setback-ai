@@ -1,4 +1,4 @@
-export const REACTION_EMOJIS = ['😀', '😂', '😮', '😢', '😡', '👏', '🔥', '🎉']
+export { REACTION_EMOJIS } from '../../shared/types/reactions'
 export const REACTION_COOLDOWN_MS = 5000
 export const AI_ACTION_DELAY_MS = 1500
 export const TRICK_COMPLETE_DELAY_MS = 5000

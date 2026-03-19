@@ -43,6 +43,24 @@ test("sendReaction records the authenticated player's emoji reaction", () => {
   assert.ok(updated.reactions[0].id.includes("p2-"));
 });
 
+
+
+test("sendReaction records a phrase reaction", () => {
+  const updated = sendReaction(createGame(), {
+    action: "sendReaction",
+    payload: {
+      gameId: "game-1",
+      playerToken: "token-2",
+      phrase: "Well played.",
+    },
+  });
+
+  assert.equal(updated.reactions.length, 1);
+  assert.equal(updated.reactions[0].playerId, "p2");
+  assert.equal(updated.reactions[0].phrase, "Well played.");
+  assert.equal(updated.reactions[0].emoji, undefined);
+});
+
 test("sendReaction rejects an invalid player token", () => {
   assert.throws(
     () =>
