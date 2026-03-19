@@ -30,9 +30,7 @@ import {
   buildOwnerSession,
   buildPlayerSession,
   clearTimeoutRef,
-  getActiveSession,
   getActiveSessionContext,
-  getActiveSessionRole,
   isConcurrentUpdateError,
   setSessionForRole,
 } from '../utils/sessionState'
@@ -757,7 +755,6 @@ export const useGameActions = ({
     handleLeaveGame,
     handleMovePlayer,
     handlePlayCard,
-    handleRejoinGame,
     handleRemovePlayer,
     handleRemoveSeat,
     handleRenamePlayer,

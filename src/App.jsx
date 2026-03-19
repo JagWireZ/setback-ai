@@ -3222,7 +3222,6 @@ export default function App() {
     handleLeaveGame,
     handleMovePlayer,
     handlePlayCard,
-    handleRejoinGame,
     handleRemovePlayer,
     handleRemoveSeat,
     handleRenamePlayer,
