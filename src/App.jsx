@@ -22,6 +22,7 @@ import { useGameActions } from './hooks/useGameActions'
 import { useLobbyDerivedState } from './hooks/useLobbyDerivedState'
 import { RoundStatusLabel, ScoreHistory, ScoreSheet, ScoreSummary } from './components/Scoreboard'
 import { CreateGameModal, JoinGameModal } from './components/SessionModals'
+import { logFrontendError, toGenericErrorMessage } from './utils/frontendErrors'
 import {
   REACTION_EMOJIS,
   TRICK_COMPLETE_DELAY_MS,
@@ -36,7 +37,6 @@ import {
   sortHandCards,
   getViewerHand,
   hashString,
-  toUserFacingActionError,
 } from './utils/gameUi'
 import { getRandomReactionPhrases, getReactionPhraseCategories } from './utils/reactionPhrases'
 import {
@@ -2611,12 +2611,12 @@ export default function App() {
     } catch (error) {
       const messageText = error instanceof Error ? error.message.toLowerCase() : ''
       if (messageText.includes('invalid player token') || messageText.includes('game not found')) {
+        logFrontendError('Unable to refresh game state', error)
         handleRemovedFromGame(activeSession.gameId)
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to refresh game state')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to refresh game state.'))
     }
   }
 
@@ -2644,6 +2644,7 @@ export default function App() {
 
       if (event?.type === 'sessionError') {
         const messageText = event.error instanceof Error ? event.error.message.toLowerCase() : ''
+        logFrontendError('Session sync error', event.error)
         if (messageText.includes('invalid player token') || messageText.includes('game not found')) {
           handleRemovedFromGame(event.gameId)
         }

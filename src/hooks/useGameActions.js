@@ -24,7 +24,7 @@ import {
   setGameIdInUrl,
 } from '../utils/gameSessions'
 import { REACTION_COOLDOWN_MS } from '../utils/gameUi'
-import { toUserFacingActionError } from '../utils/gameUi'
+import { toGenericErrorMessage } from '../utils/frontendErrors'
 import { validatePlayerName } from '../utils/playerName'
 import {
   buildOwnerSession,
@@ -137,8 +137,7 @@ export const useGameActions = ({
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner', trimmedPlayerName)
       closeCreateModal()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to create game'
-      setRequestError(message)
+      setRequestError(toGenericErrorMessage(error, 'Unable to create game.'))
     } finally {
       setIsCreatingGame(false)
     }
@@ -203,8 +202,7 @@ export const useGameActions = ({
       setGameIdInUrl(selectedGame.gameId)
       closeJoinModal()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to rejoin game'
-      setRequestError(message)
+      setRequestError(toGenericErrorMessage(error, 'Unable to rejoin game.'))
     } finally {
       setIsRejoiningGame(false)
     }
@@ -266,13 +264,7 @@ export const useGameActions = ({
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'player', trimmedPlayerName)
       closeJoinModal()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to join game'
-      if (message.toLowerCase().includes('game not found')) {
-        setJoinErrors((previousErrors) => ({ ...previousErrors, gameId: 'Game ID does not exist.' }))
-        setRequestError('')
-      } else {
-        setRequestError(message)
-      }
+      setRequestError(toGenericErrorMessage(error, 'Unable to join game.'))
     } finally {
       setIsJoiningGame(false)
     }
@@ -296,8 +288,7 @@ export const useGameActions = ({
       })
       applyRealtimeResult(result, 'owner')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to move player'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to move player.'))
     } finally {
       setPendingPlayerActionId('')
     }
@@ -321,8 +312,7 @@ export const useGameActions = ({
       applyRealtimeResult(result, 'owner')
       return true
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to remove player'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to remove player.'))
       return false
     } finally {
       setPendingPlayerActionId('')
@@ -347,8 +337,7 @@ export const useGameActions = ({
       setLobbyInfo('Seat added.')
       return true
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to add seat'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to add seat.'))
       return false
     } finally {
       setPendingPlayerActionId('')
@@ -374,8 +363,7 @@ export const useGameActions = ({
       setLobbyInfo('Seat removed.')
       return true
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to remove seat'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to remove seat.'))
       return false
     } finally {
       setPendingPlayerActionId('')
@@ -405,8 +393,7 @@ export const useGameActions = ({
         return false
       }
 
-      const message = toUserFacingActionError(error, 'Unable to play for away player')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to play for away player.'))
       return false
     } finally {
       setPendingPlayerActionId('')
@@ -445,8 +432,7 @@ export const useGameActions = ({
       handleRemovedFromGame(playerSession.gameId, `You left game ${playerSession.gameId}.`)
       return true
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to leave game'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to leave game.'))
       return false
     } finally {
       setIsLeavingGame(false)
@@ -473,8 +459,7 @@ export const useGameActions = ({
       applyRealtimeResult(result, 'owner')
       setLobbyInfo('Game started.')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to start game'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to start game.'))
     } finally {
       setIsStartingGame(false)
     }
@@ -500,8 +485,7 @@ export const useGameActions = ({
       setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
       setLobbyInfo('Game reset to lobby.')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to start over'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to start over.'))
     } finally {
       setIsStartingOver(false)
     }
@@ -531,8 +515,7 @@ export const useGameActions = ({
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to deal cards')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to deal cards.'))
     } finally {
       setIsDealingCards(false)
     }
@@ -572,8 +555,7 @@ export const useGameActions = ({
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to submit bid')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to submit bid.'))
     } finally {
       setIsSubmittingBid(false)
     }
@@ -605,8 +587,7 @@ export const useGameActions = ({
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to sort cards')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to sort cards.'))
     } finally {
       setIsSortingCards(false)
     }
@@ -681,8 +662,7 @@ export const useGameActions = ({
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to send reaction')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to send reaction.'))
       throw error
     } finally {
       setIsSendingReaction(false)
@@ -729,8 +709,7 @@ export const useGameActions = ({
 
       return true
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to update player name'
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to update player name.'))
       return false
     } finally {
       setIsRenamingPlayer(false)
@@ -762,8 +741,7 @@ export const useGameActions = ({
         return
       }
 
-      const message = toUserFacingActionError(error, 'Unable to play card')
-      setGameError(message)
+      setGameError(toGenericErrorMessage(error, 'Unable to play card.'))
     } finally {
       setIsPlayingCard(false)
     }
