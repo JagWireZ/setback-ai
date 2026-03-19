@@ -58,13 +58,16 @@ import {
 import { getPlayerPresence } from './utils/playerPresence'
 import { usePwaInstall } from './utils/pwa'
 import {
+  applyResultToSessionRole,
+  buildOwnerSession,
+  buildPlayerSession,
   clearActiveSessionState as clearSessionState,
   clearTimeoutRefs,
+  getActiveSessionContext,
   getActiveSession,
   getActiveSessionRole,
   getRestoredPlayerName,
-  mergeOwnerSessionResult,
-  mergePlayerSessionResult,
+  setSessionForRole,
 } from './utils/sessionState'
 
 const AI_DIFFICULTY_OPTIONS = [
@@ -2576,26 +2579,22 @@ export default function App() {
     result,
     role = getActiveSessionRole({ ownerSession, playerSession }) ?? 'player',
   ) => {
-    if (!result?.game) {
-      return
-    }
-
-    if (role === 'owner') {
-      setOwnerSession((prev) => mergeOwnerSessionResult(prev, result))
-      return
-    }
-
-    setPlayerSession((prev) => mergePlayerSessionResult(prev, result))
+    applyResultToSessionRole({
+      role,
+      result,
+      setOwnerSession,
+      setPlayerSession,
+    })
   }
 
   const requestActiveStateReview = async ({ associateConnection = false } = {}) => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
+    const { role, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
 
     try {
-      const result = ownerSession
+      const result = role === 'owner'
         ? await checkState({
             gameId: activeSession.gameId,
             playerToken: activeSession.playerToken,
@@ -2608,7 +2607,7 @@ export default function App() {
             associateConnection,
           })
 
-      applyRealtimeResult(result, ownerSession ? 'owner' : 'player')
+      applyRealtimeResult(result, role ?? 'player')
     } catch (error) {
       const messageText = error instanceof Error ? error.message.toLowerCase() : ''
       if (messageText.includes('invalid player token') || messageText.includes('game not found')) {
@@ -2622,20 +2621,13 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (ownerSession?.gameId && ownerSession?.playerToken) {
-      setActiveGameSession({
-        role: 'owner',
-        gameId: ownerSession.gameId,
-        playerToken: ownerSession.playerToken,
-      })
-      return
-    }
+    const { role, session } = getActiveSessionContext({ ownerSession, playerSession })
 
-    if (playerSession?.gameId && playerSession?.playerToken) {
+    if (session?.gameId && session?.playerToken && role) {
       setActiveGameSession({
-        role: 'player',
-        gameId: playerSession.gameId,
-        playerToken: playerSession.playerToken,
+        role,
+        gameId: session.gameId,
+        playerToken: session.playerToken,
       })
       return
     }
@@ -2662,12 +2654,12 @@ export default function App() {
         return
       }
 
-      const activeSession = ownerSession ?? playerSession
+      const { role, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
       if (!activeSession?.gameId || event.gameId !== activeSession.gameId) {
         return
       }
 
-      applyRealtimeResult(event.result, ownerSession ? 'owner' : 'player')
+      applyRealtimeResult(event.result, role ?? 'player')
     })
   }, [ownerSession, playerSession])
 
@@ -2705,16 +2697,19 @@ export default function App() {
           playerToken: storedSession.playerToken,
         })
 
-        setOwnerSession({
-          gameId: gameIdFromUrl,
-          playerToken: storedSession.playerToken,
-          game: resumedSession?.game ?? restoredSession.game,
-          ownerPlayerId:
-            resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
+        setSessionForRole({
+          role: 'owner',
+          session: buildOwnerSession({
+            gameId: gameIdFromUrl,
+            playerToken: storedSession.playerToken,
+            game: resumedSession?.game ?? restoredSession.game,
+            ownerPlayerId: resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
+          }),
+          setOwnerSession,
+          setPlayerSession,
         })
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setSelectedAiDifficulty(restoredSession.game?.options?.aiDifficulty ?? 'medium')
-        setPlayerSession(null)
         setIsJoinModalOpen(false)
         saveStoredGameSession(
           gameIdFromUrl,
@@ -2731,13 +2726,17 @@ export default function App() {
           playerToken: storedSession.playerToken,
         })
 
-        setPlayerSession({
-          gameId: gameIdFromUrl,
-          playerToken: storedSession.playerToken,
-          game: resumedSession?.game ?? restoredSession.game,
-          version: resumedSession?.version ?? restoredSession.version,
+        setSessionForRole({
+          role: 'player',
+          session: buildPlayerSession({
+            gameId: gameIdFromUrl,
+            playerToken: storedSession.playerToken,
+            game: resumedSession?.game ?? restoredSession.game,
+            version: resumedSession?.version ?? restoredSession.version,
+          }),
+          setOwnerSession,
+          setPlayerSession,
         })
-        setOwnerSession(null)
         setIsJoinModalOpen(false)
         saveStoredGameSession(
           gameIdFromUrl,

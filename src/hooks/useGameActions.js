@@ -27,10 +27,14 @@ import { REACTION_COOLDOWN_MS } from '../utils/gameUi'
 import { toUserFacingActionError } from '../utils/gameUi'
 import { validatePlayerName } from '../utils/playerName'
 import {
+  buildOwnerSession,
+  buildPlayerSession,
   clearTimeoutRef,
   getActiveSession,
+  getActiveSessionContext,
   getActiveSessionRole,
   isConcurrentUpdateError,
+  setSessionForRole,
 } from '../utils/sessionState'
 
 export const useGameActions = ({
@@ -113,15 +117,19 @@ export const useGameActions = ({
         gameId: result?.game?.id,
         playerToken: result?.playerToken,
       })
-      setOwnerSession({
-        gameId: result?.game?.id,
-        playerToken: result?.playerToken,
-        game: result?.game,
-        ownerPlayerId: result?.game?.players?.find((currentPlayer) => currentPlayer.type === 'human')?.id,
+      setSessionForRole({
+        role: 'owner',
+        session: buildOwnerSession({
+          gameId: result?.game?.id,
+          playerToken: result?.playerToken,
+          game: result?.game,
+          ownerPlayerId: result?.game?.players?.find((currentPlayer) => currentPlayer.type === 'human')?.id,
+        }),
+        setOwnerSession,
+        setPlayerSession,
       })
       setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
       setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
-      setPlayerSession(null)
       setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
@@ -162,25 +170,28 @@ export const useGameActions = ({
         playerToken: selectedGame.playerToken,
       })
 
-      if (restoredSession.role === 'owner') {
-        setOwnerSession({
-          gameId: selectedGame.gameId,
-          playerToken: selectedGame.playerToken,
-          game: resumedSession?.game ?? restoredSession.game,
-          ownerPlayerId: resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
-        })
-        setPlayerSession(null)
-        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'owner', selectedGame.playerName ?? '')
-      } else {
-        setPlayerSession({
-          gameId: selectedGame.gameId,
-          playerToken: selectedGame.playerToken,
-          game: resumedSession?.game ?? restoredSession.game,
-          version: resumedSession?.version ?? restoredSession.version,
-        })
-        setOwnerSession(null)
-        saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, 'player', selectedGame.playerName ?? '')
-      }
+      const role = restoredSession.role === 'owner' ? 'owner' : 'player'
+      const session = role === 'owner'
+        ? buildOwnerSession({
+            gameId: selectedGame.gameId,
+            playerToken: selectedGame.playerToken,
+            game: resumedSession?.game ?? restoredSession.game,
+            ownerPlayerId: resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
+          })
+        : buildPlayerSession({
+            gameId: selectedGame.gameId,
+            playerToken: selectedGame.playerToken,
+            game: resumedSession?.game ?? restoredSession.game,
+            version: resumedSession?.version ?? restoredSession.version,
+          })
+
+      setSessionForRole({
+        role,
+        session,
+        setOwnerSession,
+        setPlayerSession,
+      })
+      saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, role, selectedGame.playerName ?? '')
 
       setSessionInfo({
         action: 'rejoinGame',
@@ -237,13 +248,17 @@ export const useGameActions = ({
         gameId: result?.game?.id,
         playerToken: result?.playerToken,
       })
-      setPlayerSession({
-        gameId: result?.game?.id,
-        playerToken: result?.playerToken,
-        game: result?.game,
-        version: result?.version ?? result?.game?.version ?? 0,
+      setSessionForRole({
+        role: 'player',
+        session: buildPlayerSession({
+          gameId: result?.game?.id,
+          playerToken: result?.playerToken,
+          game: result?.game,
+          version: result?.version ?? result?.game?.version ?? 0,
+        }),
+        setOwnerSession,
+        setPlayerSession,
       })
-      setOwnerSession(null)
       setGameError('')
       setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
@@ -492,8 +507,7 @@ export const useGameActions = ({
   }
 
   const handleDealCards = async () => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -531,8 +545,7 @@ export const useGameActions = ({
   const handleSubmitBid = async (event) => {
     event.preventDefault()
 
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -566,8 +579,7 @@ export const useGameActions = ({
   }
 
   const handleSortCards = async (mode) => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     const activeGame = activeSession?.game
     if (!activeSession?.gameId || !activeSession?.playerToken || activeGame?.phase?.stage === 'Dealing') {
       return
@@ -604,8 +616,7 @@ export const useGameActions = ({
   }
 
   const handleContinueGame = async () => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return
     }
@@ -627,8 +638,7 @@ export const useGameActions = ({
   }
 
   const handleSendReaction = async (reactionInput) => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken || isReactionOnCooldown) {
       return
     }
@@ -679,8 +689,7 @@ export const useGameActions = ({
   }
 
   const handleRenamePlayer = async (nextPlayerName, playerId) => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     if (!activeSession?.gameId || !activeSession?.playerToken) {
       return false
     }
@@ -728,8 +737,7 @@ export const useGameActions = ({
   }
 
   const handlePlayCard = async (card) => {
-    const activeSession = getActiveSession({ ownerSession, playerSession })
-    const activeRole = getActiveSessionRole({ ownerSession, playerSession })
+    const { role: activeRole, session: activeSession } = getActiveSessionContext({ ownerSession, playerSession })
     const activeGame = activeSession?.game
     if (!activeSession?.gameId || !activeSession?.playerToken || !activeGame) {
       return

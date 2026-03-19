@@ -1,5 +1,15 @@
 export const getActiveSession = ({ ownerSession, playerSession }) => ownerSession ?? playerSession
 
+export const getActiveSessionContext = ({ ownerSession, playerSession }) => {
+  const role = getActiveSessionRole({ ownerSession, playerSession })
+  const session = getActiveSession({ ownerSession, playerSession })
+
+  return {
+    role,
+    session,
+  }
+}
+
 export const getActiveSessionRole = ({ ownerSession, playerSession }) => {
   if (ownerSession) {
     return 'owner'
@@ -72,6 +82,68 @@ export const mergePlayerSessionResult = (previousSession, result) => {
     ...previousSession,
     game: result.game,
     version: nextVersion,
+  }
+}
+
+export const buildOwnerSession = ({
+  gameId,
+  playerToken,
+  game,
+  ownerPlayerId,
+}) => ({
+  gameId,
+  playerToken,
+  game,
+  ownerPlayerId,
+})
+
+export const buildPlayerSession = ({
+  gameId,
+  playerToken,
+  game,
+  version,
+}) => ({
+  gameId,
+  playerToken,
+  game,
+  version,
+})
+
+export const setSessionForRole = ({
+  role,
+  session,
+  setOwnerSession,
+  setPlayerSession,
+}) => {
+  if (role === 'owner') {
+    setOwnerSession(session)
+    setPlayerSession(null)
+    return
+  }
+
+  if (role === 'player') {
+    setPlayerSession(session)
+    setOwnerSession(null)
+  }
+}
+
+export const applyResultToSessionRole = ({
+  role,
+  result,
+  setOwnerSession,
+  setPlayerSession,
+}) => {
+  if (!result?.game) {
+    return
+  }
+
+  if (role === 'owner') {
+    setOwnerSession((previousSession) => mergeOwnerSessionResult(previousSession, result))
+    return
+  }
+
+  if (role === 'player') {
+    setPlayerSession((previousSession) => mergePlayerSessionResult(previousSession, result))
   }
 }
 
