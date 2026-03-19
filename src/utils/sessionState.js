@@ -12,6 +12,24 @@ export const getActiveSessionRole = ({ ownerSession, playerSession }) => {
   return null
 }
 
+export const getRestoredPlayerName = (restoredSession, fallbackName = '', getViewerHand) => {
+  if (fallbackName) {
+    return fallbackName
+  }
+
+  if (!restoredSession?.game) {
+    return ''
+  }
+
+  if (restoredSession.role === 'owner') {
+    const ownerPlayerId = restoredSession.ownerPlayerId
+    return restoredSession.game.players?.find((player) => player.id === ownerPlayerId)?.name ?? ''
+  }
+
+  const viewerPlayerId = getViewerHand(restoredSession.game)?.playerId
+  return restoredSession.game.players?.find((player) => player.id === viewerPlayerId)?.name ?? ''
+}
+
 export const getResultVersion = (result) => result?.version ?? result?.game?.version ?? 0
 
 export const isConcurrentUpdateError = (error) => {
@@ -55,4 +73,51 @@ export const mergePlayerSessionResult = (previousSession, result) => {
     game: result.game,
     version: nextVersion,
   }
+}
+
+export const clearTimeoutRef = (timeoutRef) => {
+  if (!timeoutRef?.current) {
+    return
+  }
+
+  clearTimeout(timeoutRef.current)
+  timeoutRef.current = null
+}
+
+export const clearTimeoutRefs = (timeoutRefs) => {
+  timeoutRefs.forEach(clearTimeoutRef)
+}
+
+export const resetRealtimeTrackingState = ({
+  aiPauseUntilRef,
+  previousCompletedTrickCountRef,
+  latestShownRoundIndexRef,
+  hydratedRoundSummaryGameIdRef,
+}) => {
+  aiPauseUntilRef.current = 0
+  previousCompletedTrickCountRef.current = 0
+  latestShownRoundIndexRef.current = -1
+  hydratedRoundSummaryGameIdRef.current = ''
+}
+
+export const clearActiveSessionState = ({
+  timeoutRefs,
+  trackingRefs,
+  setOwnerSession,
+  setPlayerSession,
+  setGameError,
+  setLobbyInfo,
+  setPersistedEndOfRoundSummary,
+  setIsEndOfRoundModalDismissed,
+  setIsBidModalOpen,
+}) => {
+  clearTimeoutRefs(timeoutRefs)
+  resetRealtimeTrackingState(trackingRefs)
+  setOwnerSession(null)
+  setPlayerSession(null)
+  setGameError('')
+  setLobbyInfo('')
+  setPersistedEndOfRoundSummary(null)
+  setIsEndOfRoundModalDismissed(false)
+  setIsBidModalOpen(false)
 }

@@ -62,8 +62,11 @@ import {
 import { getPlayerPresence } from './utils/playerPresence'
 import { usePwaInstall } from './utils/pwa'
 import {
+  clearActiveSessionState as clearSessionState,
+  clearTimeoutRefs,
   getActiveSession,
   getActiveSessionRole,
+  getRestoredPlayerName,
   isConcurrentUpdateError,
   mergeOwnerSessionResult,
   mergePlayerSessionResult,
@@ -2530,81 +2533,37 @@ export default function App() {
     setLobbyRenameDraft('')
   }
 
-  const getRestoredPlayerName = (restoredSession, fallbackName = '') => {
-    if (fallbackName) {
-      return fallbackName
-    }
-
-    if (!restoredSession?.game) {
-      return ''
-    }
-
-    if (restoredSession.role === 'owner') {
-      const ownerPlayerId = restoredSession.ownerPlayerId
-      return restoredSession.game.players?.find((player) => player.id === ownerPlayerId)?.name ?? ''
-    }
-
-    const viewerPlayerId = getViewerHand(restoredSession.game)?.playerId
-    return restoredSession.game.players?.find((player) => player.id === viewerPlayerId)?.name ?? ''
-  }
-
   useEffect(() => () => {
-    if (shareLinkCopiedTimeoutRef.current) {
-      clearTimeout(shareLinkCopiedTimeoutRef.current)
-      shareLinkCopiedTimeoutRef.current = null
-    }
-    if (reactionCooldownTimeoutRef.current) {
-      clearTimeout(reactionCooldownTimeoutRef.current)
-      reactionCooldownTimeoutRef.current = null
-    }
-    if (endOfRoundSummaryTimeoutRef.current) {
-      clearTimeout(endOfRoundSummaryTimeoutRef.current)
-      endOfRoundSummaryTimeoutRef.current = null
-    }
-    if (gameOverScoreTimeoutRef.current) {
-      clearTimeout(gameOverScoreTimeoutRef.current)
-      gameOverScoreTimeoutRef.current = null
-    }
+    clearTimeoutRefs([
+      shareLinkCopiedTimeoutRef,
+      reactionCooldownTimeoutRef,
+      endOfRoundSummaryTimeoutRef,
+      gameOverScoreTimeoutRef,
+    ])
   }, [])
 
-  const clearGameplayTimers = () => {
-    if (aiPauseTimeoutRef.current) {
-      clearTimeout(aiPauseTimeoutRef.current)
-      aiPauseTimeoutRef.current = null
-    }
-
-    if (gameErrorTimeoutRef.current) {
-      clearTimeout(gameErrorTimeoutRef.current)
-      gameErrorTimeoutRef.current = null
-    }
-    if (endOfRoundSummaryTimeoutRef.current) {
-      clearTimeout(endOfRoundSummaryTimeoutRef.current)
-      endOfRoundSummaryTimeoutRef.current = null
-    }
-    if (gameOverScoreTimeoutRef.current) {
-      clearTimeout(gameOverScoreTimeoutRef.current)
-      gameOverScoreTimeoutRef.current = null
-    }
-  }
-
-  const resetRealtimeState = () => {
-    clearGameplayTimers()
-
-    aiPauseUntilRef.current = 0
-    previousCompletedTrickCountRef.current = 0
-    latestShownRoundIndexRef.current = -1
-    hydratedRoundSummaryGameIdRef.current = ''
-  }
-
   const clearActiveSessionState = () => {
-    resetRealtimeState()
-    setOwnerSession(null)
-    setPlayerSession(null)
-    setGameError('')
-    setLobbyInfo('')
-    setPersistedEndOfRoundSummary(null)
-    setIsEndOfRoundModalDismissed(false)
-    setIsBidModalOpen(false)
+    clearSessionState({
+      timeoutRefs: [
+        aiPauseTimeoutRef,
+        gameErrorTimeoutRef,
+        endOfRoundSummaryTimeoutRef,
+        gameOverScoreTimeoutRef,
+      ],
+      trackingRefs: {
+        aiPauseUntilRef,
+        previousCompletedTrickCountRef,
+        latestShownRoundIndexRef,
+        hydratedRoundSummaryGameIdRef,
+      },
+      setOwnerSession,
+      setPlayerSession,
+      setGameError,
+      setLobbyInfo,
+      setPersistedEndOfRoundSummary,
+      setIsEndOfRoundModalDismissed,
+      setIsBidModalOpen,
+    })
   }
 
   const handleRemovedFromGame = (gameId, message = "You have been removed from game " + gameId + ".") => {
@@ -2766,7 +2725,7 @@ export default function App() {
           gameIdFromUrl,
           storedSession.playerToken,
           'owner',
-          getRestoredPlayerName(restoredSession, storedSession.playerName ?? ''),
+          getRestoredPlayerName(restoredSession, storedSession.playerName ?? '', getViewerHand),
         )
         return
       }
@@ -2789,7 +2748,7 @@ export default function App() {
           gameIdFromUrl,
           storedSession.playerToken,
           'player',
-          getRestoredPlayerName(restoredSession, storedSession.playerName ?? ''),
+          getRestoredPlayerName(restoredSession, storedSession.playerName ?? '', getViewerHand),
         )
         return
       }
@@ -2856,7 +2815,7 @@ export default function App() {
           return {
             gameId,
             playerToken: storedSession.playerToken,
-            playerName: getRestoredPlayerName(normalized, storedSession.playerName ?? ''),
+            playerName: getRestoredPlayerName(normalized, storedSession.playerName ?? '', getViewerHand),
             phase: normalized.game.phase?.stage ?? 'Unknown',
             role: normalized.role,
             updatedAt: storedSession.updatedAt ?? 0,
