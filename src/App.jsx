@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AppRoutes } from './components/AppRoutes'
 import { useGameActions } from './hooks/useGameActions'
 import { useAppRuntime } from './hooks/useAppRuntime'
+import { useAppModalState } from './hooks/useAppModalState'
 import { useLobbyDerivedState } from './hooks/useLobbyDerivedState'
 import {
   clearGameIdInUrl,
@@ -23,8 +24,6 @@ const buildTimestampLabel = typeof __BUILD_TIMESTAMP__ === 'string' ? __BUILD_TI
 
 export default function App() {
   const { canInstall: canInstallApp, promptToInstall } = usePwaInstall()
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
   const [selectedMaxCards, setSelectedMaxCards] = useState('10')
   const [selectedAiDifficulty, setSelectedAiDifficulty] = useState('medium')
@@ -41,7 +40,44 @@ export default function App() {
   const [requestError, setRequestError] = useState('')
   const [sessionInfo, setSessionInfo] = useState(null)
   const [rejoinableGames, setRejoinableGames] = useState([])
-  const [showAwayContinueModal, setShowAwayContinueModal] = useState(false)
+  const {
+    closeCreateModal,
+    closeJoinModal,
+    closeLobbyRemovePlayerConfirm,
+    closeLobbyRemoveSeatConfirm,
+    closeLobbyRenamePlayerModal,
+    closeSubmitBidModal,
+    helpSection,
+    isBidModalOpen,
+    isCreateModalOpen,
+    isEndOfRoundModalDismissed,
+    isHelpModalOpen,
+    isJoinModalOpen,
+    isLobbyShareModalOpen,
+    isShareLinkCopied,
+    lobbyRenameDraft,
+    openLobbyRemovePlayerConfirm,
+    openLobbyRemoveSeatConfirm,
+    openLobbyRenamePlayerModal,
+    pendingLobbyRemovePlayer,
+    pendingLobbyRemoveSeat,
+    pendingLobbyRenamePlayer,
+    selectedBid,
+    setHelpSection,
+    setIsBidModalOpen,
+    setIsCreateModalOpen,
+    setIsEndOfRoundModalDismissed,
+    setIsHelpModalOpen,
+    setIsJoinModalOpen,
+    setIsLobbyShareModalOpen,
+    setIsShareLinkCopied,
+    setLobbyRenameDraft,
+    setSelectedBid,
+    shareQrCodeDataUrl,
+    setShareQrCodeDataUrl,
+    setShowAwayContinueModal,
+    showAwayContinueModal,
+  } = useAppModalState()
 
   const [ownerSession, setOwnerSession] = useState(null)
   const [playerSession, setPlayerSession] = useState(null)
@@ -49,9 +85,7 @@ export default function App() {
   const [lobbyInfo, setLobbyInfo] = useState('')
   const [isStartingGame, setIsStartingGame] = useState(false)
   const [isDealingCards, setIsDealingCards] = useState(false)
-  const [isBidModalOpen, setIsBidModalOpen] = useState(false)
   const [sortMode, setSortMode] = useState('bySuit')
-  const [selectedBid, setSelectedBid] = useState('0')
   const [isSubmittingBid, setIsSubmittingBid] = useState(false)
   const [isPlayingCard, setIsPlayingCard] = useState(false)
   const [isSendingReaction, setIsSendingReaction] = useState(false)
@@ -60,86 +94,9 @@ export default function App() {
   const [isContinuingGame, setIsContinuingGame] = useState(false)
   const [isLeavingGame, setIsLeavingGame] = useState(false)
   const [isStartingOver, setIsStartingOver] = useState(false)
-  const [isEndOfRoundModalDismissed, setIsEndOfRoundModalDismissed] = useState(false)
   const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
   const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
-  const [isShareLinkCopied, setIsShareLinkCopied] = useState(false)
-  const [isLobbyShareModalOpen, setIsLobbyShareModalOpen] = useState(false)
-  const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('')
-  const [pendingLobbyRemovePlayer, setPendingLobbyRemovePlayer] = useState(null)
-  const [pendingLobbyRemoveSeat, setPendingLobbyRemoveSeat] = useState(null)
-  const [pendingLobbyRenamePlayer, setPendingLobbyRenamePlayer] = useState(null)
-  const [lobbyRenameDraft, setLobbyRenameDraft] = useState('')
-  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false)
-  const [helpSection, setHelpSection] = useState('how-to-play')
   const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
-
-  const openLobbyRemovePlayerConfirm = (player) => {
-    if (!player) {
-      return
-    }
-
-    window.setTimeout(() => {
-      setPendingLobbyRemovePlayer({
-        id: player.id,
-        name: player.name,
-      })
-    }, 0)
-  }
-
-  const closeLobbyRemovePlayerConfirm = () => {
-    setPendingLobbyRemovePlayer(null)
-  }
-
-  const openLobbyRemoveSeatConfirm = (player) => {
-    if (!player) {
-      return
-    }
-
-    window.setTimeout(() => {
-      setPendingLobbyRemoveSeat({
-        id: player.id,
-        name: player.name,
-      })
-    }, 0)
-  }
-
-  const closeLobbyRemoveSeatConfirm = () => {
-    setPendingLobbyRemoveSeat(null)
-  }
-
-  const openLobbyRenamePlayerModal = (player) => {
-    if (!player) {
-      return
-    }
-
-    window.setTimeout(() => {
-      setPendingLobbyRenamePlayer({
-        id: player.id,
-        name: player.name,
-      })
-      setLobbyRenameDraft(player.name)
-    }, 0)
-  }
-
-  const closeLobbyRenamePlayerModal = () => {
-    setPendingLobbyRenamePlayer(null)
-    setLobbyRenameDraft('')
-  }
-
-  const closeCreateModal = () => {
-    setIsCreateModalOpen(false)
-    setPlayerName('')
-    setCreateErrors({})
-  }
-
-  const closeJoinModal = () => {
-    setIsJoinModalOpen(false)
-    setSelectedRejoinGameId('')
-    setJoinGameId('')
-    setJoinPlayerName('')
-    setJoinErrors({})
-  }
 
   const handleJoinGameIdInputChange = (event) => {
     setJoinGameId(event.target.value)
@@ -154,6 +111,20 @@ export default function App() {
   const handleCreatePlayerNameInputChange = (event) => {
     setPlayerName(sanitizePlayerNameInput(event.target.value))
     setCreateErrors((prev) => ({ ...prev, playerName: undefined }))
+  }
+
+  const handleCloseCreateModal = () => {
+    closeCreateModal()
+    setPlayerName('')
+    setCreateErrors({})
+  }
+
+  const handleCloseJoinModal = () => {
+    closeJoinModal()
+    setSelectedRejoinGameId('')
+    setJoinGameId('')
+    setJoinPlayerName('')
+    setJoinErrors({})
   }
 
   const handleRejoinSelectionChange = (event) => {
@@ -254,11 +225,6 @@ export default function App() {
     setIsJoinModalOpen(true)
   }
 
-  const closeSubmitBidModal = () => {
-    setIsBidModalOpen(false)
-    setSelectedBid('0')
-  }
-
   const {
     handleAddSeat,
     handleContinueGame,
@@ -298,8 +264,8 @@ export default function App() {
     requestActiveStateReview,
     applyRealtimeResult,
     handleRemovedFromGame,
-    closeCreateModal,
-    closeJoinModal,
+    closeCreateModal: handleCloseCreateModal,
+    closeJoinModal: handleCloseJoinModal,
     closeSubmitBidModal,
     setCreateErrors,
     setJoinErrors,
@@ -351,7 +317,7 @@ export default function App() {
       playerName={playerName}
       createErrors={createErrors}
       isCreatingGame={isCreatingGame}
-      closeCreateModal={closeCreateModal}
+      closeCreateModal={handleCloseCreateModal}
       handleCreateGame={handleCreateGame}
       setPlayerNameInput={handleCreatePlayerNameInputChange}
       isJoinModalOpen={isJoinModalOpen}
@@ -363,7 +329,7 @@ export default function App() {
       isLoadingRejoinGames={isLoadingRejoinGames}
       isJoiningGame={isJoiningGame}
       isRejoiningGame={isRejoiningGame}
-      closeJoinModal={closeJoinModal}
+      closeJoinModal={handleCloseJoinModal}
       handleJoinGame={handleJoinGame}
       handleJoinGameIdInputChange={handleJoinGameIdInputChange}
       handleJoinPlayerNameInputChange={handleJoinPlayerNameInputChange}
