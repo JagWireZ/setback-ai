@@ -18,42 +18,38 @@ export function ActiveGameScreen({
   )
 }
 
-export function LobbyScreen({
-  activeLobbySession,
-  gameError,
-  lobbyInfo,
-  orderedPlayers,
-  currentDealerPlayerId,
-  activeLobbyPlayerId,
-  isOwnerLobby,
-  ownerSession,
-  isRenamingPlayer,
-  isStartingGame,
-  openLobbyRenamePlayerModal,
-  pendingPlayerActionId,
-  handleMovePlayer,
-  openLobbyRemoveSeatConfirm,
-  openLobbyRemovePlayerConfirm,
-  handleAddSeat,
-  maxSeats,
-  maxCardsForLobbySeatCount,
-  selectedMaxCards,
-  setSelectedMaxCards,
-  selectedAiDifficulty,
-  setSelectedAiDifficulty,
-  aiDifficultyOptions,
-  resetActiveSessionState,
-  handleStartGame,
-  setIsLobbyShareModalOpen,
-  getPlayerPresence,
-  shareIcon: ShareIcon,
-  shareModal,
-  removePlayerModal,
-  removeSeatModal,
-  renamePlayerModal,
-  awayContinueModal,
-  helpModal,
-}) {
+export function LobbyScreen({ lobby, shareModal, removePlayerModal, removeSeatModal, renamePlayerModal, awayContinueModal, helpModal }) {
+  const {
+    activeLobbySession,
+    gameError,
+    lobbyInfo,
+    orderedPlayers,
+    currentDealerPlayerId,
+    activeLobbyPlayerId,
+    isOwnerLobby,
+    ownerSession,
+    isRenamingPlayer,
+    isStartingGame,
+    openLobbyRenamePlayerModal,
+    pendingPlayerActionId,
+    handleMovePlayer,
+    openLobbyRemoveSeatConfirm,
+    openLobbyRemovePlayerConfirm,
+    handleAddSeat,
+    maxSeats,
+    maxCardsForLobbySeatCount,
+    selectedMaxCards,
+    setSelectedMaxCards,
+    selectedAiDifficulty,
+    setSelectedAiDifficulty,
+    aiDifficultyOptions,
+    resetActiveSessionState,
+    handleStartGame,
+    openShareModal,
+    getPlayerPresence,
+    ShareIcon,
+  } = lobby
+
   return (
     <main className="theme-shell min-h-screen px-4 py-4 sm:py-6">
       <section className="mx-auto flex w-full max-w-5xl flex-col">
@@ -68,7 +64,7 @@ export function LobbyScreen({
               <button
                 type="button"
                 className="badge-subtle inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-muted transition hover:border-white/20 hover:text-white"
-                onClick={() => setIsLobbyShareModalOpen(true)}
+                onClick={openShareModal}
                 aria-label={`Share game ${activeLobbySession.gameId}`}
                 title="Share game"
               >
@@ -301,22 +297,21 @@ export function LobbyScreen({
   )
 }
 
-export function HomeScreen({
-  isStagingBuild,
-  buildTimestampLabel,
-  requestError,
-  sessionInfo,
-  canInstallApp,
-  promptToInstall,
-  setIsHelpModalOpen,
-  setIsCreateModalOpen,
-  setIsJoinModalOpen,
-  DownloadIcon,
-  HelpIcon,
-  createGameModal,
-  joinGameModal,
-  helpModal,
-}) {
+export function HomeScreen({ home, createGameModal, joinGameModal, helpModal }) {
+  const {
+    isStagingBuild,
+    buildTimestampLabel,
+    requestError,
+    sessionInfo,
+    canInstallApp,
+    promptToInstall,
+    openHelp,
+    openCreateGame,
+    openJoinGame,
+    DownloadIcon,
+    HelpIcon,
+  } = home
+
   return (
     <main className="theme-shell h-[100dvh] overflow-hidden px-4 py-4">
       {isStagingBuild ? (
@@ -345,14 +340,14 @@ export function HomeScreen({
             <button
               type="button"
               className="btn-primary px-4 py-2"
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={openCreateGame}
             >
               New Game
             </button>
             <button
               type="button"
               className="btn-secondary px-4 py-2"
-              onClick={() => setIsJoinModalOpen(true)}
+              onClick={openJoinGame}
             >
               Join Game
             </button>
@@ -376,7 +371,7 @@ export function HomeScreen({
                   className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[color:var(--accent-blue)] bg-[rgba(47,111,219,0.12)] p-0 text-[color:var(--accent-blue-soft)] transition hover:bg-[rgba(47,111,219,0.2)]"
                   aria-label="Help"
                   title="Help"
-                  onClick={() => setIsHelpModalOpen(true)}
+                  onClick={openHelp}
                 >
                   <HelpIcon className="h-[1.5625rem] w-[1.5625rem]" />
                 </button>

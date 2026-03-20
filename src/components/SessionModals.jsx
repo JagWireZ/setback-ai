@@ -1,14 +1,6 @@
 import { MAX_PLAYER_NAME_LENGTH } from '../utils/playerName'
 
-export function CreateGameModal({
-  isOpen,
-  playerName,
-  playerNameError,
-  isCreatingGame,
-  onClose,
-  onSubmit,
-  onPlayerNameChange,
-}) {
+export function CreateGameModal({ isOpen, form, onClose, onSubmit }) {
   if (!isOpen) {
     return null
   }
@@ -28,13 +20,13 @@ export function CreateGameModal({
             <span className="text-sm text-muted">Player Name</span>
             <input
               type="text"
-              value={playerName}
-              onChange={onPlayerNameChange}
+              value={form.playerName}
+              onChange={form.onPlayerNameChange}
               className="input-surface"
               placeholder="Enter your name"
               maxLength={MAX_PLAYER_NAME_LENGTH}
             />
-            {playerNameError ? <span className="text-sm text-red-300">{playerNameError}</span> : null}
+            {form.playerNameError ? <span className="text-sm text-red-300">{form.playerNameError}</span> : null}
           </label>
 
           <div className="mt-2 flex justify-end gap-3">
@@ -47,10 +39,10 @@ export function CreateGameModal({
             </button>
             <button
               type="submit"
-              disabled={isCreatingGame}
+              disabled={form.isCreatingGame}
               className="btn-primary px-4 py-2"
             >
-              {isCreatingGame ? 'Creating...' : 'Create Game'}
+              {form.isCreatingGame ? 'Creating...' : 'Create Game'}
             </button>
           </div>
         </form>
@@ -59,22 +51,7 @@ export function CreateGameModal({
   )
 }
 
-export function JoinGameModal({
-  isOpen,
-  joinGameId,
-  joinPlayerName,
-  joinErrors,
-  rejoinableGames,
-  selectedRejoinGameId,
-  isLoadingRejoinGames,
-  isJoiningGame,
-  isRejoiningGame,
-  onClose,
-  onSubmit,
-  onJoinGameIdChange,
-  onJoinPlayerNameChange,
-  onSelectedRejoinGameIdChange,
-}) {
+export function JoinGameModal({ isOpen, form, onClose, onSubmit }) {
   if (!isOpen) {
     return null
   }
@@ -94,30 +71,30 @@ export function JoinGameModal({
             <span className="text-sm text-muted">Game ID</span>
             <input
               type="text"
-              value={joinGameId}
-              onChange={onJoinGameIdChange}
+              value={form.joinGameId}
+              onChange={form.onJoinGameIdChange}
               className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Enter game ID"
-              disabled={Boolean(selectedRejoinGameId)}
+              disabled={Boolean(form.selectedRejoinGameId)}
             />
-            {joinErrors.gameId ? <span className="text-sm text-red-300">{joinErrors.gameId}</span> : null}
+            {form.joinErrors.gameId ? <span className="text-sm text-red-300">{form.joinErrors.gameId}</span> : null}
           </label>
 
           <label className="flex flex-col gap-2">
             <span className="text-sm text-muted">Player Name</span>
             <input
               type="text"
-              value={joinPlayerName}
-              onChange={onJoinPlayerNameChange}
+              value={form.joinPlayerName}
+              onChange={form.onJoinPlayerNameChange}
               className="input-surface disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Enter your name"
               maxLength={MAX_PLAYER_NAME_LENGTH}
-              disabled={Boolean(selectedRejoinGameId)}
+              disabled={Boolean(form.selectedRejoinGameId)}
             />
-            {joinErrors.playerName ? <span className="text-sm text-red-300">{joinErrors.playerName}</span> : null}
+            {form.joinErrors.playerName ? <span className="text-sm text-red-300">{form.joinErrors.playerName}</span> : null}
           </label>
 
-          {rejoinableGames.length > 0 ? (
+          {form.rejoinableGames.length > 0 ? (
             <>
               <div className="divider relative my-1 border-t">
                 <span className="divider-label text-accent absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 px-3 text-xs font-semibold uppercase tracking-[0.18em]">
@@ -128,13 +105,13 @@ export function JoinGameModal({
               <label className="flex flex-col gap-2">
                 <span className="text-sm text-muted">Continue a Saved Game</span>
                 <select
-                  value={selectedRejoinGameId}
-                  onChange={onSelectedRejoinGameIdChange}
+                  value={form.selectedRejoinGameId}
+                  onChange={form.onSelectedRejoinGameIdChange}
                   className="input-surface"
-                  disabled={isLoadingRejoinGames || isRejoiningGame}
+                  disabled={form.isLoadingRejoinGames || form.isRejoiningGame}
                 >
                   <option value=""></option>
-                  {rejoinableGames.map((game) => (
+                  {form.rejoinableGames.map((game) => (
                     <option key={game.gameId} value={game.gameId}>
                       {game.gameId} ({game.phase})
                     </option>
@@ -154,14 +131,14 @@ export function JoinGameModal({
             </button>
             <button
               type="submit"
-              disabled={isJoiningGame || isRejoiningGame}
+              disabled={form.isJoiningGame || form.isRejoiningGame}
               className="btn-primary px-4 py-2"
             >
-              {selectedRejoinGameId
-                ? isRejoiningGame
+              {form.selectedRejoinGameId
+                ? form.isRejoiningGame
                   ? 'Rejoining...'
                   : 'Join Game'
-                : isJoiningGame
+                : form.isJoiningGame
                   ? 'Joining...'
                   : 'Join Game'}
             </button>

@@ -278,124 +278,174 @@ export default function App() {
     setPendingPlayerActionId,
   })
 
+  const homeProps = {
+    isStagingBuild,
+    buildTimestampLabel,
+    requestError,
+    sessionInfo,
+    canInstallApp,
+    promptToInstall,
+  }
+
+  const lobbyProps = {
+    activeLobbySession: lobby.activeLobbySession,
+    orderedPlayers: lobby.orderedPlayers,
+    currentDealerPlayerId: lobby.currentDealerPlayerId,
+    activeLobbyPlayerId: lobby.activeLobbyPlayerId,
+    isOwnerLobby: lobby.isOwnerLobby,
+    isLocalPlayerMarkedAway: lobby.isLocalPlayerMarkedAway,
+    isRenamingPlayer,
+    isStartingGame,
+    pendingPlayerActionId,
+    maxSeats: lobby.maxSeats,
+    maxCardsForLobbySeatCount: lobby.maxCardsForLobbySeatCount,
+    selectedMaxCards,
+    setSelectedMaxCards,
+    selectedAiDifficulty,
+    setSelectedAiDifficulty,
+    aiDifficultyOptions: lobby.aiDifficultyOptions,
+    shareLink: lobby.shareLink,
+    isShareLinkCopied,
+    shareQrCodeDataUrl,
+    handleCopyShareLink,
+    handleMovePlayer: lobby.handleMovePlayer,
+    openLobbyRenamePlayerModal,
+    openLobbyRemoveSeatConfirm,
+    openLobbyRemovePlayerConfirm,
+    handleAddSeat: lobby.handleAddSeat,
+    handleStartGame: lobby.handleStartGame,
+    handleRemovePlayer: lobby.handleRemovePlayer,
+    handleRemoveSeat: lobby.handleRemoveSeat,
+    handleRenamePlayer,
+    resetActiveSessionState,
+    gameError,
+    lobbyInfo,
+    ownerSession,
+  }
+
+  const activeGameProps = {
+    game: lobby.activeGame,
+    isOwner: Boolean(ownerSession),
+    ownerPlayerId: ownerSession?.ownerPlayerId ?? '',
+    pendingPlayerActionId,
+    errorMessage: gameError,
+    shareLink: lobby.shareLink,
+    isShareLinkCopied,
+    onCopyShareLink: handleCopyShareLink,
+    onSetGameError: setGameError,
+    onRenamePlayer: handleRenamePlayer,
+    onRemovePlayer: lobby.handleRemovePlayer,
+    onCoverAwayPlayerTurn: handleCoverAwayPlayerTurn,
+    onLeaveGame: handleLeaveGame,
+    onDealCards: handleDealCards,
+    onSubmitBid: openSubmitBidModal,
+    onPlayCard: handlePlayCard,
+    onSortCards: toggleSortCards,
+    sortMode,
+    onStartOver: handleStartOver,
+    onSendReaction: handleSendReaction,
+    onGoHome: resetActiveSessionState,
+    onOpenHelp: () => setIsHelpModalOpen(true),
+    onOpenNewGame: handleOpenNewGame,
+    onOpenJoinGame: handleOpenJoinGame,
+    onInstallApp: promptToInstall,
+    isDealingCards,
+    isStartingOver,
+    isPlayingCard,
+    isSendingReaction,
+    isReactionOnCooldown,
+    isLeavingGame,
+    isSortingCards,
+    isLocalPlayerMarkedAway: lobby.isLocalPlayerMarkedAway,
+  }
+
+  const modalProps = {
+    help: {
+      isOpen: isHelpModalOpen,
+      helpSection,
+      setHelpSection,
+      onClose: () => setIsHelpModalOpen(false),
+      onOpen: () => setIsHelpModalOpen(true),
+    },
+    createGame: {
+      isOpen: isCreateModalOpen,
+      form: {
+        playerName,
+        playerNameError: createErrors.playerName,
+        isCreatingGame,
+        onPlayerNameChange: handleCreatePlayerNameInputChange,
+      },
+      onClose: handleCloseCreateModal,
+      onSubmit: handleCreateGame,
+      onOpen: () => setIsCreateModalOpen(true),
+    },
+    joinGame: {
+      isOpen: isJoinModalOpen,
+      form: {
+        joinGameId,
+        joinPlayerName,
+        joinErrors,
+        rejoinableGames,
+        selectedRejoinGameId,
+        isLoadingRejoinGames,
+        isJoiningGame,
+        isRejoiningGame,
+        onJoinGameIdChange: handleJoinGameIdInputChange,
+        onJoinPlayerNameChange: handleJoinPlayerNameInputChange,
+        onSelectedRejoinGameIdChange: handleRejoinSelectionChange,
+      },
+      onClose: handleCloseJoinModal,
+      onSubmit: handleJoinGame,
+      onOpen: () => setIsJoinModalOpen(true),
+      menuCloseRequestKey: joinMenuCloseRequestKey,
+    },
+    lobbyShare: {
+      isOpen: isLobbyShareModalOpen,
+      onClose: () => setIsLobbyShareModalOpen(false),
+      onOpen: () => setIsLobbyShareModalOpen(true),
+    },
+    lobbyRemovePlayer: {
+      pendingPlayer: pendingLobbyRemovePlayer,
+      onClose: closeLobbyRemovePlayerConfirm,
+    },
+    lobbyRemoveSeat: {
+      pendingPlayer: pendingLobbyRemoveSeat,
+      onClose: closeLobbyRemoveSeatConfirm,
+    },
+    lobbyRenamePlayer: {
+      pendingPlayer: pendingLobbyRenamePlayer,
+      draftValue: lobbyRenameDraft,
+      setDraftValue: setLobbyRenameDraft,
+      onClose: closeLobbyRenamePlayerModal,
+    },
+    awayContinue: {
+      isOpen: showAwayContinueModal,
+      isContinuingGame,
+      onContinue: handleContinueGame,
+    },
+    bid: {
+      isOpen: isBidModalOpen,
+      currentRoundCardCount: lobby.currentRoundCardCount,
+      isTripRound: lobby.isTripRound,
+      selectedBid,
+      setSelectedBid,
+      isSubmittingBid,
+      onClose: closeSubmitBidModal,
+      onSubmit: handleSubmitBid,
+    },
+    endOfRound: {
+      summary: persistedEndOfRoundSummary,
+      isDismissed: isEndOfRoundModalDismissed,
+      onClose: () => setIsEndOfRoundModalDismissed(true),
+    },
+  }
+
   return (
     <AppRoutes
-      isStagingBuild={isStagingBuild}
-      buildTimestampLabel={buildTimestampLabel}
-      requestError={requestError}
-      sessionInfo={sessionInfo}
-      canInstallApp={canInstallApp}
-      promptToInstall={promptToInstall}
-      setIsHelpModalOpen={setIsHelpModalOpen}
-      isHelpModalOpen={isHelpModalOpen}
-      helpSection={helpSection}
-      setHelpSection={setHelpSection}
-      isCreateModalOpen={isCreateModalOpen}
-      playerName={playerName}
-      createErrors={createErrors}
-      isCreatingGame={isCreatingGame}
-      closeCreateModal={handleCloseCreateModal}
-      handleCreateGame={handleCreateGame}
-      setPlayerNameInput={handleCreatePlayerNameInputChange}
-      isJoinModalOpen={isJoinModalOpen}
-      joinGameId={joinGameId}
-      joinPlayerName={joinPlayerName}
-      joinErrors={joinErrors}
-      rejoinableGames={rejoinableGames}
-      selectedRejoinGameId={selectedRejoinGameId}
-      isLoadingRejoinGames={isLoadingRejoinGames}
-      isJoiningGame={isJoiningGame}
-      isRejoiningGame={isRejoiningGame}
-      closeJoinModal={handleCloseJoinModal}
-      handleJoinGame={handleJoinGame}
-      handleJoinGameIdInputChange={handleJoinGameIdInputChange}
-      handleJoinPlayerNameInputChange={handleJoinPlayerNameInputChange}
-      handleRejoinSelectionChange={handleRejoinSelectionChange}
-      setIsCreateModalOpen={setIsCreateModalOpen}
-      setIsJoinModalOpen={setIsJoinModalOpen}
-      activeGame={lobby.activeGame}
-      ownerSession={ownerSession}
-      gameError={gameError}
-      lobbyInfo={lobbyInfo}
-      activeLobbySession={lobby.activeLobbySession}
-      orderedPlayers={lobby.orderedPlayers}
-      currentDealerPlayerId={lobby.currentDealerPlayerId}
-      activeLobbyPlayerId={lobby.activeLobbyPlayerId}
-      isOwnerLobby={lobby.isOwnerLobby}
-      isRenamingPlayer={isRenamingPlayer}
-      isStartingGame={isStartingGame}
-      openLobbyRenamePlayerModal={openLobbyRenamePlayerModal}
-      pendingPlayerActionId={pendingPlayerActionId}
-      handleMovePlayer={lobby.handleMovePlayer}
-      openLobbyRemoveSeatConfirm={openLobbyRemoveSeatConfirm}
-      openLobbyRemovePlayerConfirm={openLobbyRemovePlayerConfirm}
-      handleAddSeat={lobby.handleAddSeat}
-      maxSeats={lobby.maxSeats}
-      maxCardsForLobbySeatCount={lobby.maxCardsForLobbySeatCount}
-      selectedMaxCards={selectedMaxCards}
-      setSelectedMaxCards={setSelectedMaxCards}
-      selectedAiDifficulty={selectedAiDifficulty}
-      setSelectedAiDifficulty={setSelectedAiDifficulty}
-      aiDifficultyOptions={lobby.aiDifficultyOptions}
-      resetActiveSessionState={resetActiveSessionState}
-      handleStartGame={lobby.handleStartGame}
-      setIsLobbyShareModalOpen={setIsLobbyShareModalOpen}
-      isLobbyShareModalOpen={isLobbyShareModalOpen}
-      shareLink={lobby.shareLink}
-      isShareLinkCopied={isShareLinkCopied}
-      shareQrCodeDataUrl={shareQrCodeDataUrl}
-      handleCopyShareLink={handleCopyShareLink}
-      pendingLobbyRemovePlayer={pendingLobbyRemovePlayer}
-      pendingLobbyRemoveSeat={pendingLobbyRemoveSeat}
-      pendingLobbyRenamePlayer={pendingLobbyRenamePlayer}
-      lobbyRenameDraft={lobbyRenameDraft}
-      setLobbyRenameDraft={setLobbyRenameDraft}
-      closeLobbyRemovePlayerConfirm={closeLobbyRemovePlayerConfirm}
-      closeLobbyRemoveSeatConfirm={closeLobbyRemoveSeatConfirm}
-      closeLobbyRenamePlayerModal={closeLobbyRenamePlayerModal}
-      handleRemovePlayer={lobby.handleRemovePlayer}
-      handleRemoveSeat={lobby.handleRemoveSeat}
-      handleRenamePlayer={handleRenamePlayer}
-      showAwayContinueModal={showAwayContinueModal}
-      isLocalPlayerMarkedAway={lobby.isLocalPlayerMarkedAway}
-      isContinuingGame={isContinuingGame}
-      handleContinueGame={handleContinueGame}
-      isTripRound={lobby.isTripRound}
-      currentRoundCardCount={lobby.currentRoundCardCount}
-      selectedBid={selectedBid}
-      setSelectedBid={setSelectedBid}
-      isBidModalOpen={isBidModalOpen}
-      closeSubmitBidModal={closeSubmitBidModal}
-      handleSubmitBid={handleSubmitBid}
-      persistedEndOfRoundSummary={persistedEndOfRoundSummary}
-      isEndOfRoundModalDismissed={isEndOfRoundModalDismissed}
-      setIsEndOfRoundModalDismissed={setIsEndOfRoundModalDismissed}
-      sortMode={sortMode}
-      onSetGameError={setGameError}
-      onRenamePlayer={handleRenamePlayer}
-      onRemovePlayer={handleRemovePlayer}
-      onCoverAwayPlayerTurn={handleCoverAwayPlayerTurn}
-      onLeaveGame={handleLeaveGame}
-      onDealCards={handleDealCards}
-      onSubmitBid={openSubmitBidModal}
-      onPlayCard={handlePlayCard}
-      onSortCards={toggleSortCards}
-      onStartOver={handleStartOver}
-      onSendReaction={handleSendReaction}
-      onGoHome={resetActiveSessionState}
-      onOpenHelp={() => setIsHelpModalOpen(true)}
-      onOpenNewGame={handleOpenNewGame}
-      onOpenJoinGame={handleOpenJoinGame}
-      onInstallApp={promptToInstall}
-      isDealingCards={isDealingCards}
-      isStartingOver={isStartingOver}
-      isSubmittingBid={isSubmittingBid}
-      isPlayingCard={isPlayingCard}
-      isSendingReaction={isSendingReaction}
-      isReactionOnCooldown={isReactionOnCooldown}
-      isLeavingGame={isLeavingGame}
-      isSortingCards={isSortingCards}
-      menuCloseRequestKey={joinMenuCloseRequestKey}
+      home={homeProps}
+      lobby={lobbyProps}
+      activeGame={activeGameProps}
+      modals={modalProps}
     />
   )
 }
