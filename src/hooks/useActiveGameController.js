@@ -2,6 +2,7 @@ import {
   coverAwayPlayerTurn,
   dealCards,
   playCard,
+  removeGame,
   removePlayer,
   returnFromAway,
   sendReaction,
@@ -81,20 +82,6 @@ export function useActiveGameController({
   }
 
   const handleLeaveGame = async () => {
-    if (!playerSession?.gameId || !playerSession?.playerToken) {
-      return false
-    }
-
-    const leavingPlayerId =
-      playerSession.game?.phase && 'cards' in playerSession.game.phase
-        ? playerSession.game.phase.cards.hands?.[0]?.playerId
-        : ''
-
-    if (!leavingPlayerId) {
-      setGameError('Unable to determine which player should leave this game')
-      return false
-    }
-
     setGameError('')
     setLobbyInfo('')
     setRequestError('')
@@ -102,6 +89,29 @@ export function useActiveGameController({
     setIsLeavingGame(true)
 
     try {
+      if (ownerSession?.gameId && ownerSession?.playerToken) {
+        await removeGame({
+          gameId: ownerSession.gameId,
+          playerToken: ownerSession.playerToken,
+        })
+        handleRemovedFromGame(ownerSession.gameId, `You ended game ${ownerSession.gameId}.`)
+        return true
+      }
+
+      if (!playerSession?.gameId || !playerSession?.playerToken) {
+        return false
+      }
+
+      const leavingPlayerId =
+        playerSession.game?.phase && 'cards' in playerSession.game.phase
+          ? playerSession.game.phase.cards.hands?.[0]?.playerId
+          : ''
+
+      if (!leavingPlayerId) {
+        setGameError('Unable to determine which player should leave this game')
+        return false
+      }
+
       await removePlayer({
         gameId: playerSession.gameId,
         playerToken: playerSession.playerToken,

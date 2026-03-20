@@ -351,7 +351,7 @@ export function HomeScreen({ home, createGameModal, joinGameModal, helpModal }) 
             >
               Join Game
             </button>
-            <div className="mt-1 border-t border-[color:var(--border-color)] pt-3">
+            <div>
               <div className="flex justify-end gap-2">
                 {canInstallApp ? (
                   <button

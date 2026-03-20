@@ -4,6 +4,26 @@ import { getPlayerPresence } from '../utils/playerPresence'
 
 const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
 
+function ExitIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M4.75 5.5h5v13h-5z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.75 5.5 14 7.25v9.5L9.75 18.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 12h7.25" strokeLinecap="round" />
+      <path d="M16.25 8.75 19.5 12l-3.25 3.25" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ResetIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M19 12a7 7 0 1 1-2.05-4.95" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M19 5.75v4.5h-4.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function ModalShell({ children, className = 'max-w-md', onClick, onClose, overlayClassName = 'bg-black/70' }) {
   return (
     <div
@@ -58,8 +78,7 @@ function GameTableModals({
   onInstallApp,
   onLeaveGame,
   onOpenHelp,
-  onOpenJoinGame,
-  onOpenNewGame,
+  onGoHome,
   onRemovePlayer,
   onRenamePlayer,
   onSetGameError,
@@ -310,46 +329,35 @@ function GameTableModals({
             </form>
           ) : null}
           <div className="mt-4 flex flex-col items-center gap-3">
+            {isOwner ? (
+              <>
+                <button
+                  type="button"
+                  className="inline-flex w-[90%] items-center justify-end gap-3 rounded-md border border-[color:var(--accent-blue)] bg-[rgba(47,111,219,0.12)] px-4 py-3 text-right font-medium text-[color:var(--accent-blue-soft)] transition hover:bg-[rgba(47,111,219,0.2)]"
+                  onClick={() => {
+                    setIsMenuModalOpen(false)
+                    setIsResetConfirmModalOpen(true)
+                  }}
+                >
+                  <span>Reset</span>
+                  <ResetIcon className="h-6 w-6 shrink-0" />
+                </button>
+              </>
+            ) : null}
             <button
               type="button"
-              className="btn-secondary w-[90%] px-4 py-3 text-left"
+              className="btn-danger btn-danger-soft inline-flex w-[90%] items-center justify-end gap-3 px-4 py-3 text-right disabled:opacity-50"
               onClick={() => {
                 setIsMenuModalOpen(false)
-                onOpenNewGame?.()
+                setIsLeaveConfirmModalOpen(true)
               }}
+              disabled={isLeavingGame}
             >
-              New Game
+              <span>{isLeavingGame ? 'Leaving...' : 'Leave'}</span>
+              <ExitIcon className="h-6 w-6 shrink-0" />
             </button>
-            <button type="button" className="btn-secondary w-[90%] px-4 py-3 text-left" onClick={() => onOpenJoinGame?.()}>
-              Join Game
-            </button>
-            {isOwner ? (
-              <button
-                type="button"
-                className="btn-secondary w-[90%] px-4 py-3 text-left"
-                onClick={() => {
-                  setIsMenuModalOpen(false)
-                  setIsResetConfirmModalOpen(true)
-                }}
-              >
-                Reset Game
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn-danger btn-danger-soft w-[90%] px-4 py-3 text-left disabled:opacity-50"
-                onClick={() => {
-                  setIsMenuModalOpen(false)
-                  setIsLeaveConfirmModalOpen(true)
-                }}
-                disabled={isLeavingGame}
-              >
-                {isLeavingGame ? 'Leaving...' : 'Leave Game'}
-              </button>
-            )}
-            <div className="mt-1 w-[90%] border-t border-[color:var(--border-color)] pt-3" />
           </div>
-          <div className="mt-5 flex items-center justify-between gap-3">
+          <div className="mx-auto mt-5 flex w-[90%] items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -379,7 +387,11 @@ function GameTableModals({
               ) : null}
             </div>
             <div className="flex justify-end">
-              <button type="button" className="btn-secondary px-4 py-2 text-sm" onClick={() => setIsMenuModalOpen(false)}>
+              <button
+                type="button"
+                className="btn-secondary inline-flex h-10 items-center justify-center px-4 text-sm"
+                onClick={() => setIsMenuModalOpen(false)}
+              >
                 Close
               </button>
             </div>
@@ -465,7 +477,11 @@ function GameTableModals({
       {isLeaveConfirmModalOpen ? (
         <ModalShell className="max-w-md" onClose={() => setIsLeaveConfirmModalOpen(false)}>
           <h2 className="text-xl font-semibold text-white">Leave Game?</h2>
-          <p className="mt-3 text-sm text-muted">You will leave this game and return to the home screen.</p>
+          <p className="mt-3 text-sm text-muted">
+            {isOwner
+              ? 'Leaving will end this game for everyone.'
+              : 'You will be removed from this game.'}
+          </p>
           <div className="mt-6 flex justify-end gap-3">
             <button
               type="button"
@@ -478,13 +494,13 @@ function GameTableModals({
             <button
               type="button"
               className="btn-danger btn-danger-soft px-4 py-2 disabled:opacity-50"
-              onClick={() => {
+              onClick={async () => {
                 setIsLeaveConfirmModalOpen(false)
-                onLeaveGame?.()
+                await onLeaveGame?.()
               }}
               disabled={isLeavingGame}
             >
-              {isLeavingGame ? 'Leaving...' : 'Leave Game'}
+              {isLeavingGame ? 'Leaving...' : 'Leave'}
             </button>
           </div>
         </ModalShell>

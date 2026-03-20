@@ -83,6 +83,7 @@ function GameTablePage({
   onRemovePlayer,
   onCoverAwayPlayerTurn,
   onLeaveGame,
+  onGoHome,
   onDealCards,
   onSubmitBid,
   onPlayCard,
@@ -90,7 +91,6 @@ function GameTablePage({
   sortMode = 'bySuit',
   onStartOver,
   onSendReaction,
-  onGoHome,
   onOpenHelp,
   onOpenNewGame,
   onOpenJoinGame,
@@ -739,9 +739,8 @@ function GameTablePage({
         onCoverAwayPlayerTurn={onCoverAwayPlayerTurn}
         onInstallApp={onInstallApp}
         onLeaveGame={onLeaveGame}
+        onGoHome={onGoHome}
         onOpenHelp={onOpenHelp}
-        onOpenJoinGame={onOpenJoinGame}
-        onOpenNewGame={onOpenNewGame}
         onRemovePlayer={onRemovePlayer}
         onRenamePlayer={onRenamePlayer}
         onSetGameError={onSetGameError}

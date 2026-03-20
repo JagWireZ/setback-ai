@@ -258,6 +258,12 @@ export const createGame = ({ playerName }) =>
     playerName,
   })
 
+export const removeGame = ({ gameId, playerToken }) =>
+  invoke('removeGame', {
+    gameId: normalizeGameId(gameId),
+    playerToken,
+  })
+
 export const joinGame = ({ gameId, playerName }) =>
   invoke('joinGame', {
     gameId: normalizeGameId(gameId),
