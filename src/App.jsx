@@ -49,18 +49,16 @@ export default function App() {
     sortMode,
   } = appState
   const {
-    setCreateErrors,
+    clearHomeRequestState,
+    rejoinSelectionChanged,
+    resetCreateDraft,
+    resetJoinDraft,
     setGameError,
-    setJoinErrors,
-    setJoinGameId,
-    setJoinMenuCloseRequestKey,
-    setJoinPlayerName,
     setPlayerName,
-    setRequestError,
     setSelectedAiDifficulty,
     setSelectedMaxCards,
-    setSelectedRejoinGameId,
-    setSessionInfo,
+    joinGameIdChanged,
+    joinPlayerNameChanged,
   } = appActions
   const {
     closeCreateModal,
@@ -104,49 +102,25 @@ export default function App() {
   } = useAppModalState()
 
   const handleJoinGameIdInputChange = (event) => {
-    setJoinGameId(event.target.value)
-    setJoinErrors((prev) => ({ ...prev, gameId: undefined }))
+    joinGameIdChanged(event.target.value)
   }
 
   const handleJoinPlayerNameInputChange = (event) => {
-    setJoinPlayerName(sanitizePlayerNameInput(event.target.value))
-    setJoinErrors((prev) => ({ ...prev, playerName: undefined }))
+    joinPlayerNameChanged(sanitizePlayerNameInput(event.target.value))
   }
 
   const handleCreatePlayerNameInputChange = (event) => {
     setPlayerName(sanitizePlayerNameInput(event.target.value))
-    setCreateErrors((prev) => ({ ...prev, playerName: undefined }))
   }
 
   const handleCloseCreateModal = () => {
     closeCreateModal()
-    setPlayerName('')
-    setCreateErrors({})
+    resetCreateDraft()
   }
 
   const handleCloseJoinModal = () => {
     closeJoinModal()
-    setSelectedRejoinGameId('')
-    setJoinGameId('')
-    setJoinPlayerName('')
-    setJoinErrors({})
-  }
-
-  const clearHomeRequestState = () => {
-    setRequestError('')
-    setSessionInfo(null)
-  }
-
-  const resetCreateDraft = () => {
-    setPlayerName('')
-    setCreateErrors({})
-  }
-
-  const resetJoinDraft = () => {
-    setSelectedRejoinGameId('')
-    setJoinGameId('')
-    setJoinPlayerName('')
-    setJoinErrors({})
+    resetJoinDraft()
   }
 
   const openHomeSessionModal = (modalType) => {
@@ -167,18 +141,7 @@ export default function App() {
     const nextGameId = event.target.value
     const selectedGame = rejoinableGames.find((game) => game.gameId === nextGameId)
 
-    setSelectedRejoinGameId(nextGameId)
-
-    if (nextGameId) {
-      setJoinGameId(nextGameId)
-      setJoinPlayerName(selectedGame?.playerName ?? '')
-      setJoinErrors((prev) => ({ ...prev, gameId: undefined, playerName: undefined }))
-      setJoinMenuCloseRequestKey((current) => current + 1)
-      return
-    }
-
-    setJoinGameId('')
-    setJoinPlayerName('')
+    rejoinSelectionChanged(nextGameId, selectedGame)
   }
 
   const lobby = useLobbyController({

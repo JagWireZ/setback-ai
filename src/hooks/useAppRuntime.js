@@ -31,7 +31,6 @@ import {
   getActiveSessionContext,
   getActiveSessionRole,
   getRestoredPlayerName,
-  setSessionForRole,
 } from '../utils/sessionState'
 
 export const useAppRuntime = ({
@@ -62,18 +61,17 @@ export const useAppRuntime = ({
     playerSession,
   } = appState
   const {
+    rejoinableGamesLoaded,
+    rejoinableGamesLoadingStarted,
+    sessionRestoreInitialized,
+    sessionRestoreSucceeded,
     setGameError,
-    setIsLoadingRejoinGames,
-    setJoinGameId,
     setLobbyInfo,
     setOwnerSession,
     setPersistedEndOfRoundSummary,
     setPlayerSession,
-    setRejoinableGames,
     setRequestError,
-    setSelectedAiDifficulty,
     setSelectedMaxCards,
-    setSelectedRejoinGameId,
     setSessionInfo,
     setSortMode,
   } = appActions
@@ -234,7 +232,7 @@ export const useAppRuntime = ({
     }
 
     let isCancelled = false
-    setJoinGameId(gameIdFromUrl)
+    sessionRestoreInitialized(gameIdFromUrl)
 
     const attemptSessionRestore = async () => {
       const storedSession = getStoredGameSession(gameIdFromUrl)
@@ -261,7 +259,7 @@ export const useAppRuntime = ({
           playerToken: storedSession.playerToken,
         })
 
-        setSessionForRole({
+        sessionRestoreSucceeded({
           role: 'owner',
           session: buildOwnerSession({
             gameId: gameIdFromUrl,
@@ -269,11 +267,9 @@ export const useAppRuntime = ({
             game: resumedSession?.game ?? restoredSession.game,
             ownerPlayerId: resumedSession?.ownerPlayerId ?? restoredSession.ownerPlayerId,
           }),
-          setOwnerSession,
-          setPlayerSession,
+          selectedMaxCards: String(restoredSession.game?.options?.maxCards ?? 10),
+          selectedAiDifficulty: restoredSession.game?.options?.aiDifficulty ?? 'medium',
         })
-        setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
-        setSelectedAiDifficulty(restoredSession.game?.options?.aiDifficulty ?? 'medium')
         closeJoinModal()
         saveStoredGameSession(
           gameIdFromUrl,
@@ -290,7 +286,7 @@ export const useAppRuntime = ({
           playerToken: storedSession.playerToken,
         })
 
-        setSessionForRole({
+        sessionRestoreSucceeded({
           role: 'player',
           session: buildPlayerSession({
             gameId: gameIdFromUrl,
@@ -298,8 +294,6 @@ export const useAppRuntime = ({
             game: resumedSession?.game ?? restoredSession.game,
             version: resumedSession?.version ?? restoredSession.version,
           }),
-          setOwnerSession,
-          setPlayerSession,
         })
         closeJoinModal()
         saveStoredGameSession(
@@ -340,16 +334,14 @@ export const useAppRuntime = ({
     let isCancelled = false
 
     const loadRejoinableGames = async () => {
-      setIsLoadingRejoinGames(true)
+      rejoinableGamesLoadingStarted()
 
       const storedSessions = await pruneMissingStoredGameSessions()
       const gameIds = Object.keys(storedSessions)
 
       if (gameIds.length === 0) {
         if (!isCancelled) {
-          setRejoinableGames([])
-          setSelectedRejoinGameId('')
-          setIsLoadingRejoinGames(false)
+          rejoinableGamesLoaded([])
         }
         return
       }
@@ -389,13 +381,7 @@ export const useAppRuntime = ({
         .filter(Boolean)
         .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
 
-      setRejoinableGames(nextRejoinableGames)
-      setSelectedRejoinGameId((current) =>
-        current && nextRejoinableGames.some((entry) => entry.gameId === current)
-          ? current
-          : '',
-      )
-      setIsLoadingRejoinGames(false)
+      rejoinableGamesLoaded(nextRejoinableGames)
     }
 
     loadRejoinableGames()

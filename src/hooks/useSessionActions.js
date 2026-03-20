@@ -16,7 +16,6 @@ import {
   buildOwnerSession,
   buildPlayerSession,
   getActiveSessionContext,
-  setSessionForRole,
 } from '../utils/sessionState'
 
 export function useSessionActions({
@@ -37,20 +36,21 @@ export function useSessionActions({
     selectedRejoinGameId,
   } = appState
   const {
-    setCreateErrors,
+    createGameFailed,
+    createGameStarted,
+    createGameSucceeded,
+    createGameValidationFailed,
+    joinGameFailed,
+    joinGameStarted,
+    joinGameSucceeded,
+    joinGameValidationFailed,
+    rejoinGameFailed,
+    rejoinGameStarted,
+    rejoinGameSucceeded,
+    sessionFeedbackCleared,
     setGameError,
-    setIsCreatingGame,
-    setIsJoiningGame,
-    setIsRejoiningGame,
     setIsRenamingPlayer,
-    setJoinErrors,
     setLobbyInfo,
-    setOwnerSession,
-    setPlayerSession,
-    setRequestError,
-    setSelectedAiDifficulty,
-    setSelectedMaxCards,
-    setSessionInfo,
   } = appActions
 
   const handleCreateGame = async (event) => {
@@ -64,45 +64,36 @@ export function useSessionActions({
     }
 
     if (Object.keys(errors).length > 0) {
-      setCreateErrors(errors)
+      createGameValidationFailed(errors)
       return
     }
 
-    setCreateErrors({})
-    setRequestError('')
-    setIsCreatingGame(true)
+    createGameStarted()
 
     try {
       const result = await createGame({
         playerName: trimmedPlayerName,
       })
-      setSessionInfo({
-        action: 'createGame',
-        gameId: result?.game?.id,
-        playerToken: result?.playerToken,
-      })
-      setSessionForRole({
-        role: 'owner',
-        session: buildOwnerSession({
+      createGameSucceeded({
+        sessionInfo: {
+          action: 'createGame',
+          gameId: result?.game?.id,
+          playerToken: result?.playerToken,
+        },
+        ownerSession: buildOwnerSession({
           gameId: result?.game?.id,
           playerToken: result?.playerToken,
           game: result?.game,
           ownerPlayerId: result?.game?.players?.find((currentPlayer) => currentPlayer.type === 'human')?.id,
         }),
-        setOwnerSession,
-        setPlayerSession,
+        selectedMaxCards: String(result?.game?.options?.maxCards ?? 10),
+        selectedAiDifficulty: result?.game?.options?.aiDifficulty ?? 'medium',
       })
-      setSelectedMaxCards(String(result?.game?.options?.maxCards ?? 10))
-      setSelectedAiDifficulty(result?.game?.options?.aiDifficulty ?? 'medium')
-      setGameError('')
-      setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'owner', trimmedPlayerName)
       closeCreateModal()
     } catch (error) {
-      setRequestError(toGenericErrorMessage(error, 'Unable to create game.'))
-    } finally {
-      setIsCreatingGame(false)
+      createGameFailed(toGenericErrorMessage(error, 'Unable to create game.'))
     }
   }
 
@@ -114,8 +105,7 @@ export function useSessionActions({
       return
     }
 
-    setRequestError('')
-    setIsRejoiningGame(true)
+    rejoinGameStarted()
 
     try {
       const restoredSession = await normalizeStoredSessionGame(
@@ -148,26 +138,20 @@ export function useSessionActions({
             version: resumedSession?.version ?? restoredSession.version,
           })
 
-      setSessionForRole({
-        role,
-        session,
-        setOwnerSession,
-        setPlayerSession,
-      })
       saveStoredGameSession(selectedGame.gameId, selectedGame.playerToken, role, selectedGame.playerName ?? '')
 
-      setSessionInfo({
-        action: 'rejoinGame',
-        gameId: selectedGame.gameId,
+      rejoinGameSucceeded({
+        role,
+        session,
+        sessionInfo: {
+          action: 'rejoinGame',
+          gameId: selectedGame.gameId,
+        },
       })
-      setGameError('')
-      setLobbyInfo('')
       setGameIdInUrl(selectedGame.gameId)
       closeJoinModal()
     } catch (error) {
-      setRequestError(toGenericErrorMessage(error, 'Unable to rejoin game.'))
-    } finally {
-      setIsRejoiningGame(false)
+      rejoinGameFailed(toGenericErrorMessage(error, 'Unable to rejoin game.'))
     }
   }
 
@@ -192,44 +176,35 @@ export function useSessionActions({
     }
 
     if (Object.keys(errors).length > 0) {
-      setJoinErrors(errors)
+      joinGameValidationFailed(errors)
       return
     }
 
-    setJoinErrors({})
-    setRequestError('')
-    setIsJoiningGame(true)
+    joinGameStarted()
 
     try {
       const result = await joinGame({
         gameId: joinGameId.trim(),
         playerName: trimmedPlayerName,
       })
-      setSessionInfo({
-        action: 'joinGame',
-        gameId: result?.game?.id,
-        playerToken: result?.playerToken,
-      })
-      setSessionForRole({
-        role: 'player',
-        session: buildPlayerSession({
+      joinGameSucceeded({
+        sessionInfo: {
+          action: 'joinGame',
+          gameId: result?.game?.id,
+          playerToken: result?.playerToken,
+        },
+        playerSession: buildPlayerSession({
           gameId: result?.game?.id,
           playerToken: result?.playerToken,
           game: result?.game,
           version: result?.version ?? result?.game?.version ?? 0,
         }),
-        setOwnerSession,
-        setPlayerSession,
       })
-      setGameError('')
-      setLobbyInfo('')
       setGameIdInUrl(result?.game?.id)
       saveStoredGameSession(result?.game?.id, result?.playerToken, 'player', trimmedPlayerName)
       closeJoinModal()
     } catch (error) {
-      setRequestError(toGenericErrorMessage(error, 'Unable to join game.'))
-    } finally {
-      setIsJoiningGame(false)
+      joinGameFailed(toGenericErrorMessage(error, 'Unable to join game.'))
     }
   }
 
@@ -239,8 +214,7 @@ export function useSessionActions({
       return false
     }
 
-    setGameError('')
-    setLobbyInfo('')
+    sessionFeedbackCleared()
     setIsRenamingPlayer(true)
 
     try {
