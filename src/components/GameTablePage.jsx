@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import QRCode from 'qrcode'
 import { CardAsset, CardBack } from './Cards'
-import { RoundStatusLabel, ScoreHistory, ScoreSheet, ScoreSummary } from './Scoreboard'
+import { ScoreHistory, ScoreSheet, ScoreSummary } from './Scoreboard'
 import {
   REACTION_EMOJIS,
+  TRICK_COMPLETE_DELAY_MS,
   getBidDisplay,
   getCardLabel,
   getCompletedRoundCount,
@@ -15,13 +15,8 @@ import {
   getViewerHand,
   hashString,
 } from '../utils/gameUi'
-import { getRandomReactionPhrases, getReactionPhraseCategories } from '../utils/reactionPhrases'
-import {
-  MAX_PLAYER_NAME_LENGTH,
-  sanitizePlayerNameInput,
-  truncateLabel,
-  validatePlayerName,
-} from '../utils/playerName'
+import { useGameTableState } from '../hooks/useGameTableState'
+import { MAX_PLAYER_NAME_LENGTH, sanitizePlayerNameInput, truncateLabel, validatePlayerName } from '../utils/playerName'
 import { getPlayerPresence } from '../utils/playerPresence'
 
 const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
@@ -123,53 +118,7 @@ function GameTablePage({
       cards: sortHandCards(rawViewerHand.cards ?? [], sortMode, trumpSuit),
     }
   }, [rawViewerHand, sortMode, trumpSuit])
-  const [viewportWidth, setViewportWidth] = useState(() =>
-    typeof window === 'undefined' ? 1024 : window.innerWidth,
-  )
   const [mobileActionBarHeight, setMobileActionBarHeight] = useState(0)
-  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false)
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false)
-  const [shareQrCodeDataUrl, setShareQrCodeDataUrl] = useState('')
-
-  useEffect(() => {
-    if (menuCloseRequestKey > 0) {
-      setIsMenuModalOpen(false)
-    }
-  }, [menuCloseRequestKey])
-
-  useEffect(() => {
-    let isCancelled = false
-
-    if (!isShareModalOpen || !shareLink) {
-      setShareQrCodeDataUrl('')
-      return undefined
-    }
-
-    QRCode.toDataURL(shareLink, {
-      errorCorrectionLevel: 'M',
-      margin: 1,
-      width: 320,
-      color: {
-        dark: '#0f172a',
-        light: '#f8fafc',
-      },
-    })
-      .then((url) => {
-        if (!isCancelled) {
-          setShareQrCodeDataUrl(url)
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setShareQrCodeDataUrl('')
-          onSetGameError?.('Unable to generate QR code.')
-        }
-      })
-
-    return () => {
-      isCancelled = true
-    }
-  }, [isShareModalOpen, onSetGameError, shareLink])
 
   const viewerPlayerId = viewerHand?.playerId
   const actualTurnPlayerId = game?.phase && 'turnPlayerId' in game.phase ? game.phase.turnPlayerId : undefined
@@ -235,10 +184,6 @@ function GameTablePage({
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
   const [isLeaveConfirmModalOpen, setIsLeaveConfirmModalOpen] = useState(false)
-  const [isReactionModalOpen, setIsReactionModalOpen] = useState(false)
-  const [selectedReactionPhraseCategoryId, setSelectedReactionPhraseCategoryId] = useState('')
-  const [reactionPhraseOptions, setReactionPhraseOptions] = useState([])
-  const [reactionModalPosition, setReactionModalPosition] = useState({ right: 16, bottom: 16 })
   const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
   const [selectedScorePlayerId, setSelectedScorePlayerId] = useState('')
   const [pendingRemovePlayer, setPendingRemovePlayer] = useState(null)
@@ -259,7 +204,6 @@ function GameTablePage({
   const returningTrickLabelTimeoutRef = useRef(null)
   const returningTrickLabelFrameRef = useRef(null)
   const mobileActionBarRef = useRef(null)
-  const reactionPickerRef = useRef(null)
   const hasAutoOpenedGameOverScoreRef = useRef(false)
   const gameOverScoreTimeoutRef = useRef(null)
   const trickSurfaceRef = useRef(null)
@@ -317,7 +261,6 @@ function GameTablePage({
       ? displayedTrickPlays[selectedTrickCardIndex]
       : null
   const handCardCount = viewerHand?.cards?.length ?? 0
-  const isMobileViewport = viewportWidth < 640
   const currentPlayerName = getPlayerName(game, viewerPlayerId)
   const selectedTrickPlayerName = selectedTrickPlay ? getPlayerName(game, selectedTrickPlay.playerId) : ''
   const selectedScorePlayer =
@@ -329,10 +272,28 @@ function GameTablePage({
     typeof game?.phase?.trickIndex === 'number'
       ? game.phase.trickIndex
       : -1
-  const reactionPhraseCategories = useMemo(
-    () => getReactionPhraseCategories(),
-    [],
-  )
+  const {
+    handleReactionCategorySelect,
+    isMenuModalOpen,
+    isMobileViewport,
+    isReactionModalOpen,
+    isShareModalOpen,
+    reactionModalPosition,
+    reactionPhraseCategories,
+    reactionPhraseOptions,
+    reactionPickerRef,
+    selectedReactionPhraseCategoryId,
+    setIsMenuModalOpen,
+    setIsReactionModalOpen,
+    setIsShareModalOpen,
+    shareQrCodeDataUrl,
+    viewportWidth,
+  } = useGameTableState({
+    menuCloseRequestKey,
+    onSetGameError,
+    shareLink,
+    trickPhraseSeed,
+  })
   const emojiReactionLayouts = useMemo(
     () =>
       activeReactions
@@ -382,71 +343,9 @@ function GameTablePage({
             '--reaction-sway-b': `${driftB}px`,
           },
         }
-      }),
+        }),
     [activeReactions, mobileActionBarHeight],
   )
-
-  useEffect(() => {
-    if (!isReactionModalOpen) {
-      return
-    }
-
-    const hasActiveCategory = reactionPhraseCategories.some((category) => category.id === selectedReactionPhraseCategoryId)
-    if (hasActiveCategory && reactionPhraseOptions.length > 0) {
-      return
-    }
-
-    const activeCategoryId = hasActiveCategory
-      ? selectedReactionPhraseCategoryId
-      : (reactionPhraseCategories[0]?.id ?? '')
-    const nextOptions = getRandomReactionPhrases(activeCategoryId, 3, hashString(`${activeCategoryId}:${trickPhraseSeed}`))
-
-    if (selectedReactionPhraseCategoryId !== activeCategoryId) {
-      setSelectedReactionPhraseCategoryId(activeCategoryId)
-    }
-
-    setReactionPhraseOptions((current) => {
-      if (
-        current.length === nextOptions.length &&
-        current.every((phrase, index) => phrase === nextOptions[index])
-      ) {
-        return current
-      }
-
-      return nextOptions
-    })
-  }, [isReactionModalOpen, reactionPhraseCategories, selectedReactionPhraseCategoryId, reactionPhraseOptions.length, trickPhraseSeed])
-
-  useEffect(() => {
-    if (!isReactionModalOpen || typeof window === 'undefined') {
-      return
-    }
-
-    const updateReactionModalPosition = () => {
-      const pickerBounds = reactionPickerRef.current?.getBoundingClientRect()
-      if (!pickerBounds) {
-        return
-      }
-
-      const nextPosition = {
-        right: Math.max(16, window.innerWidth - pickerBounds.right),
-        bottom: Math.max(16, window.innerHeight - pickerBounds.top + 12),
-      }
-
-      setReactionModalPosition((current) =>
-        current.right === nextPosition.right && current.bottom === nextPosition.bottom
-          ? current
-          : nextPosition,
-      )
-    }
-
-    updateReactionModalPosition()
-    window.addEventListener('resize', updateReactionModalPosition)
-
-    return () => {
-      window.removeEventListener('resize', updateReactionModalPosition)
-    }
-  }, [isReactionModalOpen, isMobileViewport])
 
   const handLayout = useMemo(() => {
     if (!isMobileViewport) {
@@ -539,19 +438,6 @@ function GameTablePage({
     totalTrickPlayers,
     useScatterTrickLayout,
   ])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return undefined
-    }
-
-    const handleResize = () => setViewportWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -987,25 +873,6 @@ function GameTablePage({
   }
 
   useEffect(() => {
-    if (!isReactionModalOpen || typeof window === 'undefined') {
-      return undefined
-    }
-
-    const handlePointerDown = (event) => {
-      if (reactionPickerRef.current?.contains(event.target)) {
-        return
-      }
-
-      setIsReactionModalOpen(false)
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown)
-    }
-  }, [isReactionModalOpen])
-
-  useEffect(() => {
     previousCompletedTrickCountRef.current = completedTricks.length
     setBookWinnerMessage('')
     setRevealedCompletedTrick(null)
@@ -1283,12 +1150,7 @@ function GameTablePage({
                           ? 'border-amber-300/80 bg-amber-200/20 text-amber-50'
                           : 'border-white/15 bg-white/5 text-white/80 hover:border-white/30 hover:bg-white/10'
                       }`}
-                      onClick={() => {
-                        setSelectedReactionPhraseCategoryId(category.id)
-                        setReactionPhraseOptions(
-                          getRandomReactionPhrases(category.id, 3, hashString(`${category.id}:${trickPhraseSeed}`)),
-                        )
-                      }}
+                      onClick={() => handleReactionCategorySelect(category.id)}
                       disabled={isSendingReaction || isReactionOnCooldown}
                     >
                       {category.label}
