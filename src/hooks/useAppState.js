@@ -1,6 +1,6 @@
 import { useMemo, useReducer } from 'react'
 
-const INITIAL_APP_STATE = {
+export const INITIAL_APP_STATE = {
   home: {
     playerName: '',
     joinGameId: '',
@@ -63,7 +63,9 @@ const updateStateField = (state, slice, key, value) => {
   }
 }
 
-const appStateReducer = (state, action) => {
+export const createInitialAppState = () => JSON.parse(JSON.stringify(INITIAL_APP_STATE))
+
+export const appStateReducer = (state, action) => {
   switch (action.type) {
     case 'create_player_name_changed':
       return {
