@@ -6,15 +6,8 @@ import {
   startGame,
 } from '../api/lambdaClient'
 import { toGenericErrorMessage } from '../utils/frontendErrors'
+import { AI_DIFFICULTY_OPTIONS, MAX_SEATS } from '../lobby/constants'
 import { useLobbyDerivedState } from './useLobbyDerivedState'
-
-export const AI_DIFFICULTY_OPTIONS = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'hard', label: 'Hard' },
-]
-
-export const MAX_SEATS = 8
 
 export function useLobbyController({
   ownerSession,

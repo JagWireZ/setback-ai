@@ -5,11 +5,9 @@ import { useAppModalState } from './hooks/useAppModalState'
 import { useLobbyController } from './hooks/useLobbyController'
 import { useActiveGameController } from './hooks/useActiveGameController'
 import { useSessionActions } from './hooks/useSessionActions'
+import { buildTimestampLabel, isStagingBuild } from './config/appConfig'
 import { sanitizePlayerNameInput } from './utils/playerName'
 import { usePwaInstall } from './utils/pwa'
-
-const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
-const buildTimestampLabel = typeof __BUILD_TIMESTAMP__ === 'string' ? __BUILD_TIMESTAMP__ : ''
 
 export default function App() {
   const { canInstall: canInstallApp, promptToInstall } = usePwaInstall()
