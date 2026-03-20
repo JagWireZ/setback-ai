@@ -244,6 +244,7 @@ function GameTablePage({
     returningTrickLabel,
     selectedCard,
     selectedCardIndex,
+    setSelectedTrickCardIndex,
     selectedTrickCardIndex,
     selectedTrickLabelRef,
     selectedTrickLabelStyle,
