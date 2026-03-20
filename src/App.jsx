@@ -1,23 +1,12 @@
 import { useState } from 'react'
 import { AppRoutes } from './components/AppRoutes'
-import { useGameActions } from './hooks/useGameActions'
 import { useAppRuntime } from './hooks/useAppRuntime'
 import { useAppModalState } from './hooks/useAppModalState'
-import { useLobbyDerivedState } from './hooks/useLobbyDerivedState'
-import {
-  clearGameIdInUrl,
-  setGameIdInUrl,
-} from './utils/gameSessions'
+import { useLobbyController } from './hooks/useLobbyController'
+import { useActiveGameController } from './hooks/useActiveGameController'
+import { useSessionActions } from './hooks/useSessionActions'
 import { sanitizePlayerNameInput } from './utils/playerName'
 import { usePwaInstall } from './utils/pwa'
-
-const AI_DIFFICULTY_OPTIONS = [
-  { value: 'easy', label: 'Easy' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'hard', label: 'Hard' },
-]
-
-const MAX_SEATS = 8
 
 const isStagingBuild = import.meta.env.VITE_APP_ENV === 'staging'
 const buildTimestampLabel = typeof __BUILD_TIMESTAMP__ === 'string' ? __BUILD_TIMESTAMP__ : ''
@@ -145,24 +134,16 @@ export default function App() {
     setJoinPlayerName('')
   }
 
-  const {
-    activeGame,
-    activeLobbyPlayer,
-    activeLobbyPlayerId,
-    activeLobbySession,
-    activeRoundIndex,
-    activeSessionKey,
-    completedRoundCount,
-    currentRoundCardCount,
-    isLocalPlayerMarkedAway,
-    isOwnerLobby,
-    isTripRound,
-    maxCardsForLobbySeatCount,
-    orderedPlayers,
-    shareLink,
-  } = useLobbyDerivedState({
+  const lobby = useLobbyController({
     ownerSession,
     playerSession,
+    selectedMaxCards,
+    selectedAiDifficulty,
+    setPendingPlayerActionId,
+    setGameError,
+    setLobbyInfo,
+    setIsStartingGame,
+    applyRealtimeResult: (...args) => applyRealtimeResult(...args),
   })
   const {
     applyRealtimeResult,
@@ -175,15 +156,15 @@ export default function App() {
   } = useAppRuntime({
     ownerSession,
     playerSession,
-    activeGame,
-    activeLobbySession,
-    activeSessionKey,
-    completedRoundCount,
-    isLocalPlayerMarkedAway,
-    isOwnerLobby,
-    maxCardsForLobbySeatCount,
+    activeGame: lobby.activeGame,
+    activeLobbySession: lobby.activeLobbySession,
+    activeSessionKey: lobby.activeSessionKey,
+    completedRoundCount: lobby.completedRoundCount,
+    isLocalPlayerMarkedAway: lobby.isLocalPlayerMarkedAway,
+    isOwnerLobby: lobby.isOwnerLobby,
+    maxCardsForLobbySeatCount: lobby.maxCardsForLobbySeatCount,
     selectedMaxCards,
-    shareLink,
+    shareLink: lobby.shareLink,
     isLobbyShareModalOpen,
     gameError,
     reactionCooldownUntil,
@@ -225,27 +206,7 @@ export default function App() {
     setIsJoinModalOpen(true)
   }
 
-  const {
-    handleAddSeat,
-    handleContinueGame,
-    handleCoverAwayPlayerTurn,
-    handleCreateGame,
-    handleDealCards,
-    handleJoinGame,
-    handleLeaveGame,
-    handleMovePlayer,
-    handlePlayCard,
-    handleRemovePlayer,
-    handleRemoveSeat,
-    handleRenamePlayer,
-    handleSendReaction,
-    handleSortCards,
-    handleStartGame,
-    handleStartOver,
-    handleSubmitBid,
-    openSubmitBidModal,
-    toggleSortCards,
-  } = useGameActions({
+  const { handleCreateGame, handleJoinGame, handleRenamePlayer } = useSessionActions({
     playerName,
     joinGameId,
     selectedRejoinGameId,
@@ -253,20 +214,9 @@ export default function App() {
     rejoinableGames,
     ownerSession,
     playerSession,
-    selectedMaxCards,
-    selectedAiDifficulty,
-    orderedPlayers,
-    currentRoundCardCount,
-    sortMode,
-    selectedBid,
-    isReactionOnCooldown,
-    activeLobbyPlayerId,
-    requestActiveStateReview,
-    applyRealtimeResult,
-    handleRemovedFromGame,
+    activeLobbyPlayerId: lobby.activeLobbyPlayerId,
     closeCreateModal: handleCloseCreateModal,
     closeJoinModal: handleCloseJoinModal,
-    closeSubmitBidModal,
     setCreateErrors,
     setJoinErrors,
     setRequestError,
@@ -280,9 +230,38 @@ export default function App() {
     setLobbyInfo,
     setIsJoiningGame,
     setIsRejoiningGame,
-    setPendingPlayerActionId,
+    setIsRenamingPlayer,
+    applyRealtimeResult,
+  })
+  const {
+    handleContinueGame,
+    handleCoverAwayPlayerTurn,
+    handleDealCards,
+    handleLeaveGame,
+    handlePlayCard,
+    handleSendReaction,
+    handleStartOver,
+    handleSubmitBid,
+    openSubmitBidModal,
+    toggleSortCards,
+  } = useActiveGameController({
+    ownerSession,
+    playerSession,
+    currentRoundCardCount: lobby.currentRoundCardCount,
+    sortMode,
+    selectedBid,
+    isReactionOnCooldown,
+    requestActiveStateReview,
+    applyRealtimeResult,
+    handleRemovedFromGame,
+    closeSubmitBidModal,
+    setRequestError,
+    setSessionInfo,
+    setSelectedMaxCards,
+    setSelectedAiDifficulty,
+    setGameError,
+    setLobbyInfo,
     setIsLeavingGame,
-    setIsStartingGame,
     setIsStartingOver,
     setIsDealingCards,
     setSortMode,
@@ -295,11 +274,9 @@ export default function App() {
     setIsSendingReaction,
     setReactionCooldownUntil,
     reactionCooldownTimeoutRef,
-    setIsRenamingPlayer,
     setIsPlayingCard,
+    setPendingPlayerActionId,
   })
-
-  const currentDealerPlayerId = ownerSession?.game?.phase?.dealerPlayerId ?? orderedPlayers[0]?.id ?? ''
 
   return (
     <AppRoutes
@@ -336,35 +313,35 @@ export default function App() {
       handleRejoinSelectionChange={handleRejoinSelectionChange}
       setIsCreateModalOpen={setIsCreateModalOpen}
       setIsJoinModalOpen={setIsJoinModalOpen}
-      activeGame={activeGame}
+      activeGame={lobby.activeGame}
       ownerSession={ownerSession}
       gameError={gameError}
       lobbyInfo={lobbyInfo}
-      activeLobbySession={activeLobbySession}
-      orderedPlayers={orderedPlayers}
-      currentDealerPlayerId={currentDealerPlayerId}
-      activeLobbyPlayerId={activeLobbyPlayerId}
-      isOwnerLobby={isOwnerLobby}
+      activeLobbySession={lobby.activeLobbySession}
+      orderedPlayers={lobby.orderedPlayers}
+      currentDealerPlayerId={lobby.currentDealerPlayerId}
+      activeLobbyPlayerId={lobby.activeLobbyPlayerId}
+      isOwnerLobby={lobby.isOwnerLobby}
       isRenamingPlayer={isRenamingPlayer}
       isStartingGame={isStartingGame}
       openLobbyRenamePlayerModal={openLobbyRenamePlayerModal}
       pendingPlayerActionId={pendingPlayerActionId}
-      handleMovePlayer={handleMovePlayer}
+      handleMovePlayer={lobby.handleMovePlayer}
       openLobbyRemoveSeatConfirm={openLobbyRemoveSeatConfirm}
       openLobbyRemovePlayerConfirm={openLobbyRemovePlayerConfirm}
-      handleAddSeat={handleAddSeat}
-      maxSeats={MAX_SEATS}
-      maxCardsForLobbySeatCount={maxCardsForLobbySeatCount}
+      handleAddSeat={lobby.handleAddSeat}
+      maxSeats={lobby.maxSeats}
+      maxCardsForLobbySeatCount={lobby.maxCardsForLobbySeatCount}
       selectedMaxCards={selectedMaxCards}
       setSelectedMaxCards={setSelectedMaxCards}
       selectedAiDifficulty={selectedAiDifficulty}
       setSelectedAiDifficulty={setSelectedAiDifficulty}
-      aiDifficultyOptions={AI_DIFFICULTY_OPTIONS}
+      aiDifficultyOptions={lobby.aiDifficultyOptions}
       resetActiveSessionState={resetActiveSessionState}
-      handleStartGame={handleStartGame}
+      handleStartGame={lobby.handleStartGame}
       setIsLobbyShareModalOpen={setIsLobbyShareModalOpen}
       isLobbyShareModalOpen={isLobbyShareModalOpen}
-      shareLink={shareLink}
+      shareLink={lobby.shareLink}
       isShareLinkCopied={isShareLinkCopied}
       shareQrCodeDataUrl={shareQrCodeDataUrl}
       handleCopyShareLink={handleCopyShareLink}
@@ -376,15 +353,15 @@ export default function App() {
       closeLobbyRemovePlayerConfirm={closeLobbyRemovePlayerConfirm}
       closeLobbyRemoveSeatConfirm={closeLobbyRemoveSeatConfirm}
       closeLobbyRenamePlayerModal={closeLobbyRenamePlayerModal}
-      handleRemovePlayer={handleRemovePlayer}
-      handleRemoveSeat={handleRemoveSeat}
+      handleRemovePlayer={lobby.handleRemovePlayer}
+      handleRemoveSeat={lobby.handleRemoveSeat}
       handleRenamePlayer={handleRenamePlayer}
       showAwayContinueModal={showAwayContinueModal}
-      isLocalPlayerMarkedAway={isLocalPlayerMarkedAway}
+      isLocalPlayerMarkedAway={lobby.isLocalPlayerMarkedAway}
       isContinuingGame={isContinuingGame}
       handleContinueGame={handleContinueGame}
-      isTripRound={isTripRound}
-      currentRoundCardCount={currentRoundCardCount}
+      isTripRound={lobby.isTripRound}
+      currentRoundCardCount={lobby.currentRoundCardCount}
       selectedBid={selectedBid}
       setSelectedBid={setSelectedBid}
       isBidModalOpen={isBidModalOpen}
