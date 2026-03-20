@@ -58,7 +58,8 @@ export const useAppRuntime = ({
   setIsBidModalOpen,
   setSessionInfo,
   setRequestError,
-  setIsJoinModalOpen,
+  openJoinModal,
+  closeJoinModal,
   setRejoinableGames,
   setSelectedRejoinGameId,
   setIsLoadingRejoinGames,
@@ -232,7 +233,7 @@ export const useAppRuntime = ({
       const storedSession = getStoredGameSession(gameIdFromUrl)
       if (!storedSession?.playerToken) {
         if (!isCancelled) {
-          setIsJoinModalOpen(true)
+          openJoinModal()
         }
         return
       }
@@ -266,7 +267,7 @@ export const useAppRuntime = ({
         })
         setSelectedMaxCards(String(restoredSession.game?.options?.maxCards ?? 10))
         setSelectedAiDifficulty(restoredSession.game?.options?.aiDifficulty ?? 'medium')
-        setIsJoinModalOpen(false)
+        closeJoinModal()
         saveStoredGameSession(
           gameIdFromUrl,
           storedSession.playerToken,
@@ -293,7 +294,7 @@ export const useAppRuntime = ({
           setOwnerSession,
           setPlayerSession,
         })
-        setIsJoinModalOpen(false)
+        closeJoinModal()
         saveStoredGameSession(
           gameIdFromUrl,
           storedSession.playerToken,
@@ -308,7 +309,7 @@ export const useAppRuntime = ({
         if (storedSession?.role === 'player') {
           handleRemovedFromGame(gameIdFromUrl)
         } else {
-          setIsJoinModalOpen(true)
+          openJoinModal()
         }
       }
     }

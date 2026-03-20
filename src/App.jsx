@@ -31,10 +31,12 @@ export default function App() {
   const [rejoinableGames, setRejoinableGames] = useState([])
   const {
     closeCreateModal,
+    closeHelpModal,
     closeJoinModal,
     closeLobbyRemovePlayerConfirm,
     closeLobbyRemoveSeatConfirm,
     closeLobbyRenamePlayerModal,
+    closeLobbyShareModal,
     closeSubmitBidModal,
     helpSection,
     isBidModalOpen,
@@ -45,20 +47,20 @@ export default function App() {
     isLobbyShareModalOpen,
     isShareLinkCopied,
     lobbyRenameDraft,
+    openCreateModal,
+    openHelpModal,
+    openJoinModal,
     openLobbyRemovePlayerConfirm,
     openLobbyRemoveSeatConfirm,
     openLobbyRenamePlayerModal,
+    openLobbyShareModal,
     pendingLobbyRemovePlayer,
     pendingLobbyRemoveSeat,
     pendingLobbyRenamePlayer,
     selectedBid,
     setHelpSection,
     setIsBidModalOpen,
-    setIsCreateModalOpen,
     setIsEndOfRoundModalDismissed,
-    setIsHelpModalOpen,
-    setIsJoinModalOpen,
-    setIsLobbyShareModalOpen,
     setIsShareLinkCopied,
     setLobbyRenameDraft,
     setSelectedBid,
@@ -114,6 +116,37 @@ export default function App() {
     setJoinGameId('')
     setJoinPlayerName('')
     setJoinErrors({})
+  }
+
+  const clearHomeRequestState = () => {
+    setRequestError('')
+    setSessionInfo(null)
+  }
+
+  const resetCreateDraft = () => {
+    setPlayerName('')
+    setCreateErrors({})
+  }
+
+  const resetJoinDraft = () => {
+    setSelectedRejoinGameId('')
+    setJoinGameId('')
+    setJoinPlayerName('')
+    setJoinErrors({})
+  }
+
+  const openHomeSessionModal = (modalType) => {
+    resetActiveSessionState()
+    clearHomeRequestState()
+
+    if (modalType === 'create') {
+      resetCreateDraft()
+      openCreateModal()
+      return
+    }
+
+    resetJoinDraft()
+    openJoinModal()
   }
 
   const handleRejoinSelectionChange = (event) => {
@@ -177,7 +210,8 @@ export default function App() {
     setIsBidModalOpen,
     setSessionInfo,
     setRequestError,
-    setIsJoinModalOpen,
+    openJoinModal,
+    closeJoinModal,
     setRejoinableGames,
     setSelectedRejoinGameId,
     setIsLoadingRejoinGames,
@@ -191,19 +225,11 @@ export default function App() {
   })
 
   const handleOpenNewGame = () => {
-    resetActiveSessionState()
-    setRequestError('')
-    setSessionInfo(null)
-    setIsJoinModalOpen(false)
-    setIsCreateModalOpen(true)
+    openHomeSessionModal('create')
   }
 
   const handleOpenJoinGame = () => {
-    resetActiveSessionState()
-    setRequestError('')
-    setSessionInfo(null)
-    setIsCreateModalOpen(false)
-    setIsJoinModalOpen(true)
+    openHomeSessionModal('join')
   }
 
   const { handleCreateGame, handleJoinGame, handleRenamePlayer } = useSessionActions({
@@ -345,7 +371,7 @@ export default function App() {
     onStartOver: handleStartOver,
     onSendReaction: handleSendReaction,
     onGoHome: resetActiveSessionState,
-    onOpenHelp: () => setIsHelpModalOpen(true),
+    onOpenHelp: openHelpModal,
     onOpenNewGame: handleOpenNewGame,
     onOpenJoinGame: handleOpenJoinGame,
     onInstallApp: promptToInstall,
@@ -364,8 +390,8 @@ export default function App() {
       isOpen: isHelpModalOpen,
       helpSection,
       setHelpSection,
-      onClose: () => setIsHelpModalOpen(false),
-      onOpen: () => setIsHelpModalOpen(true),
+      onClose: closeHelpModal,
+      onOpen: openHelpModal,
     },
     createGame: {
       isOpen: isCreateModalOpen,
@@ -377,7 +403,10 @@ export default function App() {
       },
       onClose: handleCloseCreateModal,
       onSubmit: handleCreateGame,
-      onOpen: () => setIsCreateModalOpen(true),
+      onOpen: () => {
+        resetCreateDraft()
+        openCreateModal()
+      },
     },
     joinGame: {
       isOpen: isJoinModalOpen,
@@ -396,13 +425,16 @@ export default function App() {
       },
       onClose: handleCloseJoinModal,
       onSubmit: handleJoinGame,
-      onOpen: () => setIsJoinModalOpen(true),
+      onOpen: () => {
+        resetJoinDraft()
+        openJoinModal()
+      },
       menuCloseRequestKey: joinMenuCloseRequestKey,
     },
     lobbyShare: {
       isOpen: isLobbyShareModalOpen,
-      onClose: () => setIsLobbyShareModalOpen(false),
-      onOpen: () => setIsLobbyShareModalOpen(true),
+      onClose: closeLobbyShareModal,
+      onOpen: openLobbyShareModal,
     },
     lobbyRemovePlayer: {
       pendingPlayer: pendingLobbyRemovePlayer,

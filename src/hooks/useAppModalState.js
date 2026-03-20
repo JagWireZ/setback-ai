@@ -33,12 +33,38 @@ export function useAppModalState() {
     }
   }, [])
 
+  const openCreateModal = () => {
+    setIsJoinModalOpen(false)
+    setIsCreateModalOpen(true)
+  }
+
   const closeCreateModal = () => {
     setIsCreateModalOpen(false)
   }
 
+  const openJoinModal = () => {
+    setIsCreateModalOpen(false)
+    setIsJoinModalOpen(true)
+  }
+
   const closeJoinModal = () => {
     setIsJoinModalOpen(false)
+  }
+
+  const openHelpModal = () => {
+    setIsHelpModalOpen(true)
+  }
+
+  const closeHelpModal = () => {
+    setIsHelpModalOpen(false)
+  }
+
+  const openLobbyShareModal = () => {
+    setIsLobbyShareModalOpen(true)
+  }
+
+  const closeLobbyShareModal = () => {
+    setIsLobbyShareModalOpen(false)
   }
 
   const closeSubmitBidModal = () => {
@@ -46,97 +72,91 @@ export function useAppModalState() {
     setSelectedBid('0')
   }
 
-  const closeLobbyRemovePlayerConfirm = () => {
-    setPendingLobbyRemovePlayer(null)
-    if (removePlayerTimerRef.current) {
-      window.clearTimeout(removePlayerTimerRef.current)
-      removePlayerTimerRef.current = null
+  const clearPendingLobbyAction = (timerRef, clearPendingState) => {
+    clearPendingState(null)
+    if (!timerRef.current) {
+      return
     }
+
+    window.clearTimeout(timerRef.current)
+    timerRef.current = null
+  }
+
+  const closeLobbyRemovePlayerConfirm = () => {
+    clearPendingLobbyAction(removePlayerTimerRef, setPendingLobbyRemovePlayer)
   }
 
   const closeLobbyRemoveSeatConfirm = () => {
-    setPendingLobbyRemoveSeat(null)
-    if (removeSeatTimerRef.current) {
-      window.clearTimeout(removeSeatTimerRef.current)
-      removeSeatTimerRef.current = null
-    }
+    clearPendingLobbyAction(removeSeatTimerRef, setPendingLobbyRemoveSeat)
   }
 
   const closeLobbyRenamePlayerModal = () => {
-    setPendingLobbyRenamePlayer(null)
+    clearPendingLobbyAction(renamePlayerTimerRef, setPendingLobbyRenamePlayer)
     setLobbyRenameDraft('')
-    if (renamePlayerTimerRef.current) {
-      window.clearTimeout(renamePlayerTimerRef.current)
-      renamePlayerTimerRef.current = null
+  }
+
+  const scheduleLobbyPlayerModal = ({
+    player,
+    timerRef,
+    setPendingState,
+    onOpen,
+  }) => {
+    if (!player) {
+      return
     }
+
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current)
+    }
+
+    timerRef.current = window.setTimeout(() => {
+      setPendingState({
+        id: player.id,
+        name: player.name,
+      })
+      onOpen?.(player)
+      timerRef.current = null
+    }, 0)
   }
 
   const openLobbyRemovePlayerConfirm = (player) => {
-    if (!player) {
-      return
-    }
-
-    if (removePlayerTimerRef.current) {
-      window.clearTimeout(removePlayerTimerRef.current)
-    }
-
-    removePlayerTimerRef.current = window.setTimeout(() => {
-      setPendingLobbyRemovePlayer({
-        id: player.id,
-        name: player.name,
-      })
-      removePlayerTimerRef.current = null
-    }, 0)
+    scheduleLobbyPlayerModal({
+      player,
+      timerRef: removePlayerTimerRef,
+      setPendingState: setPendingLobbyRemovePlayer,
+    })
   }
 
   const openLobbyRemoveSeatConfirm = (player) => {
-    if (!player) {
-      return
-    }
-
-    if (removeSeatTimerRef.current) {
-      window.clearTimeout(removeSeatTimerRef.current)
-    }
-
-    removeSeatTimerRef.current = window.setTimeout(() => {
-      setPendingLobbyRemoveSeat({
-        id: player.id,
-        name: player.name,
-      })
-      removeSeatTimerRef.current = null
-    }, 0)
+    scheduleLobbyPlayerModal({
+      player,
+      timerRef: removeSeatTimerRef,
+      setPendingState: setPendingLobbyRemoveSeat,
+    })
   }
 
   const openLobbyRenamePlayerModal = (player) => {
-    if (!player) {
-      return
-    }
-
-    if (renamePlayerTimerRef.current) {
-      window.clearTimeout(renamePlayerTimerRef.current)
-    }
-
-    renamePlayerTimerRef.current = window.setTimeout(() => {
-      setPendingLobbyRenamePlayer({
-        id: player.id,
-        name: player.name,
-      })
-      setLobbyRenameDraft(player.name)
-      renamePlayerTimerRef.current = null
-    }, 0)
+    scheduleLobbyPlayerModal({
+      player,
+      timerRef: renamePlayerTimerRef,
+      setPendingState: setPendingLobbyRenamePlayer,
+      onOpen: (nextPlayer) => {
+        setLobbyRenameDraft(nextPlayer.name)
+      },
+    })
   }
 
   return {
     isCreateModalOpen,
-    setIsCreateModalOpen,
+    openCreateModal,
     isJoinModalOpen,
-    setIsJoinModalOpen,
+    openJoinModal,
     isBidModalOpen,
     setIsBidModalOpen,
     isLobbyShareModalOpen,
-    setIsLobbyShareModalOpen,
+    openLobbyShareModal,
     isHelpModalOpen,
-    setIsHelpModalOpen,
+    openHelpModal,
     showAwayContinueModal,
     setShowAwayContinueModal,
     isEndOfRoundModalDismissed,
@@ -155,7 +175,9 @@ export function useAppModalState() {
     lobbyRenameDraft,
     setLobbyRenameDraft,
     closeCreateModal,
+    closeHelpModal,
     closeJoinModal,
+    closeLobbyShareModal,
     closeSubmitBidModal,
     openLobbyRemovePlayerConfirm,
     closeLobbyRemovePlayerConfirm,
