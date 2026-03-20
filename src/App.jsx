@@ -79,44 +79,13 @@ export default function App() {
     joinPlayerNameChanged,
   } = appActions
   const {
-    closeCreateModal,
-    closeHelpModal,
-    closeJoinModal,
-    closeLobbyRemovePlayerConfirm,
-    closeLobbyRemoveSeatConfirm,
-    closeLobbyRenamePlayerModal,
-    closeLobbyShareModal,
-    closeSubmitBidModal,
-    helpSection,
-    isBidModalOpen,
-    isCreateModalOpen,
-    isEndOfRoundModalDismissed,
-    isHelpModalOpen,
-    isJoinModalOpen,
-    isLobbyShareModalOpen,
-    isShareLinkCopied,
-    lobbyRenameDraft,
-    openCreateModal,
-    openHelpModal,
-    openJoinModal,
-    openLobbyRemovePlayerConfirm,
-    openLobbyRemoveSeatConfirm,
-    openLobbyRenamePlayerModal,
-    openLobbyShareModal,
-    pendingLobbyRemovePlayer,
-    pendingLobbyRemoveSeat,
-    pendingLobbyRenamePlayer,
-    selectedBid,
-    setHelpSection,
-    setIsBidModalOpen,
-    setIsEndOfRoundModalDismissed,
-    setIsShareLinkCopied,
-    setLobbyRenameDraft,
-    setSelectedBid,
-    shareQrCodeDataUrl,
-    setShareQrCodeDataUrl,
-    setShowAwayContinueModal,
-    showAwayContinueModal,
+    awayContinue,
+    bid,
+    endOfRound,
+    help,
+    homeSession,
+    lobbyPlayer,
+    share,
   } = useAppModalState()
 
   const handleJoinGameIdInputChange = (event) => {
@@ -132,12 +101,12 @@ export default function App() {
   }
 
   const handleCloseCreateModal = () => {
-    closeCreateModal()
+    homeSession.closeCreate()
     resetCreateDraft()
   }
 
   const handleCloseJoinModal = () => {
-    closeJoinModal()
+    homeSession.closeJoin()
     resetJoinDraft()
   }
 
@@ -147,12 +116,12 @@ export default function App() {
 
     if (modalType === 'create') {
       resetCreateDraft()
-      openCreateModal()
+      homeSession.openCreate()
       return
     }
 
     resetJoinDraft()
-    openJoinModal()
+    homeSession.openJoin()
   }
 
   const handleRejoinSelectionChange = (event) => {
@@ -187,15 +156,15 @@ export default function App() {
     maxCardsForLobbySeatCount: lobby.maxCardsForLobbySeatCount,
     selectedMaxCards,
     shareLink: lobby.shareLink,
-    isLobbyShareModalOpen,
+    isLobbyShareModalOpen: share.isLobbyOpen,
     reactionCooldownUntil,
-    setIsEndOfRoundModalDismissed,
-    setIsBidModalOpen,
-    openJoinModal,
-    closeJoinModal,
-    setShowAwayContinueModal,
-    setShareQrCodeDataUrl,
-    setIsShareLinkCopied,
+    setIsEndOfRoundModalDismissed: endOfRound.setIsDismissed,
+    setIsBidModalOpen: bid.setIsOpen,
+    openJoinModal: homeSession.openJoin,
+    closeJoinModal: homeSession.closeJoin,
+    setShowAwayContinueModal: awayContinue.setIsOpen,
+    setShareQrCodeDataUrl: share.setQrCodeDataUrl,
+    setIsShareLinkCopied: share.setIsLinkCopied,
   })
 
   const handleOpenNewGame = () => {
@@ -230,15 +199,15 @@ export default function App() {
     appActions,
     currentRoundCardCount: lobby.currentRoundCardCount,
     sortMode,
-    selectedBid,
+    selectedBid: bid.selectedBid,
     isReactionOnCooldown,
     requestActiveStateReview,
     applyRealtimeResult,
     handleRemovedFromGame,
-    closeSubmitBidModal,
-    setSelectedBid,
-    setIsBidModalOpen,
-    setShowAwayContinueModal,
+    closeSubmitBidModal: bid.close,
+    setSelectedBid: bid.setSelectedBid,
+    setIsBidModalOpen: bid.setIsOpen,
+    setShowAwayContinueModal: awayContinue.setIsOpen,
     reactionCooldownTimeoutRef,
   })
 
@@ -256,13 +225,13 @@ export default function App() {
     handleCopyShareLink,
     handleRenamePlayer,
     isRenamingPlayer,
-    isShareLinkCopied,
+    isShareLinkCopied: share.isLinkCopied,
     isStartingGame,
     lobby,
     lobbyInfo,
-    openLobbyRemovePlayerConfirm,
-    openLobbyRemoveSeatConfirm,
-    openLobbyRenamePlayerModal,
+    openLobbyRemovePlayerConfirm: lobbyPlayer.openRemovePlayerConfirm,
+    openLobbyRemoveSeatConfirm: lobbyPlayer.openRemoveSeatConfirm,
+    openLobbyRenamePlayerModal: lobbyPlayer.openRenameModal,
     ownerSession,
     pendingPlayerActionId,
     resetActiveSessionState,
@@ -270,7 +239,7 @@ export default function App() {
     selectedMaxCards,
     setSelectedAiDifficulty,
     setSelectedMaxCards,
-    shareQrCodeDataUrl,
+    shareQrCodeDataUrl: share.qrCodeDataUrl,
   })
 
   const activeGameProps = buildActiveGameProps({
@@ -290,11 +259,11 @@ export default function App() {
     isPlayingCard,
     isReactionOnCooldown,
     isSendingReaction,
-    isShareLinkCopied,
+    isShareLinkCopied: share.isLinkCopied,
     isSortingCards,
     isStartingOver,
     lobby,
-    openHelpModal,
+    openHelpModal: help.open,
     openSubmitBidModal,
     ownerSession,
     pendingPlayerActionId,
@@ -306,12 +275,12 @@ export default function App() {
   })
 
   const modalProps = buildModalProps({
-    closeHelpModal,
-    closeLobbyRemovePlayerConfirm,
-    closeLobbyRemoveSeatConfirm,
-    closeLobbyRenamePlayerModal,
-    closeLobbyShareModal,
-    closeSubmitBidModal,
+    closeHelpModal: help.close,
+    closeLobbyRemovePlayerConfirm: lobbyPlayer.closeRemovePlayerConfirm,
+    closeLobbyRemoveSeatConfirm: lobbyPlayer.closeRemoveSeatConfirm,
+    closeLobbyRenamePlayerModal: lobbyPlayer.closeRenameModal,
+    closeLobbyShareModal: share.closeLobby,
+    closeSubmitBidModal: bid.close,
     createErrors,
     handleCloseCreateModal,
     handleCloseJoinModal,
@@ -323,17 +292,17 @@ export default function App() {
     handleJoinPlayerNameInputChange,
     handleRejoinSelectionChange,
     handleSubmitBid,
-    helpSection,
-    isBidModalOpen,
+    helpSection: help.section,
+    isBidModalOpen: bid.isOpen,
     isContinuingGame,
-    isCreateModalOpen,
+    isCreateModalOpen: homeSession.isCreateOpen,
     isCreatingGame,
-    isEndOfRoundModalDismissed,
-    isHelpModalOpen,
-    isJoinModalOpen,
+    isEndOfRoundModalDismissed: endOfRound.isDismissed,
+    isHelpModalOpen: help.isOpen,
+    isJoinModalOpen: homeSession.isJoinOpen,
     isJoiningGame,
     isLoadingRejoinGames,
-    isLobbyShareModalOpen,
+    isLobbyShareModalOpen: share.isLobbyOpen,
     isRejoiningGame,
     isSubmittingBid,
     joinErrors,
@@ -341,26 +310,26 @@ export default function App() {
     joinMenuCloseRequestKey,
     joinPlayerName,
     lobby,
-    lobbyRenameDraft,
-    openCreateModal,
-    openHelpModal,
-    openJoinModal,
-    openLobbyShareModal,
-    pendingLobbyRemovePlayer,
-    pendingLobbyRemoveSeat,
-    pendingLobbyRenamePlayer,
+    lobbyRenameDraft: lobbyPlayer.renameDraft,
+    openCreateModal: homeSession.openCreate,
+    openHelpModal: help.open,
+    openJoinModal: homeSession.openJoin,
+    openLobbyShareModal: share.openLobby,
+    pendingLobbyRemovePlayer: lobbyPlayer.pendingRemovePlayer,
+    pendingLobbyRemoveSeat: lobbyPlayer.pendingRemoveSeat,
+    pendingLobbyRenamePlayer: lobbyPlayer.pendingRenamePlayer,
     persistedEndOfRoundSummary,
     playerName,
     rejoinableGames,
     resetCreateDraft,
     resetJoinDraft,
-    selectedBid,
+    selectedBid: bid.selectedBid,
     selectedRejoinGameId,
-    setHelpSection,
-    setIsEndOfRoundModalDismissed,
-    setLobbyRenameDraft,
-    setSelectedBid,
-    showAwayContinueModal,
+    setHelpSection: help.setSection,
+    setIsEndOfRoundModalDismissed: endOfRound.setIsDismissed,
+    setLobbyRenameDraft: lobbyPlayer.setRenameDraft,
+    setSelectedBid: bid.setSelectedBid,
+    showAwayContinueModal: awayContinue.isOpen,
   })
 
   return (
