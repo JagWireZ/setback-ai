@@ -13,8 +13,38 @@ export default function App() {
   const { canInstall: canInstallApp, promptToInstall } = usePwaInstall()
   const { appState, appActions } = useAppState()
   const {
+    home,
+    session,
+    game,
+    requests,
+  } = appState
+  const {
     createErrors,
+    joinErrors,
+    joinGameId,
+    joinMenuCloseRequestKey,
+    joinPlayerName,
+    playerName,
+    rejoinableGames,
+    requestError,
+    selectedRejoinGameId,
+    sessionInfo,
+  } = home
+  const {
+    ownerSession,
+    playerSession,
+  } = session
+  const {
     gameError,
+    lobbyInfo,
+    pendingPlayerActionId,
+    persistedEndOfRoundSummary,
+    reactionCooldownUntil,
+    selectedAiDifficulty,
+    selectedMaxCards,
+    sortMode,
+  } = game
+  const {
     isContinuingGame,
     isCreatingGame,
     isDealingCards,
@@ -29,25 +59,7 @@ export default function App() {
     isStartingGame,
     isStartingOver,
     isSubmittingBid,
-    joinErrors,
-    joinGameId,
-    joinMenuCloseRequestKey,
-    joinPlayerName,
-    lobbyInfo,
-    ownerSession,
-    pendingPlayerActionId,
-    persistedEndOfRoundSummary,
-    playerName,
-    playerSession,
-    reactionCooldownUntil,
-    rejoinableGames,
-    requestError,
-    selectedAiDifficulty,
-    selectedMaxCards,
-    selectedRejoinGameId,
-    sessionInfo,
-    sortMode,
-  } = appState
+  } = requests
   const {
     clearHomeRequestState,
     rejoinSelectionChanged,

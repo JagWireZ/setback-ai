@@ -1,54 +1,65 @@
 import { useMemo, useReducer } from 'react'
 
 const INITIAL_APP_STATE = {
-  playerName: '',
-  selectedMaxCards: '10',
-  selectedAiDifficulty: 'medium',
-  joinGameId: '',
-  selectedRejoinGameId: '',
-  joinPlayerName: '',
-  createErrors: {},
-  joinErrors: {},
-  isCreatingGame: false,
-  isJoiningGame: false,
-  isRejoiningGame: false,
-  isLoadingRejoinGames: false,
-  joinMenuCloseRequestKey: 0,
-  requestError: '',
-  sessionInfo: null,
-  rejoinableGames: [],
-  ownerSession: null,
-  playerSession: null,
-  gameError: '',
-  lobbyInfo: '',
-  isStartingGame: false,
-  isDealingCards: false,
-  sortMode: 'bySuit',
-  isSubmittingBid: false,
-  isPlayingCard: false,
-  isSendingReaction: false,
-  isRenamingPlayer: false,
-  isSortingCards: false,
-  isContinuingGame: false,
-  isLeavingGame: false,
-  isStartingOver: false,
-  persistedEndOfRoundSummary: null,
-  pendingPlayerActionId: '',
-  reactionCooldownUntil: 0,
+  home: {
+    playerName: '',
+    joinGameId: '',
+    selectedRejoinGameId: '',
+    joinPlayerName: '',
+    createErrors: {},
+    joinErrors: {},
+    joinMenuCloseRequestKey: 0,
+    requestError: '',
+    sessionInfo: null,
+    rejoinableGames: [],
+  },
+  session: {
+    ownerSession: null,
+    playerSession: null,
+  },
+  game: {
+    selectedMaxCards: '10',
+    selectedAiDifficulty: 'medium',
+    gameError: '',
+    lobbyInfo: '',
+    sortMode: 'bySuit',
+    persistedEndOfRoundSummary: null,
+    pendingPlayerActionId: '',
+    reactionCooldownUntil: 0,
+  },
+  requests: {
+    isCreatingGame: false,
+    isJoiningGame: false,
+    isRejoiningGame: false,
+    isLoadingRejoinGames: false,
+    isStartingGame: false,
+    isDealingCards: false,
+    isSubmittingBid: false,
+    isPlayingCard: false,
+    isSendingReaction: false,
+    isRenamingPlayer: false,
+    isSortingCards: false,
+    isContinuingGame: false,
+    isLeavingGame: false,
+    isStartingOver: false,
+  },
 }
 
 const resolveNextValue = (currentValue, nextValue) =>
   typeof nextValue === 'function' ? nextValue(currentValue) : nextValue
 
-const updateStateField = (state, key, value) => {
-  const nextValue = resolveNextValue(state[key], value)
-  if (Object.is(state[key], nextValue)) {
+const updateStateField = (state, slice, key, value) => {
+  const nextValue = resolveNextValue(state[slice][key], value)
+  if (Object.is(state[slice][key], nextValue)) {
     return state
   }
 
   return {
     ...state,
-    [key]: nextValue,
+    [slice]: {
+      ...state[slice],
+      [key]: nextValue,
+    },
   }
 }
 
@@ -57,252 +68,364 @@ const appStateReducer = (state, action) => {
     case 'create_player_name_changed':
       return {
         ...state,
-        playerName: action.value,
-        createErrors: {
-          ...state.createErrors,
-          playerName: undefined,
+        home: {
+          ...state.home,
+          playerName: action.value,
+          createErrors: {
+            ...state.home.createErrors,
+            playerName: undefined,
+          },
         },
       }
     case 'join_game_id_changed':
       return {
         ...state,
-        joinGameId: action.value,
-        joinErrors: {
-          ...state.joinErrors,
-          gameId: undefined,
+        home: {
+          ...state.home,
+          joinGameId: action.value,
+          joinErrors: {
+            ...state.home.joinErrors,
+            gameId: undefined,
+          },
         },
       }
     case 'join_player_name_changed':
       return {
         ...state,
-        joinPlayerName: action.value,
-        joinErrors: {
-          ...state.joinErrors,
-          playerName: undefined,
+        home: {
+          ...state.home,
+          joinPlayerName: action.value,
+          joinErrors: {
+            ...state.home.joinErrors,
+            playerName: undefined,
+          },
         },
       }
     case 'clear_home_request_state':
       return {
         ...state,
-        requestError: '',
-        sessionInfo: null,
+        home: {
+          ...state.home,
+          requestError: '',
+          sessionInfo: null,
+        },
       }
     case 'reset_create_draft':
       return {
         ...state,
-        playerName: '',
-        createErrors: {},
+        home: {
+          ...state.home,
+          playerName: '',
+          createErrors: {},
+        },
       }
     case 'reset_join_draft':
       return {
         ...state,
-        selectedRejoinGameId: '',
-        joinGameId: '',
-        joinPlayerName: '',
-        joinErrors: {},
+        home: {
+          ...state.home,
+          selectedRejoinGameId: '',
+          joinGameId: '',
+          joinPlayerName: '',
+          joinErrors: {},
+        },
       }
     case 'rejoin_selection_changed': {
       const nextGameId = action.gameId
       const selectedGame = action.selectedGame
 
-      if (nextGameId) {
-        return {
-          ...state,
-          selectedRejoinGameId: nextGameId,
-          joinGameId: nextGameId,
-          joinPlayerName: selectedGame?.playerName ?? '',
-          joinErrors: {
-            ...state.joinErrors,
-            gameId: undefined,
-            playerName: undefined,
-          },
-          joinMenuCloseRequestKey: state.joinMenuCloseRequestKey + 1,
-        }
-      }
-
       return {
         ...state,
-        selectedRejoinGameId: '',
-        joinGameId: '',
-        joinPlayerName: '',
+        home: {
+          ...state.home,
+          selectedRejoinGameId: nextGameId,
+          joinGameId: nextGameId,
+          joinPlayerName: nextGameId ? (selectedGame?.playerName ?? '') : '',
+          joinErrors: nextGameId
+            ? {
+                ...state.home.joinErrors,
+                gameId: undefined,
+                playerName: undefined,
+              }
+            : state.home.joinErrors,
+          joinMenuCloseRequestKey: nextGameId
+            ? state.home.joinMenuCloseRequestKey + 1
+            : state.home.joinMenuCloseRequestKey,
+        },
       }
     }
     case 'create_game_validation_failed':
       return {
         ...state,
-        createErrors: action.errors,
+        home: {
+          ...state.home,
+          createErrors: action.errors,
+        },
       }
     case 'create_game_started':
       return {
         ...state,
-        createErrors: {},
-        requestError: '',
-        isCreatingGame: true,
+        home: {
+          ...state.home,
+          createErrors: {},
+          requestError: '',
+        },
+        requests: {
+          ...state.requests,
+          isCreatingGame: true,
+        },
       }
     case 'create_game_failed':
       return {
         ...state,
-        requestError: action.message,
-        isCreatingGame: false,
+        home: {
+          ...state.home,
+          requestError: action.message,
+        },
+        requests: {
+          ...state.requests,
+          isCreatingGame: false,
+        },
       }
     case 'create_game_succeeded':
       return {
         ...state,
-        isCreatingGame: false,
-        sessionInfo: action.sessionInfo,
-        ownerSession: action.ownerSession,
-        playerSession: null,
-        selectedMaxCards: action.selectedMaxCards,
-        selectedAiDifficulty: action.selectedAiDifficulty,
-        gameError: '',
-        lobbyInfo: '',
-        playerName: '',
-        createErrors: {},
+        home: {
+          ...state.home,
+          playerName: '',
+          createErrors: {},
+          sessionInfo: action.sessionInfo,
+        },
+        session: {
+          ownerSession: action.ownerSession,
+          playerSession: null,
+        },
+        game: {
+          ...state.game,
+          selectedMaxCards: action.selectedMaxCards,
+          selectedAiDifficulty: action.selectedAiDifficulty,
+          gameError: '',
+          lobbyInfo: '',
+        },
+        requests: {
+          ...state.requests,
+          isCreatingGame: false,
+        },
       }
     case 'join_game_validation_failed':
       return {
         ...state,
-        joinErrors: action.errors,
+        home: {
+          ...state.home,
+          joinErrors: action.errors,
+        },
       }
     case 'join_game_started':
       return {
         ...state,
-        joinErrors: {},
-        requestError: '',
-        isJoiningGame: true,
+        home: {
+          ...state.home,
+          joinErrors: {},
+          requestError: '',
+        },
+        requests: {
+          ...state.requests,
+          isJoiningGame: true,
+        },
       }
     case 'join_game_failed':
       return {
         ...state,
-        requestError: action.message,
-        isJoiningGame: false,
+        home: {
+          ...state.home,
+          requestError: action.message,
+        },
+        requests: {
+          ...state.requests,
+          isJoiningGame: false,
+        },
       }
     case 'join_game_succeeded':
       return {
         ...state,
-        isJoiningGame: false,
-        sessionInfo: action.sessionInfo,
-        ownerSession: null,
-        playerSession: action.playerSession,
-        gameError: '',
-        lobbyInfo: '',
-        selectedRejoinGameId: '',
-        joinGameId: '',
-        joinPlayerName: '',
-        joinErrors: {},
+        home: {
+          ...state.home,
+          selectedRejoinGameId: '',
+          joinGameId: '',
+          joinPlayerName: '',
+          joinErrors: {},
+          sessionInfo: action.sessionInfo,
+        },
+        session: {
+          ownerSession: null,
+          playerSession: action.playerSession,
+        },
+        game: {
+          ...state.game,
+          gameError: '',
+          lobbyInfo: '',
+        },
+        requests: {
+          ...state.requests,
+          isJoiningGame: false,
+        },
       }
     case 'rejoin_game_started':
       return {
         ...state,
-        requestError: '',
-        isRejoiningGame: true,
+        home: {
+          ...state.home,
+          requestError: '',
+        },
+        requests: {
+          ...state.requests,
+          isRejoiningGame: true,
+        },
       }
     case 'rejoin_game_failed':
       return {
         ...state,
-        requestError: action.message,
-        isRejoiningGame: false,
+        home: {
+          ...state.home,
+          requestError: action.message,
+        },
+        requests: {
+          ...state.requests,
+          isRejoiningGame: false,
+        },
       }
     case 'rejoin_game_succeeded':
       return {
         ...state,
-        isRejoiningGame: false,
-        sessionInfo: action.sessionInfo,
-        ownerSession: action.role === 'owner' ? action.session : null,
-        playerSession: action.role === 'player' ? action.session : null,
-        gameError: '',
-        lobbyInfo: '',
-        selectedRejoinGameId: '',
-        joinGameId: '',
-        joinPlayerName: '',
-        joinErrors: {},
-        selectedMaxCards: action.selectedMaxCards ?? state.selectedMaxCards,
-        selectedAiDifficulty: action.selectedAiDifficulty ?? state.selectedAiDifficulty,
+        home: {
+          ...state.home,
+          selectedRejoinGameId: '',
+          joinGameId: '',
+          joinPlayerName: '',
+          joinErrors: {},
+          sessionInfo: action.sessionInfo,
+        },
+        session: {
+          ownerSession: action.role === 'owner' ? action.session : null,
+          playerSession: action.role === 'player' ? action.session : null,
+        },
+        game: {
+          ...state.game,
+          selectedMaxCards: action.selectedMaxCards ?? state.game.selectedMaxCards,
+          selectedAiDifficulty: action.selectedAiDifficulty ?? state.game.selectedAiDifficulty,
+          gameError: '',
+          lobbyInfo: '',
+        },
+        requests: {
+          ...state.requests,
+          isRejoiningGame: false,
+        },
       }
     case 'rejoinable_games_loading_started':
       return {
         ...state,
-        isLoadingRejoinGames: true,
+        requests: {
+          ...state.requests,
+          isLoadingRejoinGames: true,
+        },
       }
     case 'rejoinable_games_loaded':
       return {
         ...state,
-        rejoinableGames: action.games,
-        selectedRejoinGameId:
-          state.selectedRejoinGameId && action.games.some((entry) => entry.gameId === state.selectedRejoinGameId)
-            ? state.selectedRejoinGameId
-            : '',
-        isLoadingRejoinGames: false,
+        home: {
+          ...state.home,
+          rejoinableGames: action.games,
+          selectedRejoinGameId:
+            state.home.selectedRejoinGameId &&
+            action.games.some((entry) => entry.gameId === state.home.selectedRejoinGameId)
+              ? state.home.selectedRejoinGameId
+              : '',
+        },
+        requests: {
+          ...state.requests,
+          isLoadingRejoinGames: false,
+        },
       }
     case 'session_restore_initialized':
       return {
         ...state,
-        joinGameId: action.gameId,
+        home: {
+          ...state.home,
+          joinGameId: action.gameId,
+        },
       }
     case 'session_restore_succeeded':
       return {
         ...state,
-        ownerSession: action.role === 'owner' ? action.session : null,
-        playerSession: action.role === 'player' ? action.session : null,
-        selectedMaxCards: action.selectedMaxCards ?? state.selectedMaxCards,
-        selectedAiDifficulty: action.selectedAiDifficulty ?? state.selectedAiDifficulty,
+        session: {
+          ownerSession: action.role === 'owner' ? action.session : null,
+          playerSession: action.role === 'player' ? action.session : null,
+        },
+        game: {
+          ...state.game,
+          selectedMaxCards: action.selectedMaxCards ?? state.game.selectedMaxCards,
+          selectedAiDifficulty: action.selectedAiDifficulty ?? state.game.selectedAiDifficulty,
+        },
       }
     case 'session_feedback_cleared':
       return {
         ...state,
-        gameError: '',
-        lobbyInfo: '',
+        game: {
+          ...state.game,
+          gameError: '',
+          lobbyInfo: '',
+        },
       }
     case 'set_create_errors':
-      return updateStateField(state, 'createErrors', action.value)
+      return updateStateField(state, 'home', 'createErrors', action.value)
     case 'set_game_error':
-      return updateStateField(state, 'gameError', action.value)
+      return updateStateField(state, 'game', 'gameError', action.value)
     case 'set_is_continuing_game':
-      return updateStateField(state, 'isContinuingGame', action.value)
+      return updateStateField(state, 'requests', 'isContinuingGame', action.value)
     case 'set_is_dealing_cards':
-      return updateStateField(state, 'isDealingCards', action.value)
+      return updateStateField(state, 'requests', 'isDealingCards', action.value)
     case 'set_is_leaving_game':
-      return updateStateField(state, 'isLeavingGame', action.value)
+      return updateStateField(state, 'requests', 'isLeavingGame', action.value)
     case 'set_is_playing_card':
-      return updateStateField(state, 'isPlayingCard', action.value)
+      return updateStateField(state, 'requests', 'isPlayingCard', action.value)
     case 'set_is_renaming_player':
-      return updateStateField(state, 'isRenamingPlayer', action.value)
+      return updateStateField(state, 'requests', 'isRenamingPlayer', action.value)
     case 'set_is_sending_reaction':
-      return updateStateField(state, 'isSendingReaction', action.value)
+      return updateStateField(state, 'requests', 'isSendingReaction', action.value)
     case 'set_is_sorting_cards':
-      return updateStateField(state, 'isSortingCards', action.value)
+      return updateStateField(state, 'requests', 'isSortingCards', action.value)
     case 'set_is_starting_game':
-      return updateStateField(state, 'isStartingGame', action.value)
+      return updateStateField(state, 'requests', 'isStartingGame', action.value)
     case 'set_is_starting_over':
-      return updateStateField(state, 'isStartingOver', action.value)
+      return updateStateField(state, 'requests', 'isStartingOver', action.value)
     case 'set_is_submitting_bid':
-      return updateStateField(state, 'isSubmittingBid', action.value)
+      return updateStateField(state, 'requests', 'isSubmittingBid', action.value)
     case 'set_join_errors':
-      return updateStateField(state, 'joinErrors', action.value)
+      return updateStateField(state, 'home', 'joinErrors', action.value)
     case 'set_join_menu_close_request_key':
-      return updateStateField(state, 'joinMenuCloseRequestKey', action.value)
+      return updateStateField(state, 'home', 'joinMenuCloseRequestKey', action.value)
     case 'set_lobby_info':
-      return updateStateField(state, 'lobbyInfo', action.value)
+      return updateStateField(state, 'game', 'lobbyInfo', action.value)
     case 'set_owner_session':
-      return updateStateField(state, 'ownerSession', action.value)
+      return updateStateField(state, 'session', 'ownerSession', action.value)
     case 'set_pending_player_action_id':
-      return updateStateField(state, 'pendingPlayerActionId', action.value)
+      return updateStateField(state, 'game', 'pendingPlayerActionId', action.value)
     case 'set_persisted_end_of_round_summary':
-      return updateStateField(state, 'persistedEndOfRoundSummary', action.value)
+      return updateStateField(state, 'game', 'persistedEndOfRoundSummary', action.value)
     case 'set_player_session':
-      return updateStateField(state, 'playerSession', action.value)
+      return updateStateField(state, 'session', 'playerSession', action.value)
     case 'set_reaction_cooldown_until':
-      return updateStateField(state, 'reactionCooldownUntil', action.value)
+      return updateStateField(state, 'game', 'reactionCooldownUntil', action.value)
     case 'set_request_error':
-      return updateStateField(state, 'requestError', action.value)
+      return updateStateField(state, 'home', 'requestError', action.value)
     case 'set_selected_ai_difficulty':
-      return updateStateField(state, 'selectedAiDifficulty', action.value)
+      return updateStateField(state, 'game', 'selectedAiDifficulty', action.value)
     case 'set_selected_max_cards':
-      return updateStateField(state, 'selectedMaxCards', action.value)
+      return updateStateField(state, 'game', 'selectedMaxCards', action.value)
     case 'set_session_info':
-      return updateStateField(state, 'sessionInfo', action.value)
+      return updateStateField(state, 'home', 'sessionInfo', action.value)
     case 'set_sort_mode':
-      return updateStateField(state, 'sortMode', action.value)
+      return updateStateField(state, 'game', 'sortMode', action.value)
     default:
       return state
   }

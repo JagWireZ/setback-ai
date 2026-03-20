@@ -14,7 +14,9 @@ export function useLobbyController({
   appActions,
   applyRealtimeResult,
 }) {
-  const { ownerSession, playerSession, selectedAiDifficulty, selectedMaxCards } = appState
+  const { session, game } = appState
+  const { ownerSession, playerSession } = session
+  const { selectedAiDifficulty, selectedMaxCards } = game
   const {
     setGameError,
     setIsStartingGame,

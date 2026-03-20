@@ -27,14 +27,20 @@ export function useSessionActions({
   applyRealtimeResult,
 }) {
   const {
+    home,
+    session,
+  } = appState
+  const {
     joinGameId,
     joinPlayerName,
-    ownerSession,
     playerName,
-    playerSession,
     rejoinableGames,
     selectedRejoinGameId,
-  } = appState
+  } = home
+  const {
+    ownerSession,
+    playerSession,
+  } = session
   const {
     createGameFailed,
     createGameStarted,

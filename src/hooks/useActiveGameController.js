@@ -35,9 +35,12 @@ export function useActiveGameController({
   reactionCooldownTimeoutRef,
 }) {
   const {
+    session,
+  } = appState
+  const {
     ownerSession,
     playerSession,
-  } = appState
+  } = session
   const {
     setGameError,
     setIsContinuingGame,

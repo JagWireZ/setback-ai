@@ -56,10 +56,16 @@ export const useAppRuntime = ({
   setIsShareLinkCopied,
 }) => {
   const {
+    game,
+    session,
+  } = appState
+  const {
     gameError,
+  } = game
+  const {
     ownerSession,
     playerSession,
-  } = appState
+  } = session
   const {
     rejoinableGamesLoaded,
     rejoinableGamesLoadingStarted,
