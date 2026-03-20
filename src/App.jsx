@@ -1,32 +1,67 @@
-import { useState } from 'react'
 import { AppRoutes } from './components/AppRoutes'
 import { useAppRuntime } from './hooks/useAppRuntime'
 import { useAppModalState } from './hooks/useAppModalState'
 import { useLobbyController } from './hooks/useLobbyController'
 import { useActiveGameController } from './hooks/useActiveGameController'
 import { useSessionActions } from './hooks/useSessionActions'
+import { useAppState } from './hooks/useAppState'
 import { buildTimestampLabel, isStagingBuild } from './config/appConfig'
 import { sanitizePlayerNameInput } from './utils/playerName'
 import { usePwaInstall } from './utils/pwa'
 
 export default function App() {
   const { canInstall: canInstallApp, promptToInstall } = usePwaInstall()
-  const [playerName, setPlayerName] = useState('')
-  const [selectedMaxCards, setSelectedMaxCards] = useState('10')
-  const [selectedAiDifficulty, setSelectedAiDifficulty] = useState('medium')
-  const [joinGameId, setJoinGameId] = useState('')
-  const [selectedRejoinGameId, setSelectedRejoinGameId] = useState('')
-  const [joinPlayerName, setJoinPlayerName] = useState('')
-  const [createErrors, setCreateErrors] = useState({})
-  const [joinErrors, setJoinErrors] = useState({})
-  const [isCreatingGame, setIsCreatingGame] = useState(false)
-  const [isJoiningGame, setIsJoiningGame] = useState(false)
-  const [isRejoiningGame, setIsRejoiningGame] = useState(false)
-  const [isLoadingRejoinGames, setIsLoadingRejoinGames] = useState(false)
-  const [joinMenuCloseRequestKey, setJoinMenuCloseRequestKey] = useState(0)
-  const [requestError, setRequestError] = useState('')
-  const [sessionInfo, setSessionInfo] = useState(null)
-  const [rejoinableGames, setRejoinableGames] = useState([])
+  const { appState, appActions } = useAppState()
+  const {
+    createErrors,
+    gameError,
+    isContinuingGame,
+    isCreatingGame,
+    isDealingCards,
+    isJoiningGame,
+    isLeavingGame,
+    isLoadingRejoinGames,
+    isPlayingCard,
+    isRejoiningGame,
+    isRenamingPlayer,
+    isSendingReaction,
+    isSortingCards,
+    isStartingGame,
+    isStartingOver,
+    isSubmittingBid,
+    joinErrors,
+    joinGameId,
+    joinMenuCloseRequestKey,
+    joinPlayerName,
+    lobbyInfo,
+    ownerSession,
+    pendingPlayerActionId,
+    persistedEndOfRoundSummary,
+    playerName,
+    playerSession,
+    reactionCooldownUntil,
+    rejoinableGames,
+    requestError,
+    selectedAiDifficulty,
+    selectedMaxCards,
+    selectedRejoinGameId,
+    sessionInfo,
+    sortMode,
+  } = appState
+  const {
+    setCreateErrors,
+    setGameError,
+    setJoinErrors,
+    setJoinGameId,
+    setJoinMenuCloseRequestKey,
+    setJoinPlayerName,
+    setPlayerName,
+    setRequestError,
+    setSelectedAiDifficulty,
+    setSelectedMaxCards,
+    setSelectedRejoinGameId,
+    setSessionInfo,
+  } = appActions
   const {
     closeCreateModal,
     closeHelpModal,
@@ -67,25 +102,6 @@ export default function App() {
     setShowAwayContinueModal,
     showAwayContinueModal,
   } = useAppModalState()
-
-  const [ownerSession, setOwnerSession] = useState(null)
-  const [playerSession, setPlayerSession] = useState(null)
-  const [gameError, setGameError] = useState('')
-  const [lobbyInfo, setLobbyInfo] = useState('')
-  const [isStartingGame, setIsStartingGame] = useState(false)
-  const [isDealingCards, setIsDealingCards] = useState(false)
-  const [sortMode, setSortMode] = useState('bySuit')
-  const [isSubmittingBid, setIsSubmittingBid] = useState(false)
-  const [isPlayingCard, setIsPlayingCard] = useState(false)
-  const [isSendingReaction, setIsSendingReaction] = useState(false)
-  const [isRenamingPlayer, setIsRenamingPlayer] = useState(false)
-  const [isSortingCards, setIsSortingCards] = useState(false)
-  const [isContinuingGame, setIsContinuingGame] = useState(false)
-  const [isLeavingGame, setIsLeavingGame] = useState(false)
-  const [isStartingOver, setIsStartingOver] = useState(false)
-  const [persistedEndOfRoundSummary, setPersistedEndOfRoundSummary] = useState(null)
-  const [pendingPlayerActionId, setPendingPlayerActionId] = useState('')
-  const [reactionCooldownUntil, setReactionCooldownUntil] = useState(0)
 
   const handleJoinGameIdInputChange = (event) => {
     setJoinGameId(event.target.value)
@@ -166,14 +182,8 @@ export default function App() {
   }
 
   const lobby = useLobbyController({
-    ownerSession,
-    playerSession,
-    selectedMaxCards,
-    selectedAiDifficulty,
-    setPendingPlayerActionId,
-    setGameError,
-    setLobbyInfo,
-    setIsStartingGame,
+    appState,
+    appActions,
     applyRealtimeResult: (...args) => applyRealtimeResult(...args),
   })
   const {
@@ -185,8 +195,8 @@ export default function App() {
     requestActiveStateReview,
     resetActiveSessionState,
   } = useAppRuntime({
-    ownerSession,
-    playerSession,
+    appState,
+    appActions,
     activeGame: lobby.activeGame,
     activeLobbySession: lobby.activeLobbySession,
     activeSessionKey: lobby.activeSessionKey,
@@ -197,28 +207,13 @@ export default function App() {
     selectedMaxCards,
     shareLink: lobby.shareLink,
     isLobbyShareModalOpen,
-    gameError,
     reactionCooldownUntil,
-    setOwnerSession,
-    setPlayerSession,
-    setGameError,
-    setLobbyInfo,
-    setPersistedEndOfRoundSummary,
     setIsEndOfRoundModalDismissed,
     setIsBidModalOpen,
-    setSessionInfo,
-    setRequestError,
     openJoinModal,
     closeJoinModal,
-    setRejoinableGames,
-    setSelectedRejoinGameId,
-    setIsLoadingRejoinGames,
-    setJoinGameId,
-    setSelectedMaxCards,
-    setSelectedAiDifficulty,
     setShowAwayContinueModal,
     setShareQrCodeDataUrl,
-    setSortMode,
     setIsShareLinkCopied,
   })
 
@@ -231,30 +226,11 @@ export default function App() {
   }
 
   const { handleCreateGame, handleJoinGame, handleRenamePlayer } = useSessionActions({
-    playerName,
-    joinGameId,
-    selectedRejoinGameId,
-    joinPlayerName,
-    rejoinableGames,
-    ownerSession,
-    playerSession,
+    appState,
+    appActions,
     activeLobbyPlayerId: lobby.activeLobbyPlayerId,
     closeCreateModal: handleCloseCreateModal,
     closeJoinModal: handleCloseJoinModal,
-    setCreateErrors,
-    setJoinErrors,
-    setRequestError,
-    setIsCreatingGame,
-    setSessionInfo,
-    setOwnerSession,
-    setSelectedMaxCards,
-    setSelectedAiDifficulty,
-    setPlayerSession,
-    setGameError,
-    setLobbyInfo,
-    setIsJoiningGame,
-    setIsRejoiningGame,
-    setIsRenamingPlayer,
     applyRealtimeResult,
   })
   const {
@@ -269,8 +245,8 @@ export default function App() {
     openSubmitBidModal,
     toggleSortCards,
   } = useActiveGameController({
-    ownerSession,
-    playerSession,
+    appState,
+    appActions,
     currentRoundCardCount: lobby.currentRoundCardCount,
     sortMode,
     selectedBid,
@@ -279,27 +255,10 @@ export default function App() {
     applyRealtimeResult,
     handleRemovedFromGame,
     closeSubmitBidModal,
-    setRequestError,
-    setSessionInfo,
-    setSelectedMaxCards,
-    setSelectedAiDifficulty,
-    setGameError,
-    setLobbyInfo,
-    setIsLeavingGame,
-    setIsStartingOver,
-    setIsDealingCards,
-    setSortMode,
     setSelectedBid,
     setIsBidModalOpen,
-    setIsSubmittingBid,
-    setIsSortingCards,
     setShowAwayContinueModal,
-    setIsContinuingGame,
-    setIsSendingReaction,
-    setReactionCooldownUntil,
     reactionCooldownTimeoutRef,
-    setIsPlayingCard,
-    setPendingPlayerActionId,
   })
 
   const homeProps = {

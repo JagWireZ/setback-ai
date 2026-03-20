@@ -10,16 +10,18 @@ import { AI_DIFFICULTY_OPTIONS, MAX_SEATS } from '../lobby/constants'
 import { useLobbyDerivedState } from './useLobbyDerivedState'
 
 export function useLobbyController({
-  ownerSession,
-  playerSession,
-  selectedMaxCards,
-  selectedAiDifficulty,
-  setPendingPlayerActionId,
-  setGameError,
-  setLobbyInfo,
-  setIsStartingGame,
+  appState,
+  appActions,
   applyRealtimeResult,
 }) {
+  const { ownerSession, playerSession, selectedAiDifficulty, selectedMaxCards } = appState
+  const {
+    setGameError,
+    setIsStartingGame,
+    setLobbyInfo,
+    setPendingPlayerActionId,
+  } = appActions
+
   const lobby = useLobbyDerivedState({
     ownerSession,
     playerSession,

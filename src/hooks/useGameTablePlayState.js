@@ -453,7 +453,7 @@ export function useGameTablePlayState({
       clearTimeout(bookWinnerTimeoutRef.current)
       bookWinnerTimeoutRef.current = null
     }
-  }, [completedTricks.length, game?.id])
+  }, [game?.id])
 
   useEffect(() => {
     const latestTrick = completedTricks[completedTricks.length - 1]

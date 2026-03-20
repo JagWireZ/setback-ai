@@ -35,8 +35,8 @@ import {
 } from '../utils/sessionState'
 
 export const useAppRuntime = ({
-  ownerSession,
-  playerSession,
+  appState,
+  appActions,
   activeGame,
   activeLobbySession,
   activeSessionKey,
@@ -47,30 +47,37 @@ export const useAppRuntime = ({
   selectedMaxCards,
   shareLink,
   isLobbyShareModalOpen,
-  gameError,
   reactionCooldownUntil,
-  setOwnerSession,
-  setPlayerSession,
-  setGameError,
-  setLobbyInfo,
-  setPersistedEndOfRoundSummary,
   setIsEndOfRoundModalDismissed,
   setIsBidModalOpen,
-  setSessionInfo,
-  setRequestError,
   openJoinModal,
   closeJoinModal,
-  setRejoinableGames,
-  setSelectedRejoinGameId,
-  setIsLoadingRejoinGames,
-  setJoinGameId,
-  setSelectedMaxCards,
-  setSelectedAiDifficulty,
   setShowAwayContinueModal,
   setShareQrCodeDataUrl,
-  setSortMode,
   setIsShareLinkCopied,
 }) => {
+  const {
+    gameError,
+    ownerSession,
+    playerSession,
+  } = appState
+  const {
+    setGameError,
+    setIsLoadingRejoinGames,
+    setJoinGameId,
+    setLobbyInfo,
+    setOwnerSession,
+    setPersistedEndOfRoundSummary,
+    setPlayerSession,
+    setRejoinableGames,
+    setRequestError,
+    setSelectedAiDifficulty,
+    setSelectedMaxCards,
+    setSelectedRejoinGameId,
+    setSessionInfo,
+    setSortMode,
+  } = appActions
+
   const aiPauseUntilRef = useRef(0)
   const awayModalSessionKeyRef = useRef('')
   const wasLocalPlayerAwayRef = useRef(false)

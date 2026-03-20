@@ -20,32 +20,39 @@ import {
 } from '../utils/sessionState'
 
 export function useSessionActions({
-  playerName,
-  joinGameId,
-  selectedRejoinGameId,
-  joinPlayerName,
-  rejoinableGames,
-  ownerSession,
-  playerSession,
+  appState,
+  appActions,
   activeLobbyPlayerId,
   closeCreateModal,
   closeJoinModal,
-  setCreateErrors,
-  setJoinErrors,
-  setRequestError,
-  setIsCreatingGame,
-  setSessionInfo,
-  setOwnerSession,
-  setSelectedMaxCards,
-  setSelectedAiDifficulty,
-  setPlayerSession,
-  setGameError,
-  setLobbyInfo,
-  setIsJoiningGame,
-  setIsRejoiningGame,
-  setIsRenamingPlayer,
   applyRealtimeResult,
 }) {
+  const {
+    joinGameId,
+    joinPlayerName,
+    ownerSession,
+    playerName,
+    playerSession,
+    rejoinableGames,
+    selectedRejoinGameId,
+  } = appState
+  const {
+    setCreateErrors,
+    setGameError,
+    setIsCreatingGame,
+    setIsJoiningGame,
+    setIsRejoiningGame,
+    setIsRenamingPlayer,
+    setJoinErrors,
+    setLobbyInfo,
+    setOwnerSession,
+    setPlayerSession,
+    setRequestError,
+    setSelectedAiDifficulty,
+    setSelectedMaxCards,
+    setSessionInfo,
+  } = appActions
+
   const handleCreateGame = async (event) => {
     event.preventDefault()
     const errors = {}

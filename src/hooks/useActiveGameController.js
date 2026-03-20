@@ -19,8 +19,8 @@ import {
 } from '../utils/sessionState'
 
 export function useActiveGameController({
-  ownerSession,
-  playerSession,
+  appState,
+  appActions,
   currentRoundCardCount,
   sortMode,
   selectedBid,
@@ -29,28 +29,35 @@ export function useActiveGameController({
   applyRealtimeResult,
   handleRemovedFromGame,
   closeSubmitBidModal,
-  setRequestError,
-  setSessionInfo,
-  setSelectedMaxCards,
-  setSelectedAiDifficulty,
-  setGameError,
-  setLobbyInfo,
-  setIsLeavingGame,
-  setIsStartingOver,
-  setIsDealingCards,
-  setSortMode,
   setSelectedBid,
   setIsBidModalOpen,
-  setIsSubmittingBid,
-  setIsSortingCards,
   setShowAwayContinueModal,
-  setIsContinuingGame,
-  setIsSendingReaction,
-  setReactionCooldownUntil,
   reactionCooldownTimeoutRef,
-  setIsPlayingCard,
-  setPendingPlayerActionId,
 }) {
+  const {
+    ownerSession,
+    playerSession,
+  } = appState
+  const {
+    setGameError,
+    setIsContinuingGame,
+    setIsDealingCards,
+    setIsLeavingGame,
+    setIsPlayingCard,
+    setIsSendingReaction,
+    setIsSortingCards,
+    setIsStartingOver,
+    setIsSubmittingBid,
+    setLobbyInfo,
+    setPendingPlayerActionId,
+    setReactionCooldownUntil,
+    setRequestError,
+    setSelectedAiDifficulty,
+    setSelectedMaxCards,
+    setSessionInfo,
+    setSortMode,
+  } = appActions
+
   const handleCoverAwayPlayerTurn = async (playerId) => {
     if (!ownerSession?.gameId || !ownerSession?.playerToken) {
       return false
