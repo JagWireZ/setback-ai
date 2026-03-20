@@ -15,8 +15,9 @@ import {
   hashString,
 } from '../utils/gameUi'
 import { useGameTablePlayState } from '../hooks/useGameTablePlayState'
+import { useGameTableModalState } from '../hooks/useGameTableModalState'
 import { useGameTableState } from '../hooks/useGameTableState'
-import { MAX_PLAYER_NAME_LENGTH, sanitizePlayerNameInput, truncateLabel, validatePlayerName } from '../utils/playerName'
+import { MAX_PLAYER_NAME_LENGTH, sanitizePlayerNameInput, validatePlayerName } from '../utils/playerName'
 import { getPlayerPresence } from '../utils/playerPresence'
 
 const OWNER_IDLE_TURN_TIMEOUT_MS = 60_000
@@ -178,18 +179,8 @@ function GameTablePage({
 
     return books
   }, [game?.phase])
-  const [isScoreModalOpen, setIsScoreModalOpen] = useState(false)
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
-  const [isResetConfirmModalOpen, setIsResetConfirmModalOpen] = useState(false)
-  const [isLeaveConfirmModalOpen, setIsLeaveConfirmModalOpen] = useState(false)
-  const [isEditingPlayerName, setIsEditingPlayerName] = useState(false)
-  const [selectedScorePlayerId, setSelectedScorePlayerId] = useState('')
-  const [pendingRemovePlayer, setPendingRemovePlayer] = useState(null)
-  const [scorePlayerNameDraft, setScorePlayerNameDraft] = useState('')
-  const [editedPlayerName, setEditedPlayerName] = useState('')
   const [nowMs, setNowMs] = useState(() => Date.now())
   const mobileActionBarRef = useRef(null)
-  const hasAutoOpenedGameOverScoreRef = useRef(false)
   const isViewerActualTurn = Boolean(viewerPlayerId && actualTurnPlayerId && viewerPlayerId === actualTurnPlayerId)
   const viewerTurnMessage =
     game.phase?.stage === 'Playing'
@@ -271,10 +262,37 @@ function GameTablePage({
     viewportWidth,
   })
   const currentPlayerName = getPlayerName(game, viewerPlayerId)
-  const selectedScorePlayer =
-    orderedPlayers.find((player) => player.id === selectedScorePlayerId) ??
-    game.players?.find((player) => player.id === selectedScorePlayerId) ??
-    null
+  const {
+    closeRemovePlayerConfirm,
+    closeScorePlayerModal,
+    editedPlayerName,
+    isEditingPlayerName,
+    isHistoryModalOpen,
+    isLeaveConfirmModalOpen,
+    isResetConfirmModalOpen,
+    isScoreModalOpen,
+    openRemovePlayerConfirm,
+    pendingRemovePlayer,
+    scorePlayerNameDraft,
+    selectedScorePlayer,
+    selectedScorePlayerId,
+    setEditedPlayerName,
+    setIsEditingPlayerName,
+    setIsHistoryModalOpen,
+    setIsLeaveConfirmModalOpen,
+    setIsResetConfirmModalOpen,
+    setIsScoreModalOpen,
+    setScorePlayerNameDraft,
+    setSelectedScorePlayerId,
+    shortenedMenuPlayerName,
+  } = useGameTableModalState({
+    bookWinnerMessage,
+    currentPlayerName,
+    gamePlayers: game.players,
+    isGameOver,
+    isMenuModalOpen,
+    orderedPlayers,
+  })
   const totalTrickPlayers = orderedPlayers.length > 0 ? orderedPlayers.length : (game.playerOrder?.length ?? game.players?.length ?? 0)
   const emojiReactionLayouts = useMemo(
     () =>
@@ -430,65 +448,6 @@ function GameTablePage({
       window.clearInterval(intervalId)
     }
   }, [])
-
-  useEffect(() => {
-    if (!isMenuModalOpen) {
-      setIsEditingPlayerName(false)
-      setEditedPlayerName(currentPlayerName)
-      return
-    }
-
-    if (!isEditingPlayerName) {
-      setEditedPlayerName(currentPlayerName)
-    }
-  }, [currentPlayerName, isEditingPlayerName, isMenuModalOpen])
-
-  const shortenedMenuPlayerName = truncateLabel(currentPlayerName, 18)
-
-  useEffect(() => {
-    if (!selectedScorePlayerId) {
-      return
-    }
-
-    if (!selectedScorePlayer) {
-      setSelectedScorePlayerId('')
-      setScorePlayerNameDraft('')
-      return
-    }
-
-    setScorePlayerNameDraft(selectedScorePlayer.name)
-  }, [selectedScorePlayer?.name, selectedScorePlayerId])
-
-  const closeScorePlayerModal = () => {
-    setSelectedScorePlayerId('')
-    setScorePlayerNameDraft('')
-  }
-
-  const openRemovePlayerConfirm = (player) => {
-    if (!player) {
-      return
-    }
-
-    setPendingRemovePlayer({
-      id: player.id,
-      name: player.name,
-    })
-  }
-
-  const closeRemovePlayerConfirm = () => {
-    setPendingRemovePlayer(null)
-  }
-
-  useEffect(() => {
-    if (isGameOver && !bookWinnerMessage && !hasAutoOpenedGameOverScoreRef.current) {
-      setIsScoreModalOpen(true)
-      hasAutoOpenedGameOverScoreRef.current = true
-    }
-
-    if (!isGameOver) {
-      hasAutoOpenedGameOverScoreRef.current = false
-    }
-  }, [bookWinnerMessage, isGameOver])
 
   const availableActions = (() => {
     switch (game.phase?.stage) {
