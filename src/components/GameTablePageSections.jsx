@@ -1,4 +1,4 @@
-import { CardAsset } from './Cards'
+import { CardAsset, CardBack } from './Cards'
 import { ScoreSummary } from './Scoreboard'
 import { REACTION_EMOJIS, getBidDisplay, getCardLabel, getInvalidPlayMessage, getPlayerName } from '../utils/gameUi'
 
@@ -40,6 +40,41 @@ function GameTableReactionOverlay({ emojiReactionLayouts, phraseReactionLayouts,
         </div>
       ))}
     </div>
+  )
+}
+
+function GameTableHeader({ onGoHome, trumpCard }) {
+  return (
+    <article className="shrink-0 px-1 py-3 -translate-y-[15%]">
+      <div className="flex items-center justify-between gap-4 text-sm text-muted">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <button
+            type="button"
+            className="w-fit rounded-md transition hover:scale-[1.02]"
+            onClick={onGoHome}
+            aria-label="Go home"
+          >
+            <img src="/logo-512x512.png" alt="Setback" className="h-20 w-20 shrink-0 rounded-md" />
+          </button>
+        </div>
+        {trumpCard ? (
+          <div className="mt-2 flex shrink-0 items-center gap-2 self-start md:mt-0">
+            <p className="text-sm text-dim">Trump</p>
+            <div className="relative h-[76px] w-[70px] shrink-0 md:h-[84px] md:w-[78px]">
+              <div className="absolute left-0 top-0 h-[76px] w-[54px] md:h-[84px] md:w-[60px]">
+                <CardBack />
+              </div>
+              <div
+                className="absolute top-0 h-[76px] w-[54px] md:h-[84px] md:w-[60px]"
+                style={{ left: '0.75rem' }}
+              >
+                <CardAsset card={trumpCard} showCornerSuit={false} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </article>
   )
 }
 
@@ -493,11 +528,187 @@ function GameTableBiddingPanel({
   )
 }
 
+function GameTableTrickArea({
+  bookWinnerMessage,
+  displayedTrickPlays,
+  game,
+  getPassiveTrickPlayerLabel,
+  handleSelectTrickCard,
+  isGameOver,
+  leadTrickPlayerId,
+  passiveTrickLabelStyles,
+  returningTrickLabel,
+  scatterTrickPositionsByPlayerId,
+  selectedTrickCardIndex,
+  setSelectedTrickCardIndex,
+  trickCardButtonRefs,
+  trickLayout,
+  trickPlayCount,
+  trickSurfaceRef,
+  useScatterTrickLayout,
+}) {
+  return (
+    <article
+      className="flex min-h-0 flex-col p-1"
+      onClick={(event) => {
+        if (selectedTrickCardIndex === null || bookWinnerMessage) {
+          return
+        }
+
+        if (event.target.closest('button')) {
+          return
+        }
+
+        setSelectedTrickCardIndex(null)
+      }}
+    >
+      <div ref={trickSurfaceRef} className="relative flex min-h-[152px] flex-1 overflow-visible">
+        {selectedTrickCardIndex !== null && !useScatterTrickLayout ? (
+          <div className="pointer-events-none absolute inset-0 z-20">
+            {returningTrickLabel ? (
+              <p
+                key={returningTrickLabel.key}
+                className="trick-card-player-label absolute truncate text-left"
+                style={returningTrickLabel.style}
+              >
+                {returningTrickLabel.text}
+              </p>
+            ) : null}
+            {displayedTrickPlays.map((play, index) => {
+              const labelStyle = passiveTrickLabelStyles[index]
+              if (!labelStyle || selectedTrickCardIndex === index) {
+                return null
+              }
+
+              return (
+                <p
+                  key={`passive-trick-label-${play.playerId}-${index}`}
+                  className="trick-card-player-label absolute truncate text-left"
+                  style={labelStyle}
+                >
+                  {getPassiveTrickPlayerLabel(getPlayerName(game, play.playerId), index, displayedTrickPlays.length)}
+                </p>
+              )
+            })}
+          </div>
+        ) : null}
+        <ul
+          className={
+            useScatterTrickLayout
+              ? 'relative min-h-[220px] flex-1 overflow-visible pt-8'
+              : 'flex min-h-[152px] flex-1 items-center justify-center gap-4 overflow-x-auto pt-12 -translate-y-2'
+          }
+        >
+          {displayedTrickPlays.length > 0 ? (
+            displayedTrickPlays.map((play, index) => (
+              <li
+                key={`${play.playerId}-${index}`}
+                className={
+                  useScatterTrickLayout
+                    ? 'absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-sm'
+                    : 'flex w-fit shrink-0 flex-col items-center text-sm'
+                }
+                style={
+                  useScatterTrickLayout
+                    ? {
+                        ...(scatterTrickPositionsByPlayerId.get(play.playerId) ?? {
+                          left: '50%',
+                          top: '48%',
+                        }),
+                        zIndex:
+                          selectedTrickCardIndex === index
+                            ? trickPlayCount + 20
+                            : play.playerId === leadTrickPlayerId
+                              ? trickPlayCount + 10
+                              : index + 1,
+                      }
+                    : {
+                        marginLeft: index === 0 ? '0' : trickLayout.overlapOffset,
+                        zIndex: index + 1,
+                      }
+                }
+              >
+                <button
+                  ref={(node) => {
+                    trickCardButtonRefs.current[index] = node
+                  }}
+                  type="button"
+                  className={`relative shrink-0 overflow-visible rounded-lg bg-transparent p-0 transition-transform duration-150 ${
+                    selectedTrickCardIndex === index
+                      ? useScatterTrickLayout
+                        ? 'z-20 scale-110'
+                        : '-translate-y-4'
+                      : 'translate-y-0'
+                  }`}
+                  onClick={() => handleSelectTrickCard(index)}
+                  aria-label={getPlayerName(game, play.playerId)}
+                >
+                  {selectedTrickCardIndex === null && !useScatterTrickLayout ? (
+                    <p className="trick-card-player-label pointer-events-none absolute bottom-full left-2 mb-1.5 w-12 truncate text-left sm:left-1 sm:w-24">
+                      {getPassiveTrickPlayerLabel(getPlayerName(game, play.playerId), index, displayedTrickPlays.length)}
+                    </p>
+                  ) : null}
+                  <div
+                    className={`aspect-[2.5/3.5] ${trickLayout.useCompactSizing ? '' : 'w-24 sm:w-28'}`}
+                    style={{
+                      ...(trickLayout.useCompactSizing ? { width: trickLayout.cardWidth } : {}),
+                      ...(selectedTrickCardIndex === index
+                        ? { filter: 'drop-shadow(0 0 16px rgba(255,255,255,0.55))' }
+                        : {}),
+                    }}
+                  >
+                    <CardAsset
+                      card={play.card}
+                      showCenterSymbol={!trickLayout.useCompactSizing}
+                      centerSymbolClassName="text-[104%] leading-none sm:text-[132%]"
+                      jokerTextClassName="text-[70%] font-bold tracking-[0.06em]"
+                    />
+                  </div>
+                </button>
+                {useScatterTrickLayout ? (
+                  <div className="pointer-events-none mt-1 flex flex-col items-center">
+                    <p
+                      className={`rounded-full px-2 py-0.5 text-center text-[0.62rem] transition ${
+                        selectedTrickCardIndex === index
+                          ? 'border border-white/30 bg-slate-950/95 text-white shadow-[0_4px_14px_rgba(15,23,42,0.45)]'
+                          : 'border border-white/10 bg-black/35 text-white/70'
+                      }`}
+                    >
+                      <span
+                        className={
+                          selectedTrickCardIndex === index
+                            ? 'block max-w-[8.5rem] whitespace-nowrap text-sm font-medium'
+                            : 'block max-w-[4.75rem] truncate'
+                        }
+                      >
+                        {selectedTrickCardIndex === index
+                          ? getPlayerName(game, play.playerId)
+                          : getPassiveTrickPlayerLabel(getPlayerName(game, play.playerId), index, displayedTrickPlays.length)}
+                      </span>
+                    </p>
+                    {play.playerId === leadTrickPlayerId ? (
+                      <p className="mt-0.5 text-[0.65rem] font-medium tracking-[0.18em] text-dim">LEAD</p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </li>
+            ))
+          ) : (
+            <li className="self-center text-sm text-dim">{isGameOver ? '' : 'No cards played in this trick yet.'}</li>
+          )}
+        </ul>
+      </div>
+    </article>
+  )
+}
+
 export {
   GameTableActionBar,
   GameTableBiddingPanel,
+  GameTableHeader,
   GameTableHand,
   GameTableReactionOverlay,
   GameTableScorePanel,
   GameTableStatusBanner,
+  GameTableTrickArea,
 }
