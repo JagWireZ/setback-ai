@@ -318,6 +318,13 @@ export function useActiveGameController({
       setShowAwayContinueModal(false)
 
       applyRealtimeResult(result, activeRole ?? 'player')
+    } catch (error) {
+      if (isConcurrentUpdateError(error)) {
+        void requestActiveStateReview()
+        return
+      }
+
+      setGameError(toGenericErrorMessage(error, 'Unable to continue game.'))
     } finally {
       setIsContinuingGame(false)
     }

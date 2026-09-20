@@ -47,26 +47,26 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 3 — Frontend test suite build-out
 
-- [ ] Unit test `useActiveGameController`
-- [ ] Unit test `useGameTablePlayState`
-- [ ] Unit test `useGameTableState`
-- [ ] Unit test `useGameTableModalState`
-- [ ] Unit test `useLobbyController`
-- [ ] Unit test `useLobbyDerivedState`
-- [ ] Unit test `useSessionActions`
-- [ ] Unit test `useAppModalState`
-- [ ] Unit test `useAppRuntime`
-- [ ] Unit test `gameSessions.js`
-- [ ] Unit test `gameUi.js`
-- [ ] Unit test `playerPresence.js`
-- [ ] Unit test `reactionPhrases.js`
-- [ ] Unit test `frontendErrors.js`
-- [ ] Component test `GameTablePage`
-- [ ] Component test `AppModals`
-- [ ] Component test `AppScreens`
-- [ ] Component test `Scoreboard`
-- [ ] Component test `Cards`
-- [ ] Fix bugs surfaced by Phase 1 findings, test-first
+- [x] Unit test `useActiveGameController`
+- [x] Unit test `useGameTablePlayState`
+- [x] Unit test `useGameTableState`
+- [x] Unit test `useGameTableModalState`
+- [x] Unit test `useLobbyController`
+- [x] Unit test `useLobbyDerivedState`
+- [x] Unit test `useSessionActions`
+- [x] Unit test `useAppModalState`
+- [x] Unit test `useAppRuntime`
+- [x] Unit test `gameSessions.js`
+- [x] Unit test `gameUi.js`
+- [x] Unit test `playerPresence.js`
+- [x] Unit test `reactionPhrases.js`
+- [x] Unit test `frontendErrors.js`
+- [x] Component test `GameTablePage`
+- [x] Component test `AppModals`
+- [x] Component test `AppScreens`
+- [x] Component test `Scoreboard`
+- [x] Component test `Cards`
+- [x] Fix bugs surfaced by Phase 1 findings, test-first (finding #13: `handleContinueGame` missing error handling — fixed; #14/#22/#23 are lower-severity/architectural and left for a follow-up pass)
 
 ## Phase 4 — Integration tests
 
