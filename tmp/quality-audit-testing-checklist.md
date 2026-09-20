@@ -70,10 +70,10 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 4 — Integration tests
 
-- [ ] Build in-process harness driving backend engine through full WebSocket handler contract
-- [ ] Test full game flow: create → join → deal → bid → play tricks → score → complete
-- [ ] Add frontend integration test mocking WebSocket boundary (`lambdaClient.js`)
-- [ ] Verify full session flow through React hooks/UI together
+- [x] Build in-process harness driving backend engine through full WebSocket handler contract
+- [x] Test full game flow: create → join → deal → bid → play tricks → score → complete
+- [x] Add frontend integration test mocking WebSocket boundary (`lambdaClient.js`)
+- [x] Verify full session flow through React hooks/UI together
 - [ ] (Stretch) Local harness running real Lambda handler code + `dynamodb-local` for serialization/schema issues
 
 ## Phase 5 — E2E / browser tests
