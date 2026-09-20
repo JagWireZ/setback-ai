@@ -1,0 +1,136 @@
+
+> setback@0.0.0 test:backend:coverage
+> npm --prefix ./backend run test:coverage
+
+
+> setback-ai-backend@1.0.0 test:coverage
+> npm run build && node --test --experimental-test-coverage test/**/*.test.js
+
+
+> setback-ai-backend@1.0.0 build
+> tsc
+
+✔ AI bids zero with no trump cards and no royal cards (4.323001ms)
+✔ AI trips a one-card round with ace of trump (0.929665ms)
+✔ reviewGameState submits consecutive AI bids until a human turn is reached (0.780064ms)
+✔ hard AI leads an off-suit ace before a low-trump bleed when big joker is unavailable (4.302817ms)
+✔ hard AI spends big joker over a little joker from another player (1.012777ms)
+✔ hard AI takes a guaranteed trick with the lowest winning non-trump card (0.337197ms)
+✔ reviewGameState plays through consecutive AI turns until a human turn is reached (0.647085ms)
+✔ createGame assigns bot names from the curated pool (11.070493ms)
+✔ removePlayer replaces a human with an available curated bot name (0.739695ms)
+✔ removePlayer allows the converted AI to act immediately when it is their turn (2.22621ms)
+✔ coverAwayPlayerTurn plays one legal move for an away human on their turn (3.63911ms)
+✔ coverAwayPlayerTurn rejects covering a player who is not away (0.791937ms)
+✔ coverAwayPlayerTurn covers an idle player on their turn and marks them away (0.527166ms)
+✔ buildExpiresAt sets expiration 3 days in the future (1.240741ms)
+✔ isExpired returns true only when expiration time has passed (0.245773ms)
+✔ generateGameId returns '<adjective>-<animal>' (1.5815ms)
+✔ generateGameId consistently returns valid format (5.250292ms)
+✔ generatePlayerId returns first 8 UUID characters (10.748732ms)
+✔ generatePlayerId consistently returns valid 8-char ids (8.984387ms)
+✔ generatePlayerToken returns full UUID (0.396562ms)
+✔ generatePlayerToken consistently returns valid UUIDs (1.525695ms)
+✔ normalizeGameId lowercases and trims mixed-case IDs (1.103013ms)
+✔ playCard rejects a non-lead-suit card when the player can follow suit (2.082545ms)
+✔ playCard rejects leading with trump before trump is broken when the player has a non-trump card (0.584157ms)
+✔ hasRainbow only succeeds in four-card rounds covering all suits (1.424774ms)
+✔ applyRainbowPreviewToScores awards rainbow bonus before bidding (1.941255ms)
+✔ scoreRound replaces the previewed rainbow round instead of double-counting it (0.841804ms)
+✔ renamePlayer updates only the authenticated player's name (4.824047ms)
+✔ renamePlayer rejects blank names (0.750381ms)
+✔ renamePlayer allows the owner to rename another player (0.378753ms)
+✔ renamePlayer rejects non-owner attempts to rename another player (0.261209ms)
+✔ addSeat appends a new AI seat with token, score, and turn order entry (6.906592ms)
+✔ addSeat rejects growing beyond eight seats (0.727822ms)
+✔ removeSeat deletes an AI seat from all seat-indexed collections (2.90179ms)
+✔ removeSeat rejects removing a human-controlled seat (0.433368ms)
+✔ removeSeat rejects shrinking below two seats (0.287329ms)
+✔ joinGame fills any available AI seat even when the game has more than five seats (0.419121ms)
+✔ sendReaction records the authenticated player's emoji reaction (6.303437ms)
+✔ sendReaction records a phrase reaction (0.476112ms)
+✔ sendReaction rejects an invalid player token (0.60078ms)
+✔ sendReaction ignores extra reactions from the same player inside 5 seconds (0.340758ms)
+✔ setPlayerAway marks a non-owner human as disconnected (6.450664ms)
+✔ setPlayerAway rejects marking an AI as away (0.650646ms)
+✔ returns true when a completed trick hands the turn to an AI player (1.39984ms)
+✔ returns false when a completed trick hands the turn to a human player (0.193532ms)
+✔ returns false outside the playing phase (0.153163ms)
+✔ shuffleCards returns a full 54-card deck (0.937976ms)
+✔ shuffleCards returns all standard cards exactly once plus both jokers (4.951089ms)
+✔ startGame applies maxCards and generates rounds when leaving the lobby (1.953127ms)
+✔ startGame rejects maxCards values that exceed the current seat-count limit (0.486798ms)
+✔ startOver resets an in-progress game back to lobby and clears scores (1.846269ms)
+✔ startOver also allows resetting a game that is already in the lobby (0.322949ms)
+✔ checkState advances only one due AI step (4.429859ms)
+ℹ tests 53
+ℹ suites 0
+ℹ pass 53
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 220.084828
+ℹ start of coverage report
+ℹ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ file                                    | line % | branch % | funcs % | uncovered lines
+ℹ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ dist                                    |        |          |         | 
+ℹ  backend                                |        |          |         | 
+ℹ   engine                                |        |          |         | 
+ℹ    ai                                   |        |          |         | 
+ℹ     reviewGameState.js                  |  54.50 |    63.06 |   64.29 | 15-16 21-22 25-26 29-30 50-56 81-86 112-121 127-128 130-131 133-134 154-169 178-179 181-183 187 191-193 197-198 201-202 206-207 210-211 231-232 245-255 264 292-300 304-305 311-312 316 330-331 334-338 370-371 374-377 386-387 395-396 410-419 422-439 442-520 524-525 528-529 532-533 554-555 578-579 584-589 592-632 647-655 657-666 668-696 701-702 711-714 716-722 728-736 762 767-770 772-778 784-785 798
+ℹ    helpers                              |        |          |         | 
+ℹ     generateGameId.js                   | 100.00 |   100.00 |  100.00 | 
+ℹ     generatePlayerId.js                 | 100.00 |   100.00 |  100.00 | 
+ℹ     generatePlayerToken.js              | 100.00 |   100.00 |  100.00 | 
+ℹ     generateRounds.js                   | 100.00 |   100.00 |  100.00 | 
+ℹ     getMaxCardsForSeatCount.js          |  83.33 |    66.67 |  100.00 | 8-9
+ℹ     reducer                             |        |          |         | 
+ℹ      core                               |        |          |         | 
+ℹ       assertNever.js                    |  85.71 |   100.00 |    0.00 | 5
+ℹ      gameId                             |        |          |         | 
+ℹ       normalizeGameId.js                | 100.00 |   100.00 |  100.00 | 
+ℹ      gameState                          |        |          |         | 
+ℹ       advancePhase.js                   |  49.49 |    30.77 |   60.00 | 9-10 34-38 41-56 62-63 66-71 73-78 80-85 87-88 90-92 94 96
+ℹ       rainbow.js                        | 100.00 |    61.90 |  100.00 | 
+ℹ       reactions.js                      | 100.00 |    75.00 |  100.00 | 
+ℹ       scoreRound.js                     |  75.44 |    48.48 |  100.00 | 7-8 20-24 30 34-35 39-40 43-44 48-49 57-60 65-70 80-81
+ℹ       turnTiming.js                     |  64.86 |    72.73 |   87.50 | 11-12 19-26 50-59 64-65 67-68 70-71
+ℹ       withNextVersion.js                | 100.00 |   100.00 |  100.00 | 
+ℹ      player                             |        |          |         | 
+ℹ       buildAiPlayer.js                  | 100.00 |   100.00 |  100.00 | 
+ℹ       buildPlayer.js                    | 100.00 |   100.00 |  100.00 | 
+ℹ       buildPlayerToken.js               | 100.00 |   100.00 |  100.00 | 
+ℹ       buildScore.js                     | 100.00 |   100.00 |  100.00 | 
+ℹ       getBotName.js                     | 100.00 |    75.00 |  100.00 | 
+ℹ       presence.js                       |  80.60 |    72.73 |   75.00 | 24-25 43-44 54-58 62-65
+ℹ      storage                            |        |          |         | 
+ℹ       expiration.js                     |  84.62 |   100.00 |   66.67 | 10-11
+ℹ      validation                         |        |          |         | 
+ℹ       actionContext.js                  |  93.33 |    87.50 |  100.00 | 8-9
+ℹ       requireGame.js                    |  80.00 |    66.67 |  100.00 | 6-7
+ℹ       requireOwnerToken.js              | 100.00 |   100.00 |  100.00 | 
+ℹ     shuffleCards.js                     | 100.00 |   100.00 |  100.00 | 
+ℹ    reducer                              |        |          |         | 
+ℹ     addSeat.js                          |  86.67 |    66.67 |  100.00 | 14-15 17-18
+ℹ     checkState.js                       | 100.00 |    66.67 |  100.00 | 
+ℹ     coverAwayPlayerTurn.js              |  77.36 |    55.56 |  100.00 | 11-12 14-15 18-19 22-23 25-26 46-47
+ℹ     createGame.js                       | 100.00 |   100.00 |  100.00 | 
+ℹ     dealCards.js                        |  14.61 |   100.00 |    0.00 | 10-14 17-87
+ℹ     joinGame.js                         |  88.89 |    77.78 |  100.00 | 10-11 14-15
+ℹ     playCard.js                         |  74.89 |    80.56 |   94.74 | 27-28 49-50 58-59 80-81 90-91 95-96 99-100 102-103 110-111 114-115 135-144 179-204
+ℹ     removePlayer.js                     |  79.17 |    70.59 |  100.00 | 11-12 15-16 19-20 22-23 25-26
+ℹ     removeSeat.js                       |  80.65 |    76.92 |  100.00 | 9-10 12-13 16-17
+ℹ     renamePlayer.js                     |  93.33 |    92.31 |  100.00 | 15-16
+ℹ     sendReaction.js                     | 100.00 |    90.91 |  100.00 | 
+ℹ     setPlayerAway.js                    |  83.33 |    77.78 |  100.00 | 10-11 17-18
+ℹ     startGame.js                        |  92.45 |    55.56 |  100.00 | 12-13 25-26
+ℹ     startOver.js                        |  90.91 |    75.00 |  100.00 | 10-11
+ℹ     submitBid.js                        |  64.71 |    46.67 |  100.00 | 11-12 18-19 21-22 24-25 28-29 33-34 37-38 57-66
+ℹ   src                                   |        |          |         | 
+ℹ    shouldRunAiAfterCompletedTrick.js    | 100.00 |   100.00 |  100.00 | 
+ℹ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ all files                               |  72.57 |    69.32 |   81.57 | 
+ℹ ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ end of coverage report

@@ -135,7 +135,7 @@ export function HelpModal({
                   <p className="mt-2">
                     The dealer deals one card at a time to each player until everyone has the correct number of cards
                     for the round. After dealing, the dealer flips a card face-up to set the trump suit for the round.
-                    If the card is a joker, it's placed under the deck and another card is turned over to set the trump
+                    If the card is a joker, it&apos;s placed under the deck and another card is turned over to set the trump
                     suit.
                   </p>
                 </div>

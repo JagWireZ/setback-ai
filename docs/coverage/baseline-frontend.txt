@@ -1,0 +1,43 @@
+
+> setback@0.0.0 test:frontend:coverage
+> node --test --experimental-test-coverage test/**/*.test.js
+
+✔ getActiveSession helpers prefer owner session over player session (4.036859ms)
+✔ getActiveSession helpers fall back to player session and null state (0.284954ms)
+✔ getRestoredPlayerName uses fallback, owner id, and viewer hand lookup (0.358568ms)
+✔ isConcurrentUpdateError detects transaction conflict messages (0.210154ms)
+✔ mergeOwnerSessionResult keeps newer owner session versions only (0.385877ms)
+✔ mergePlayerSessionResult keeps newer player session versions only (0.287329ms)
+✔ build session helpers create stable owner and player session shapes (0.337196ms)
+✔ setSessionForRole routes owner and player sessions to the correct setters (0.384689ms)
+✔ applyResultToSessionRole updates only the targeted session setter (0.369254ms)
+✔ clearTimeoutRef and clearTimeoutRefs null out timer refs (0.372816ms)
+✔ resetRealtimeTrackingState resets all realtime refs (0.265957ms)
+✔ clearActiveSessionState clears timers, resets refs, and clears session UI state (0.561599ms)
+✔ form reset actions clear create and join drafts (2.940971ms)
+✔ rejoin selection updates join form state and close request key (0.276644ms)
+✔ request lifecycle actions toggle request flags and surface errors (0.533102ms)
+✔ session success actions switch cleanly between owner and player sessions (0.320574ms)
+✔ session clearing and feedback clearing reset shared home and game feedback (0.325323ms)
+✔ persisted round summary field updates through the game slice (0.208967ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 130.623273
+ℹ start of coverage report
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ file              | line % | branch % | funcs % | uncovered lines
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ src               |        |          |         | 
+ℹ  hooks            |        |          |         | 
+ℹ   useAppState.js  |  68.69 |    44.78 |   66.67 | 54-55 83-93 95-105 160-166 276-286 288-298 342 352-358 360-371 382 386 388 390 392 394 396 398 400 402 404 406 408 412 414 418 420 422 424 426 428 430 432 437-495
+ℹ  utils            |        |          |         | 
+ℹ   sessionState.js |  94.87 |    78.57 |   95.24 | 55-56 72-73 137-138 144-147
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ all files         |  76.09 |    60.16 |   88.89 | 
+ℹ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ℹ end of coverage report

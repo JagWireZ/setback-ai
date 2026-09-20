@@ -6,7 +6,10 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "npm run build && node --test test/**/*.test.js"
+    "typecheck": "tsc --noEmit",
+    "lint": "cd .. && eslint backend",
+    "test": "npm run build && node --test test/**/*.test.js",
+    "test:coverage": "npm run build && node --test --experimental-test-coverage test/**/*.test.js"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.888.0",
