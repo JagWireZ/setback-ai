@@ -78,11 +78,11 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 5 — E2E / browser tests
 
-- [ ] Introduce Playwright (or equivalent)
-- [ ] E2E: create a game
-- [ ] E2E: second player joins via second browser context
-- [ ] E2E: play a full hand end-to-end
-- [ ] E2E: PWA install-prompt / offline behavior (`src/utils/pwa.js`)
+- [x] Introduce Playwright (or equivalent)
+- [x] E2E: create a game
+- [x] E2E: second player joins via second browser context
+- [x] E2E: play a full hand end-to-end
+- [x] E2E: PWA install-prompt / offline behavior (`src/utils/pwa.js`)
 
 ## Phase 6 — Dev/staging verification pass
 

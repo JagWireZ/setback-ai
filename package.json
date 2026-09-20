@@ -18,6 +18,7 @@
     "typecheck": "npm --prefix ./backend run typecheck",
     "test:backend": "npm --prefix ./backend test",
     "test:backend:coverage": "npm --prefix ./backend run test:coverage",
+    "test:e2e": "npm run build:backend && playwright test",
     "deploy:staging": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
     "deploy:prod": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select prod || tf -chdir=./infrastructure workspace new prod) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
   },
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14.3.1",
     "@vitejs/plugin-react": "^4.3.1",
@@ -53,6 +55,7 @@
     "tsx": "^4.23.15",
     "typescript-eslint": "^8.70.0",
     "vite": "^5.4.11",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "ws": "^8.21.3"
   }
 }
