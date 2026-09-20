@@ -17,19 +17,19 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 1 — Static audit
 
-- [ ] Review backend reducer/engine logic for correctness bugs
-- [ ] Review DynamoDB optimistic versioning (`withNextVersion.ts`) for race conditions
-- [ ] Review scoring edge cases (`scoreRound.ts`, `rainbow.ts`)
-- [ ] Review frontend state-management hooks for bugs (`useAppState`, `useActiveGameController`, reducer slices)
-- [ ] Review `backend/src/handler.ts` for input validation gaps
-- [ ] Review `backend/src/websocket.ts` for input validation gaps
-- [ ] Review auth/token handling (`requireOwnerToken`, `requirePlayerToken`)
-- [ ] Review error handling for internal-detail leaks / crash risk
-- [ ] Security review: Cognito identity pool permissions
-- [ ] Security review: IAM policy scope in `infrastructure/*.tf`
-- [ ] Security review: S3/CloudFront bucket policies
-- [ ] Verify Lambda Function URL is properly IAM-authenticated end-to-end
-- [ ] Write up findings doc (bugs, risks, tech debt) prioritized by severity
+- [x] Review backend reducer/engine logic for correctness bugs
+- [x] Review DynamoDB optimistic versioning (`withNextVersion.ts`) for race conditions
+- [x] Review scoring edge cases (`scoreRound.ts`, `rainbow.ts`)
+- [x] Review frontend state-management hooks for bugs (`useAppState`, `useActiveGameController`, reducer slices)
+- [x] Review `backend/src/handler.ts` for input validation gaps
+- [x] Review `backend/src/websocket.ts` for input validation gaps
+- [x] Review auth/token handling (`requireOwnerToken`, `requirePlayerToken`)
+- [x] Review error handling for internal-detail leaks / crash risk
+- [x] Security review: Cognito identity pool permissions
+- [x] Security review: IAM policy scope in `infrastructure/*.tf`
+- [x] Security review: S3/CloudFront bucket policies
+- [x] Verify Lambda Function URL is properly IAM-authenticated end-to-end
+- [x] Write up findings doc (bugs, risks, tech debt) prioritized by severity
 
 ## Phase 2 — Backend test suite completion
 
