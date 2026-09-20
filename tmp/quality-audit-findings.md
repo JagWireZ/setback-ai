@@ -133,6 +133,22 @@ findings below call out where that coverage does *not* reach (concurrency, `hand
     pending cooldown can carry over into a newly joined game (minor UX only).
 24. `main.tf:109` — `deletion_protection_enabled = false` on the game-state DynamoDB table;
     confirm intentional for the prod workspace, not just staging.
+25. Discovered during Phase 6 staging apply: `terraform plan` is never clean against the live
+    staging state, even immediately after a successful apply — two resources perpetually drift:
+    - `aws_lambda_permission.allow_frontend_invoker_function_url` (`main.tf:394-400`) sets
+      `principal = data.aws_caller_identity.current.account_id` (raw account digits), but AWS
+      normalizes/reads back a full `arn:aws:iam::<id>:root` principal for this permission,
+      so every plan sees a diff and forces a destroy/recreate of the permission on every apply
+      — a live window (however brief) where the frontend's unauth Cognito role can't invoke the
+      backend Function URL.
+    - `aws_apigatewayv2_stage.backend` (`main.tf:276-285`) has no `access_log_settings` block in
+      config, but the live stage has one attached (`.../setback-backend-staging-websocket` log
+      group); apply reports it removed, yet the next plan shows it as drift again — either an
+      out-of-band access log group attachment or an AWS/provider apply bug for this attribute.
+    Neither blocks functionality, but both mean "verify terraform plan shows no drift" can never
+    pass as stated for this workspace without a code fix (e.g. hardcode the root-principal ARN
+    literal instead of the bare account ID; add the `access_log_settings` block to config to
+    match what's actually deployed, or explicitly recreate the API Gateway stage to clear it).
 
 ## Tech debt / code smells
 

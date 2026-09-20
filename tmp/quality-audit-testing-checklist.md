@@ -86,13 +86,21 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 6 — Dev/staging verification pass
 
-- [ ] Deploy to staging via `deploy:staging`
-- [ ] Run E2E suite against staging (real Lambda, DynamoDB, Cognito)
-- [ ] Smoke test: multi-player session over real WebSocket
-- [ ] Smoke test: AI player turns (`runAiTurnsForGame.ts`)
-- [ ] Smoke test: reconnect/away-player handling (`coverAwayPlayerTurn`, `returnFromAway`)
-- [ ] Smoke test: seat management edge cases
-- [ ] Verify `terraform plan` shows no drift for staging
+- [x] Deploy to staging via `deploy:staging`
+- [x] Run E2E suite against staging (real Lambda, DynamoDB, Cognito)
+- [x] Smoke test: multi-player session over real WebSocket (`join-game.spec.js` against
+      staging: two browser contexts, real WebSocket broadcast of lobby state)
+- [x] Smoke test: AI player turns (`runAiTurnsForGame.ts`) (`play-hand.spec.js` against staging:
+      4 AI seats auto-resolve a full hand through the real Lambda)
+- [x] Smoke test: reconnect/away-player handling (`coverAwayPlayerTurn`, `returnFromAway`) — new
+      `e2e/away-reconnect.spec.js` against staging: guest disconnects (WS `$disconnect` marks
+      away), host sees "Away" badge, guest rejoins via "Continue a Saved Game" and away clears
+- [x] Smoke test: seat management edge cases — new `e2e/seat-management.spec.js` against
+      staging: add seat, move player, remove seat, all against real Lambda/DynamoDB
+- [ ] Verify `terraform plan` shows no drift for staging (checked — plan is NOT clean; two
+      persistent drift items found and filed as finding #25 in `quality-audit-findings.md`:
+      `allow_frontend_invoker_function_url` principal normalization forces replace every apply,
+      and `aws_apigatewayv2_stage.backend` access_log_settings won't clear)
 
 ## Phase 7 — Production verification & gate
 

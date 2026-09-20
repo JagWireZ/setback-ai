@@ -19,8 +19,8 @@
     "test:backend": "npm --prefix ./backend test",
     "test:backend:coverage": "npm --prefix ./backend run test:coverage",
     "test:e2e": "npm run build:backend && playwright test",
-    "deploy:staging": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select staging || tf -chdir=./infrastructure workspace new staging) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
-    "deploy:prod": "tf -chdir=./infrastructure init && (tf -chdir=./infrastructure workspace select prod || tf -chdir=./infrastructure workspace new prod) && tf -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
+    "deploy:staging": "tofu -chdir=./infrastructure init && (tofu -chdir=./infrastructure workspace select staging || tofu -chdir=./infrastructure workspace new staging) && tofu -chdir=./infrastructure apply -auto-approve -var=\"env=staging\"",
+    "deploy:prod": "tofu -chdir=./infrastructure init && (tofu -chdir=./infrastructure workspace select prod || tofu -chdir=./infrastructure workspace new prod) && tofu -chdir=./infrastructure apply -auto-approve -var=\"env=prod\""
   },
   "dependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
