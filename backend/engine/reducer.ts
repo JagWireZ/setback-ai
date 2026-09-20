@@ -124,7 +124,7 @@ const PLAYER_ACTION_REDUCERS: Record<
     returnFromAway(currentGame, currentEvent as LambdaEventPayload<"returnFromAway">),
 };
 
-export const engineReducer = (
+export const engineReducer = async (
   game: Game | undefined,
   event: LambdaEventPayload,
 ): Promise<EngineReducerResult> => {

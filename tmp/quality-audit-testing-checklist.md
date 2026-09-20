@@ -42,7 +42,7 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 - [x] Add tests for `backend/src/handler.ts` (route handling, connection lifecycle, error responses)
 - [x] Add tests for `backend/src/websocket.ts`
 - [x] Add tests for `backend/src/validation/lambdaPayload.ts` schema validation
-- [ ] Confirm every file under `backend/engine` has a corresponding test file
+- [x] Confirm every file under `backend/engine` has a corresponding test file
 - [x] Confirm every file under `backend/src` has a corresponding test file
 
 ## Phase 3 — Frontend test suite build-out

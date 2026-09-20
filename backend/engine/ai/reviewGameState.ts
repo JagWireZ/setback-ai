@@ -1019,7 +1019,12 @@ export const reviewGameState = (game: Game): Game => {
   let current = normalizeTurnDueAt(game);
 
   for (let step = 0; step < MAX_REVIEW_STEPS; step += 1) {
-    const updatedGame = advanceDueAutomation(current, Number.POSITIVE_INFINITY) ?? applyAutomationStep(current);
+    const updatedGame =
+      advanceDueAutomation(current, Number.POSITIVE_INFINITY) ??
+      applyAutomationStepForPlayer(
+        current,
+        isTurnPhase(current.phase) ? current.phase.turnPlayerId : undefined,
+      );
     if (!updatedGame) {
       return current;
     }
