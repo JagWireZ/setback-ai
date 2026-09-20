@@ -97,10 +97,12 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
       away), host sees "Away" badge, guest rejoins via "Continue a Saved Game" and away clears
 - [x] Smoke test: seat management edge cases — new `e2e/seat-management.spec.js` against
       staging: add seat, move player, remove seat, all against real Lambda/DynamoDB
-- [ ] Verify `terraform plan` shows no drift for staging (checked — plan is NOT clean; two
-      persistent drift items found and filed as finding #25 in `quality-audit-findings.md`:
-      `allow_frontend_invoker_function_url` principal normalization forces replace every apply,
-      and `aws_apigatewayv2_stage.backend` access_log_settings won't clear)
+- [x] Verify `terraform plan` shows no drift for staging — fixed both items from finding #25:
+      `allow_frontend_invoker_function_url` now uses the normalized root-principal ARN literal,
+      and the WebSocket stage's `access_log_settings` now points at a terraform-managed
+      `aws_cloudwatch_log_group.websocket_access_logs` (the old log group it referenced no
+      longer existed in AWS, which is why the setting could never actually clear). `tofu plan`
+      now reports "No changes. Your infrastructure matches the configuration."
 
 ## Phase 7 — Production verification & gate
 

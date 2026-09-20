@@ -150,6 +150,15 @@ findings below call out where that coverage does *not* reach (concurrency, `hand
     literal instead of the bare account ID; add the `access_log_settings` block to config to
     match what's actually deployed, or explicitly recreate the API Gateway stage to clear it).
 
+    **Fixed** (`main.tf`): the Lambda permission's `principal` now uses the literal
+    `"arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"` instead of the bare
+    account ID, matching what AWS normalizes it to on read. The access-log destination log group
+    (`/aws/apigateway/setback-backend-staging-websocket`) turned out not to exist in AWS at all
+    anymore -- the stage's `access_log_settings` pointed at a deleted log group, which is why
+    `apply` could never actually clear it. Added a terraform-managed
+    `aws_cloudwatch_log_group.websocket_access_logs` and wired the stage's `access_log_settings`
+    to it. `tofu plan` against staging now reports no changes.
+
 ## Tech debt / code smells
 
 - `withNextVersion` naming implies safety it doesn't provide (see finding #1) — either wire it

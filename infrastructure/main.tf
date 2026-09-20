@@ -273,6 +273,11 @@ resource "aws_apigatewayv2_route" "backend_default" {
   target    = "integrations/${aws_apigatewayv2_integration.backend.id}"
 }
 
+resource "aws_cloudwatch_log_group" "websocket_access_logs" {
+  name              = "/aws/apigateway/${local.lambda_function_name}-websocket"
+  retention_in_days = 14
+}
+
 resource "aws_apigatewayv2_stage" "backend" {
   api_id      = aws_apigatewayv2_api.backend.id
   name        = local.env
@@ -281,6 +286,21 @@ resource "aws_apigatewayv2_stage" "backend" {
   default_route_settings {
     throttling_burst_limit = 50
     throttling_rate_limit  = 100
+  }
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.websocket_access_logs.arn
+    format = jsonencode({
+      connectionId       = "$context.connectionId"
+      errorMessage       = "$context.error.message"
+      eventType          = "$context.eventType"
+      integrationError   = "$context.integration.error"
+      integrationLatency = "$context.integrationLatency"
+      integrationStatus  = "$context.integration.status"
+      requestId          = "$context.requestId"
+      routeKey           = "$context.routeKey"
+      status             = "$context.status"
+    })
   }
 }
 
@@ -395,7 +415,7 @@ resource "aws_lambda_permission" "allow_frontend_invoker_function_url" {
   statement_id           = "AllowFrontendInvokerFunctionUrl"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.backend.function_name
-  principal              = data.aws_caller_identity.current.account_id
+  principal              = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
   function_url_auth_type = "AWS_IAM"
 }
 
