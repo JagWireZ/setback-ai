@@ -129,3 +129,147 @@ test("playCard rejects leading with trump before trump is broken when the player
     /cannot lead with trump/i,
   );
 });
+
+test("playCard advances the turn and records the play when the move is legal", () => {
+  const game = createPlayingGame();
+
+  const updated = playCard(game, {
+    action: "playCard",
+    payload: {
+      gameId: "game-1",
+      playerToken: "token-1",
+      card: { rank: "9", suit: "Hearts" },
+    },
+  });
+
+  assert.equal(updated.version, 2);
+  assert.equal(updated.phase.turnPlayerId, "p2");
+  assert.deepEqual(updated.phase.cards.currentTrick.plays, [
+    { playerId: "p1", card: { rank: "9", suit: "Hearts" } },
+  ]);
+  assert.deepEqual(
+    updated.phase.cards.hands.find((hand) => hand.playerId === "p1").cards,
+    [{ rank: "A", suit: "Spades" }],
+  );
+});
+
+test("playCard resolves the trick winner and rotates the lead once all players have played", () => {
+  const game = createPlayingGame({
+    phase: {
+      stage: "Playing",
+      dealerPlayerId: "p2",
+      roundIndex: 0,
+      trickIndex: 0,
+      turnPlayerId: "p1",
+      bids: [
+        { playerId: "p1", amount: 1, trip: false },
+        { playerId: "p2", amount: 0, trip: false },
+      ],
+      cards: {
+        deck: [],
+        trump: { rank: "A", suit: "Spades" },
+        trumpBroken: false,
+        hands: [
+          { playerId: "p1", cards: [{ rank: "9", suit: "Hearts" }] },
+          { playerId: "p2", cards: [{ rank: "K", suit: "Hearts" }] },
+        ],
+        currentTrick: {
+          index: 0,
+          leadPlayerId: "p1",
+          plays: [],
+        },
+        completedTricks: [],
+      },
+    },
+  });
+
+  const afterFirstPlay = playCard(game, {
+    action: "playCard",
+    payload: {
+      gameId: "game-1",
+      playerToken: "token-1",
+      card: { rank: "9", suit: "Hearts" },
+    },
+  });
+
+  const afterTrick = playCard(afterFirstPlay, {
+    action: "playCard",
+    payload: {
+      gameId: "game-1",
+      playerToken: "token-2",
+      card: { rank: "K", suit: "Hearts" },
+    },
+  });
+
+  assert.equal(afterTrick.phase.stage, "EndOfRound");
+  assert.equal(afterTrick.phase.cards.completedTricks.length, 1);
+  assert.equal(afterTrick.phase.cards.completedTricks[0].winnerPlayerId, "p2");
+});
+
+test("playCard rejects playing outside the Playing phase", () => {
+  const game = createPlayingGame({ phase: { stage: "Bidding" } });
+
+  assert.throws(
+    () =>
+      playCard(game, {
+        action: "playCard",
+        payload: {
+          gameId: "game-1",
+          playerToken: "token-1",
+          card: { rank: "9", suit: "Hearts" },
+        },
+      }),
+    /only be played during playing phase/i,
+  );
+});
+
+test("playCard rejects a play when it is not the player's turn", () => {
+  const game = createPlayingGame();
+
+  assert.throws(
+    () =>
+      playCard(game, {
+        action: "playCard",
+        payload: {
+          gameId: "game-1",
+          playerToken: "token-2",
+          card: { rank: "K", suit: "Hearts" },
+        },
+      }),
+    /not this player's turn/i,
+  );
+});
+
+test("playCard rejects a card that is not in the player's hand", () => {
+  const game = createPlayingGame();
+
+  assert.throws(
+    () =>
+      playCard(game, {
+        action: "playCard",
+        payload: {
+          gameId: "game-1",
+          playerToken: "token-1",
+          card: { rank: "K", suit: "Diamonds" },
+        },
+      }),
+    /not found in current player's hand/i,
+  );
+});
+
+test("playCard rejects an invalid or stale player token", () => {
+  const game = createPlayingGame();
+
+  assert.throws(
+    () =>
+      playCard(game, {
+        action: "playCard",
+        payload: {
+          gameId: "game-1",
+          playerToken: "stale-token",
+          card: { rank: "9", suit: "Hearts" },
+        },
+      }),
+    /invalid player token/i,
+  );
+});

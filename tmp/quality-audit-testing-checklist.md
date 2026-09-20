@@ -33,17 +33,17 @@ Derived from `quality-audit-testing-plan.md`. Check items off as completed.
 
 ## Phase 2 — Backend test suite completion
 
-- [ ] Test `addSeat.ts` (happy path + edge cases)
-- [ ] Test `movePlayer.ts` (happy path + edge cases)
-- [ ] Test `joinGame.ts` (happy path + edge cases)
-- [ ] Test `submitBid.ts` (happy path + edge cases)
-- [ ] Test `playCard.ts` (happy path + edge cases)
-- [ ] Test remaining reducer actions for happy path + invalid/edge inputs (wrong turn, stale token, malformed payload)
-- [ ] Add tests for `backend/src/handler.ts` (route handling, connection lifecycle, error responses)
-- [ ] Add tests for `backend/src/websocket.ts`
-- [ ] Add tests for `backend/src/validation/lambdaPayload.ts` schema validation
+- [x] Test `addSeat.ts` (happy path + edge cases)
+- [x] Test `movePlayer.ts` (happy path + edge cases)
+- [x] Test `joinGame.ts` (happy path + edge cases)
+- [x] Test `submitBid.ts` (happy path + edge cases)
+- [x] Test `playCard.ts` (happy path + edge cases)
+- [x] Test remaining reducer actions for happy path + invalid/edge inputs (wrong turn, stale token, malformed payload)
+- [x] Add tests for `backend/src/handler.ts` (route handling, connection lifecycle, error responses)
+- [x] Add tests for `backend/src/websocket.ts`
+- [x] Add tests for `backend/src/validation/lambdaPayload.ts` schema validation
 - [ ] Confirm every file under `backend/engine` has a corresponding test file
-- [ ] Confirm every file under `backend/src` has a corresponding test file
+- [x] Confirm every file under `backend/src` has a corresponding test file
 
 ## Phase 3 — Frontend test suite build-out
 

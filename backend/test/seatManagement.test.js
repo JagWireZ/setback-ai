@@ -149,6 +149,48 @@ test("removeSeat rejects shrinking below two seats", () => {
   );
 });
 
+test("addSeat rejects a game ID mismatch", () => {
+  assert.throws(
+    () =>
+      addSeat(createLobbyGame(), {
+        action: "addSeat",
+        payload: {
+          gameId: "wrong-game",
+        },
+      }),
+    /game id mismatch/i,
+  );
+});
+
+test("addSeat rejects adding seats outside the Lobby phase", () => {
+  assert.throws(
+    () =>
+      addSeat(
+        { ...createLobbyGame(), phase: { stage: "GameOver" } },
+        {
+          action: "addSeat",
+          payload: {
+            gameId: "game-1",
+          },
+        },
+      ),
+    /only be added in the lobby/i,
+  );
+});
+
+test("addSeat throws when the game does not exist", () => {
+  assert.throws(
+    () =>
+      addSeat(undefined, {
+        action: "addSeat",
+        payload: {
+          gameId: "game-1",
+        },
+      }),
+    /game not found/i,
+  );
+});
+
 test("joinGame fills any available AI seat even when the game has more than five seats", () => {
   const updated = joinGame(
     {
@@ -191,4 +233,41 @@ test("joinGame fills any available AI seat even when the game has more than five
   assert.equal(updated.playerToken, "token-6");
   assert.equal(updated.game.players.find((player) => player.id === "p6").type, "human");
   assert.equal(updated.game.players.find((player) => player.id === "p6").name, "Casey");
+});
+
+test("joinGame rejects joining a game with no available AI seats", () => {
+  assert.throws(
+    () =>
+      joinGame(
+        {
+          ...createLobbyGame(),
+          players: [
+            { id: "p1", name: "Owner", type: "human", connected: true },
+            { id: "p2", name: "Robin", type: "human", connected: true },
+          ],
+        },
+        {
+          action: "joinGame",
+          payload: {
+            gameId: "game-1",
+            playerName: "Casey",
+          },
+        },
+      ),
+    /game is full/i,
+  );
+});
+
+test("joinGame rejects a game ID mismatch", () => {
+  assert.throws(
+    () =>
+      joinGame(createLobbyGame(), {
+        action: "joinGame",
+        payload: {
+          gameId: "wrong-game",
+          playerName: "Casey",
+        },
+      }),
+    /game id mismatch/i,
+  );
 });
